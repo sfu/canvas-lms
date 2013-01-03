@@ -16,6 +16,11 @@ set :bundle_dir,    "/opt/ruby-enterprise-1.8.7-2012.02/lib/ruby/gems/1.8"
 set :bundle_without, []
 default_run_options[:pty] = true
 
+if (ENV.has_key?('branch'))
+  set :branch, ENV['branch']
+end
+
+# set gateway
 if (ENV.has_key?('gateway') && ENV['gateway'].downcase == "true")
   set :gateway, "welcome.its.sfu.ca"
 end
