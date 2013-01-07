@@ -1,7 +1,7 @@
 role :app, "canvas.dev"
 role :db, "canvas.dev", :primary => true
 
-set :repository,    "git://github.com/grahamb/canvas-lms.git"
+set :repository,    "git://github.com/USERNAME/canvas-lms.git"
 set :rails_env, "production"
 
 namespace :canvas do
