@@ -147,7 +147,8 @@ module SFU
         sections = sections.compact.uniq
         sections.map! do |section_info|
           # Skip Dx00 section if there are other child sections (except in Fall 2013)
-          next if term.to_i != 1137 && sections.count > 1 && section_info[1].to_s.end_with?('00')
+          # Add Dx00 section if there are no child sections
+          next if (term.to_i != 1137 && sections.count > 1 && section_info[1].to_s.end_with?('00')) || (sections.count == 0)
 
           [section_info[0], course_id, section_info[1], 'active', nil, nil, nil]
         end
