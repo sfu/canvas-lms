@@ -5,6 +5,7 @@ module SFU #:nodoc:
 
         def copyright_urls
           @set.add_route("/sfu/copyright/disclaimer", {:controller => "copyright", :action => "disclaimer"})
+          @set.add_route("/api/v1/sfu/copyright/query/:term", {:controller => "copyright", :action => "query", :format => 'json'})
         end
 
       end
