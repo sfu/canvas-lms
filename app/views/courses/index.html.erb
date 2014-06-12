@@ -20,14 +20,24 @@
 
 <% jammit_css :context_list %>
 
-<% unless @current_enrollments.empty? %>
-  <h2><%= t('headings.my_courses', %{My Courses}) %></h2>
+<!-- SFU MOD: show message if no courses so the page isn't blank -->
+<h2><%= t('headings.my_courses', %{My Courses}) %></h2>
+<% if @current_enrollments.empty? %>
+  <p>
+    <%= t('no_courses_message', <<-BODY)
+      You aren't enrolled in any current courses. Once you've created or
+      signed up for courses, you'll start to see them show up on this page.
+    BODY
+    %>
+  </p>
+<% else %>
   <ul class="unstyled_list context_list current_enrollments">
     <% @current_enrollments.each do |enrollment| %>
       <%= render :partial => "shared/current_enrollment", :object => enrollment %>
     <% end %>
   </ul>
 <% end %>
+<!-- end SFU MOD -->
 
 <% unless @current_user.current_groups.empty? %>
   <h2><%= t('headings.my_groups', %{My Groups}) %></h2>
