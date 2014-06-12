@@ -4671,6 +4671,8 @@ en:
         my_courses: "My Courses"
         my_groups: "My Groups"
         past_enrollments: "Past Enrollments"
+      no_courses_message:  |-
+          You aren't enrolled in any current courses. Once you've created or signed up for courses, you'll start to see them show up on this page.
       start_new_course: "Start a New Course"
       titles: 
         courses: Courses
