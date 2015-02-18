@@ -119,10 +119,7 @@
         $('#' + publishFormId + ' button.btn-publish').on('click', function () {
             return confirmCopyright();
         });
-        // NOTE: This assumes only the Publish the Course button uses a POST form in the Course Wizard.
-        $(document).on('submit', '.CourseWizard__modalOverlay form[method="post"]', function () {
-            return confirmCopyright();
-        });
+
     });
 
     // Add privacy notices
