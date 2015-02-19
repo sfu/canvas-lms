@@ -104,11 +104,23 @@
 
     // END CANVAS-192
 
-    // Add copyright compliance notice
+    /*  Add copyright compliance notice
+        When a course page loads, check to see if the course is unpublished.
+        If so, first immediately disable the publish button to allow time for the bundle to be required async.
+        Then load the CANVAS_ROOT/public/javascripts/sfu-modules/copyright_notice_modal_dialog bundle
+        This bundle handles attaching a click handler to the submit button (and re-enabling it).
+        The click handler renders the SFUCopyrightComplianceNoticeModalDialog react component.
+
+        If the course is published, nothing happens.
+    */
     utils.onPage(/^\/courses\/\d+$/, function() {
-        require(['sfu-modules/copyright_notice_modal_dialog'], function(module) {
-            module.attachClickHandlerTo(location.pathname.replace('/courses/', 'edit_course_'));
-        });
+        var $publishButton = $('.btn-publish')
+        if ($publishButton.length) {
+            $publishButton.attr('disabled', true);
+            require(['sfu-modules/copyright_notice_modal_dialog'], function(module) {
+                module.attachClickHandlerTo(location.pathname.replace('/courses/', 'edit_course_'));
+            });
+        }
     });
 
     // Add privacy notices
