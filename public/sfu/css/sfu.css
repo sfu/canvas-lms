@@ -158,4 +158,14 @@
     font-size: 12px;
     margin-top: 24px;
 }
+.SFUPrivacyNoticeExternalApps i.external-apps-icon-warning {
+    display: inline;
+}
 
+.SFUPrivacyNoticeExternalApps i.external-apps-icon-warning:before {
+    font-size: inherit;
+}
+
+.SFUPrivacyNoticeExternalApps i.external-apps-icon-warning:after {
+    content: "\00a0";
+}
