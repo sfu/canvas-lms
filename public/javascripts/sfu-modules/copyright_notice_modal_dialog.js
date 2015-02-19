@@ -4,12 +4,10 @@ define([
 ], function($, SFUCopyrightComplianceModalDialog) {
 
     var render = function(formId) {
-        var mountElement = document.createElement('div');
-        mountElement.id='sfu_copyright_compliance_notice_modal_veil';
         React.renderComponent(SFUCopyrightComplianceModalDialog({
             modalIsOpen: true,
             formId: formId
-        }), mountElement);
+        }), document.getElementById('wizard_box'));
     };
 
 
