@@ -17,6 +17,7 @@ define([
             ev.preventDefault();
             render(formId);
         });
+        $button.attr('disabled', false);
     };
 
     return {
