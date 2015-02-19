@@ -154,23 +154,6 @@
             'before using External Learning and Collaboration Tools such as Google Docs because they may disclose and ' +
             'store your personal information elsewhere inside and outside Canada.</p>');
     });
-    utils.onPage(/^\/courses\/\d+\/settings/, function () {
-        $('<div class="pia-notice">')
-            .insertBefore('#external_tools')
-            .append('<p><strong>Is your app privacy compliant?</strong> There are <strong>personal legal ' +
-                'consequences</strong> if you use an app that discloses and stores students&rsquo; personal ' +
-                'information elsewhere inside or outside Canada without their consent. Unauthorized disclosure ' +
-                'is a privacy protection offense under BC law. Employees and SFU are liable to investigation and ' +
-                'possible fines. <strong>Before using any app</strong>, carefully review the complete ' +
-                '<a href="http://www.sfu.ca/canvasprivacynotice" target="_blank">Canvas Privacy Protection Notice</a> ' +
-                'to <strong>understand your legal responsibilities</strong> and please contact ' +
-                '<a href="mailto:learntech@sfu.ca">learntech@sfu.ca</a>. The Learning Technology Specialists in the ' +
-                '<strong>Teaching and Learning Centre will help you</strong> complete an app privacy assessment ' +
-                'and, if needed, advise you how to obtain students&rsquo; consent in the manner prescribed by law. ' +
-                'By using apps in your course and the App Centre in Canvas, you acknowledge that you <strong>read ' +
-                'the Privacy Protection Notice</strong> and will <strong>follow the described protection of privacy ' +
-                'requirements and procedure</strong>.</p>');
-    });
 
     // Fixes for Import Content page only
     utils.onPage(/courses\/\d+\/content_migrations/, function() {
