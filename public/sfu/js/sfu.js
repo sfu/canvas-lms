@@ -106,20 +106,9 @@
 
     // Add copyright compliance notice
     utils.onPage(/^\/courses\/\d+$/, function() {
-        // The Publish Course form ID attribute contains the course ID
-        var publishFormId = location.pathname.replace('/courses/', 'edit_course_');
-
-        var confirmCopyright = function () {
-            return confirm("I confirm that the use of copyright protected materials in this course complies with" +
-                "Canada's Copyright Act and SFU Policy R30.04 - Copyright Compliance and Administration.");
-        };
-
-        // Show the notice in a confirmation dialog when the user clicks the Publish button in the sidebar or in the
-        // Setup Checklist (a.k.a. Course Wizard). Abort if user hits Cancel.
-        $('#' + publishFormId + ' button.btn-publish').on('click', function () {
-            return confirmCopyright();
+        require(['sfu-modules/copyright_notice_modal_dialog'], function(module) {
+            module.attachClickHandlerTo(location.pathname.replace('/courses/', 'edit_course_'));
         });
-
     });
 
     // Add privacy notices
