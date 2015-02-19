@@ -7,27 +7,45 @@ define([
 
     var SFUCopyrightComplianceModalDialog = React.createClass({
 
+      propTypes: {
+        modalIsOpen: React.PropTypes.bool
+      },
+
       getInitialState() {
         return {
-          modalIsOpen: true
+          modalIsOpen: this.props.modalIsOpen
         }
       },
 
+      componentWillReceiveProps: function(nextProps) {
+        this.setState({
+          modalIsOpen: nextProps.modalIsOpen
+        });
+      },
+
       openModal(e) {
-        debugger;
         e.preventDefault();
         this.setState({modalIsOpen: true});
       },
 
       closeModal(e) {
-        e.preventDefault();
-        this.setState({modalIsOpen: false});
+        if (e) {
+          e.preventDefault();
+        }
+        this.setState({
+          modalIsOpen: false
+        });
       },
 
       publishCourse(e) {
-        e.preventDefault();
-        this.setState({modalIsOpen: false});
-        document.getElementById(this.props.formId).submit();
+        if (e) {
+          e.preventDefault();
+        }
+        this.setState({
+          modalIsOpen: false
+        }, () => {
+          document.getElementById(this.props.formId).submit();
+        });
       },
 
       render() {
