@@ -168,3 +168,8 @@
 
 .SFUPrivacyNotice .icon-warning:after {
     content: "\00";
+}
+
+.SFUPrivacyNotice.alert {
+    color: #695129;
+}
