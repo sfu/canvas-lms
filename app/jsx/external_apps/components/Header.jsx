@@ -33,7 +33,7 @@ define([
             <p dangerouslySetInnerHTML={{ __html: paragraph }}></p>
           </div>
 
-          <SFUPrivacyNotice usage="external_apps" />
+          <SFUPrivacyNotice alertStyle="alert" usage="external_apps" />
 
         </div>
 

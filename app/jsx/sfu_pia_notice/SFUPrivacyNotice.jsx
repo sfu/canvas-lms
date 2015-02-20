@@ -6,8 +6,9 @@ define([
 
   var SFUGoogleDocsStudentPrivacyNotice = React.createClass({
     render() {
+      var alertClassName = `SFUPrivacyNotice ${this.props.alertStyle}`
       return (
-        <div className="SFUPrivacyNotice alert alert-error">
+        <div className={alertClassName} >
           <h1><i className="icon-warning"></i> Is your Google Docs usage privacy compliant?</h1>
           <p>
             Google Docs is a collaboration tool that allows you to create and share documents with other people. <strong>Before using Google Docs</strong>, carefully review the <a href="http://www.sfu.ca/canvasprivacynotice" target="_blank">Canvas Privacy Protection Notice</a> to <strong>understand the personal privacy implications</strong> for yourself <strong>as well as your responsibilities to other persons</strong> and their information.
@@ -50,11 +51,13 @@ define([
     },
 
     render () {
+      var alertClassName = `SFUPrivacyNotice ${this.props.alertStyle}`
+
       if (this.props.usage === 'google_docs_student') {
-        return <SFUGoogleDocsStudentPrivacyNotice />
+        return <SFUGoogleDocsStudentPrivacyNotice alertStyle={this.props.alertStyle} />
       } else {
         return (
-          <div className="SFUPrivacyNotice alert alert-error">
+          <div className={alertClassName}>
             <h1><i className="icon-warning"></i> Is your {this.getString('h1_usage')} privacy compliant?</h1>
             <p>
               There are <strong> personal legal consequences</strong> if you use an app that discloses and stores students&rsquo; personal information elsewhere inside or outside Canada without their consent. Unauthorized disclosure is a privacy protection offense under BC law. Employees and SFU are liable to investigation and possible fines.
