@@ -123,32 +123,16 @@
         }
     });
 
-    // Add privacy notices
+    /*  Add PIA notice to Google Docs section on /courses/DDDDD/collaborations
+        When the collaboration page loads, load the google_docs_pia_notice bundle
+        In the bundle, check the current user's role within the current course and
+        display the appropriate message.
+    */
     utils.onPage(/^\/courses\/\d+\/collaborations\/?$/, function () {
-        $('<div class="pia-notice">')
-            .appendTo('#google_docs_description td')
-            .append('<p><em>Google Docs notice for instructors</em></p>')
-            .append('<p><strong>Is your use of Google Docs privacy compliant?</strong> There are <strong>personal ' +
-                'legal consequences</strong> if you use an app that discloses and stores students&rsquo; personal ' +
-                'information elsewhere inside or outside Canada without their consent. Unauthorized disclosure is a ' +
-                'privacy protection offense under BC law. Employees and SFU are liable to investigation and possible ' +
-                'fines. <strong>Before using Google Docs</strong>, carefully review the complete ' +
-                '<a href="http://www.sfu.ca/canvasprivacynotice" target="_blank">Canvas Privacy Protection Notice</a> ' +
-                'to <strong>understand your legal responsibilities</strong> and please contact ' +
-                '<a href="mailto:learntech@sfu.ca">learntech@sfu.ca</a>. The Learning Technology Specialists in the ' +
-                '<strong>Teaching and Learning Centre will help you</strong> with the student consent procedure that ' +
-                'you must use. By authorizing your SFU Canvas account to use Google Docs in your course, you ' +
-                'acknowledge that you <strong>read the Privacy Protection Notice</strong> and will <strong>follow the ' +
-                'described protection of privacy requirements and procedure</strong>.</p>')
-            .append('<hr />')
-            .append('<p><em>Google Docs notice for students</em></p>')
-            .append('<p><strong>Is your use of Google Docs privacy compliant?</strong> Google Docs is a collaboration ' +
-                'tool that allows you to create and share documents with other people. <strong>Before using Google ' +
-                'Docs</strong>, carefully review the <a href="http://www.sfu.ca/canvasprivacynotice" target="_blank">' +
-                'Canvas Privacy Protection Notice</a> to <strong>understand the personal privacy implications</strong> ' +
-                'for yourself <strong>as well as your responsibilities to other persons</strong> and their information. ' +
-                'By authorizing your SFU Canvas account to use Google Docs, you acknowledge that you read and are ' +
-                'agreeing to the Privacy Protection Notice.</p>');
+        require(['sfu-modules/google_docs_pia_notice'], function(module) {
+            module.showGoogleDocsWarning();
+        });
+
         $('#right-side-wrapper').find('.rs-margin-all').append('<p>Please read the ' +
             '<a href="http://www.sfu.ca/canvasprivacynotice" target="_blank">Canvas@SFU Privacy Protection Notices</a> ' +
             'before using External Learning and Collaboration Tools such as Google Docs because they may disclose and ' +
