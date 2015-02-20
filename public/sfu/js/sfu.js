@@ -132,11 +132,6 @@
         require(['sfu-modules/google_docs_pia_notice'], function(module) {
             module.showGoogleDocsWarning();
         });
-
-        $('#right-side-wrapper').find('.rs-margin-all').append('<p>Please read the ' +
-            '<a href="http://www.sfu.ca/canvasprivacynotice" target="_blank">Canvas@SFU Privacy Protection Notices</a> ' +
-            'before using External Learning and Collaboration Tools such as Google Docs because they may disclose and ' +
-            'store your personal information elsewhere inside and outside Canada.</p>');
     });
 
     // Fixes for Import Content page only
