@@ -5,8 +5,8 @@ define([
   'i18n!external_tools',
   'react',
   'react-router',
-  /* SFU MOD */ '../../sfu_pia_notice/SFUPrivacyNoticeExternalApps' /* END SFU MOD */
-], function (_, I18n, React, {Link}, SFUPrivacyNoticeExternalApps) {
+  /* SFU MOD */ '../../sfu_pia_notice/SFUPrivacyNotice' /* END SFU MOD */
+], function (_, I18n, React, {Link}, SFUPrivacyNotice) {
 
   return React.createClass({
     displayName: 'Header',
@@ -33,7 +33,7 @@ define([
             <p dangerouslySetInnerHTML={{ __html: paragraph }}></p>
           </div>
 
-          <SFUPrivacyNoticeExternalApps />
+          <SFUPrivacyNotice usage="external_apps" />
 
         </div>
 
