@@ -1,4 +1,11 @@
-/* jshint indent: 4 */
+/*
+    sfu.js
+    SFU-specific client-side modifications for Canvas
+
+    SFU require.js modules are located in $CANVAS_ROOT/public/javascripts/sfu-modules
+
+ */
+
 
 (function($) {
 
