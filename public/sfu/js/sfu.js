@@ -104,7 +104,7 @@
 
     // END CANVAS-192
 
-    /*  Add copyright compliance notice
+    /*  Add copyright compliance notice to the publish course button
         When a course page loads, check to see if the course is unpublished.
         If so, first immediately disable the publish button to allow time for the bundle to be required async.
         Then load the CANVAS_ROOT/public/javascripts/sfu-modules/copyright_notice_modal_dialog bundle
