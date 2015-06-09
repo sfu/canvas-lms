@@ -552,6 +552,17 @@ describe SIS::CSV::EnrollmentImporter do
         )
         expect(@user1.enrollments.first.role).to eq @role
       end
+
+      it "should associate users for custom observer roles" do
+        custom_role('ObserverEnrollment', 'step mom')
+        process_csv_data_cleanly(
+          "course_id,user_id,role,section_id,status,associated_user_id",
+          "TehCourse,user1,step mom,,active,user2"
+        )
+        expect(@user1.observer_enrollments.count).to eq 1
+        e = @user1.observer_enrollments.first
+        expect(e.associated_user_id).to eq @user2.id
+      end
     end
 
     context "in a sub-account" do
@@ -751,4 +762,28 @@ describe SIS::CSV::EnrollmentImporter do
     expect(observer.enrollments.first.workflow_state).to eq 'deleted'
   end
 
+  it "should not create enrollments for deleted users" do
+    process_csv_data_cleanly(
+        "course_id,short_name,long_name,account_id,term_id,status",
+        "test_1,TC 101,Test Course 101,,,active"
+    )
+    process_csv_data_cleanly(
+        "user_id,login_id,first_name,last_name,email,status",
+        "student_user,user1,User,Uno,user@example.com,active"
+    )
+    process_csv_data_cleanly(
+        "user_id,login_id,first_name,last_name,email,status",
+        "student_user,user1,User,Uno,user@example.com,deleted"
+    )
+    importer = process_csv_data(
+        "course_id,user_id,role,section_id,status,associated_user_id",
+        "test_1,student_user,student,,active,",
+    )
+    warnings = importer.warnings.map { |r| r.last }
+    expect(warnings).to eq ["Attempted enrolling of deleted user student_user in course test_1"]
+
+    student = Pseudonym.where(:sis_user_id => "student_user").first.user
+    expect(student.enrollments.count).to eq 1
+    expect(student.enrollments.first).to be_deleted
+  end
 end

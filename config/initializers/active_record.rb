@@ -206,10 +206,10 @@ class ActiveRecord::Base
   def touch_context
     return if (@@skip_touch_context ||= false || @skip_touch_context ||= false)
     if self.respond_to?(:context_type) && self.respond_to?(:context_id) && self.context_type && self.context_id
-      self.context_type.constantize.update_all({ :updated_at => Time.now.utc }, { :id => self.context_id })
+      self.context_type.constantize.update_all({ updated_at: Time.now.utc }, { id: self.context_id })
     end
   rescue
-    ErrorReport.log_exception(:touch_context, $!)
+    Canvas::Errors.capture_exception(:touch_context, $ERROR_INFO)
   end
 
   def touch_user
@@ -225,7 +225,7 @@ class ActiveRecord::Base
     end
     true
   rescue
-    ErrorReport.log_exception(:touch_user, $!)
+    Canvas::Errors.capture_exception(:touch_user, $ERROR_INFO)
     false
   end
 
@@ -241,13 +241,13 @@ class ActiveRecord::Base
     self.set_serialization_options if self.respond_to?(:set_serialization_options)
 
     except = options.delete(:except) || []
-    except = Array(except)
+    except = Array(except).dup
     except.concat(self.class.serialization_excludes) if self.class.respond_to?(:serialization_excludes)
     except.concat(self.serialization_excludes) if self.respond_to?(:serialization_excludes)
     except.uniq!
 
     methods = options.delete(:methods) || []
-    methods = Array(methods)
+    methods = Array(methods).dup
     methods.concat(self.class.serialization_methods) if self.class.respond_to?(:serialization_methods)
     methods.concat(self.serialization_methods) if self.respond_to?(:serialization_methods)
     methods.uniq!
@@ -636,7 +636,7 @@ ActiveRecord::Relation.class_eval do
 
   def find_in_batches_with_usefulness(options = {}, &block)
     # already in a transaction (or transactions don't matter); cursor is fine
-    if (connection.adapter_name == 'PostgreSQL' && (connection.readonly? || connection.open_transactions > (Rails.env.test? ? 1 : 0))) && !options[:start]
+    if can_use_cursor? && !options[:start]
       self.activate { find_in_batches_with_cursor(options, &block) }
     elsif find_in_batches_needs_temp_table?
       raise ArgumentError.new("GROUP and ORDER are incompatible with :start, as is an explicit select without the primary key") if options[:start]
@@ -649,7 +649,14 @@ ActiveRecord::Relation.class_eval do
   end
   alias_method_chain :find_in_batches, :usefulness
 
-  def find_in_batches_with_cursor(options = {}, &block)
+  def can_use_cursor?
+    (connection.adapter_name == 'PostgreSQL' &&
+      (Shackles.environment == :slave ||
+        connection.readonly? ||
+        connection.open_transactions > (Rails.env.test? ? 1 : 0)))
+  end
+
+  def find_in_batches_with_cursor(options = {})
     batch_size = options[:batch_size] || 1000
     klass.transaction do
       begin
@@ -674,10 +681,24 @@ ActiveRecord::Relation.class_eval do
   end
 
   def find_in_batches_with_temp_table(options = {})
+    if options[:pluck]
+      pluck = Array(options[:pluck])
+      pluck_for_select = pluck.map do |column_name|
+        if column_name.is_a?(Symbol) && column_names.include?(column_name.to_s)
+          "#{connection.quote_table_name(table_name)}.#{connection.quote_column_name(column_name)}"
+        else
+          column_name.to_s
+        end
+      end
+    end
     batch_size = options[:batch_size] || 1000
-    sql = to_sql
+    if pluck
+      sql = select(pluck_for_select).to_sql
+    else
+      sql = to_sql
+    end
     table = "#{table_name}_find_in_batches_temp_table_#{sql.hash.abs.to_s(36)}"
-    table = table[-64..-1] if table.length > 64
+    table = table[-63..-1] if table.length > 63
     connection.execute "CREATE TEMPORARY TABLE #{table} AS #{sql}"
     begin
       index = "temp_primary_key"
@@ -685,12 +706,19 @@ ActiveRecord::Relation.class_eval do
         when 'PostgreSQL'
           begin
             old_proc = connection.raw_connection.set_notice_processor {}
-            connection.execute "ALTER TABLE #{table}
-                             ADD temp_primary_key SERIAL PRIMARY KEY"
+            if pluck && pluck.length == 1 && pluck.first.to_s == primary_key.to_s
+              connection.add_index table, primary_key, name: index
+              index = primary_key
+            else
+              pluck.unshift(index) if pluck
+              connection.execute "ALTER TABLE #{table}
+                               ADD temp_primary_key SERIAL PRIMARY KEY"
+            end
           ensure
             connection.raw_connection.set_notice_processor(&old_proc) if old_proc
           end
         when 'MySQL', 'Mysql2'
+          pluck.unshift(index) if pluck
           connection.execute "ALTER TABLE #{table}
                              ADD temp_primary_key MEDIUMINT NOT NULL PRIMARY KEY AUTO_INCREMENT"
         when 'SQLite'
@@ -701,21 +729,30 @@ ActiveRecord::Relation.class_eval do
       end
 
       includes = includes_values
-      sql = "SELECT * FROM #{table} ORDER BY #{index} LIMIT #{batch_size}"
       klass.send(:with_exclusive_scope) do
-        batch = klass.find_by_sql(sql)
+        if pluck
+          batch = klass.from(table).order(index).limit(batch_size).pluck(pluck)
+        else
+          sql = "SELECT * FROM #{table} ORDER BY #{index} LIMIT #{batch_size}"
+          batch = klass.find_by_sql(sql)
+        end
         while !batch.empty?
           ActiveRecord::Associations::Preloader.new(batch, includes).run if includes
           yield batch
           break if batch.size < batch_size
-          last_value = batch.last[index]
 
-          sql = "SELECT *
-             FROM #{table}
-             WHERE #{index} > #{last_value}
-             ORDER BY #{index} ASC
-             LIMIT #{batch_size}"
-          batch = klass.find_by_sql(sql)
+          if pluck
+            last_value = pluck.length == 1 ? batch.last : batch.last[index]
+            batch = klass.from(table).order(index).where("#{index} > ?", last_value).limit(batch_size).pluck(pluck)
+          else
+            last_value = batch.last[index]
+            sql = "SELECT *
+               FROM #{table}
+               WHERE #{index} > #{last_value}
+               ORDER BY #{index} ASC
+               LIMIT #{batch_size}"
+            batch = klass.find_by_sql(sql)
+          end
         end
       end
     ensure
