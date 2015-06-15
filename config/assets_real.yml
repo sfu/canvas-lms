@@ -169,5 +169,8 @@ stylesheets:
   # Client Apps:
   canvas_quizzes:
     - public/stylesheets/compiled/bundles/canvas_quizzes.css
+  canvas_spaces:
+    - public/stylesheets/compiled/bundles/canvas_spaces.css
+
 
   <%= plugin_assets.anchors_yml %>
