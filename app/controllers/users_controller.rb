@@ -147,12 +147,13 @@ require 'atom'
 class UsersController < ApplicationController
   include Delicious
   include SearchHelper
+  include SectionTabHelper
   include I18nUtilities
   include CustomColorHelper
 
   before_filter :require_user, :only => [:grades, :merge, :kaltura_session,
     :ignore_item, :ignore_stream_item, :close_notification, :mark_avatar_image,
-    :user_dashboard, :toggle_dashboard, :masquerade, :external_tool,
+    :user_dashboard, :toggle_recent_activity_dashboard, :masquerade, :external_tool,
     :dashboard_sidebar, :settings, :all_menu_courses]
   before_filter :require_registered_user, :only => [:delete_user_service,
     :create_user_service]
@@ -467,6 +468,7 @@ class UsersController < ApplicationController
   end
 
   def user_dashboard
+    session.delete(:parent_registration) if session[:parent_registration]
     check_incomplete_registration
     get_context
 
@@ -479,7 +481,13 @@ class UsersController < ApplicationController
     end
     disable_page_views if @current_pseudonym && @current_pseudonym.unique_id == "pingdom@instructure.com"
 
-    js_env :DASHBOARD_SIDEBAR_URL => dashboard_sidebar_url
+    js_env({
+      :DASHBOARD_SIDEBAR_URL => dashboard_sidebar_url,
+      :DASHBOARD_COURSES => map_courses_for_menu(@current_user.menu_courses),
+      :PREFERENCES => {
+        :recent_activity_dashboard => @current_user.preferences[:recent_activity_dashboard]
+      }
+    })
 
     @announcements = AccountNotification.for_user_and_account(@current_user, @domain_root_account)
     @pending_invitations = @current_user.cached_current_enrollments(:include_enrollment_uuid => session[:enrollment_uuid], :preload_courses => true).select { |e| e.invited? }
@@ -545,10 +553,11 @@ class UsersController < ApplicationController
     render :layout => false
   end
 
-  def toggle_dashboard
-    @current_user.preferences[:new_dashboard] = !@current_user.preferences[:new_dashboard]
+  def toggle_recent_activity_dashboard
+    @current_user.preferences[:recent_activity_dashboard] =
+      !@current_user.preferences[:recent_activity_dashboard]
     @current_user.save!
-    render :json => {}
+    render json: {}
   end
 
   include Api::V1::StreamItem
@@ -1259,9 +1268,7 @@ class UsersController < ApplicationController
 
     @invalid_observee_creds = nil
     if @user.initial_enrollment_type == 'observer'
-      # TODO: SAML/CAS support
-      if observee_pseudonym = Pseudonym.authenticate(params[:observee] || {},
-          [@domain_root_account.id] + @domain_root_account.trusted_account_ids)
+      if (observee_pseudonym = authenticate_observee)
         @observee = observee_pseudonym.user
       else
         @invalid_observee_creds = Pseudonym.new
@@ -1787,28 +1794,11 @@ class UsersController < ApplicationController
     end
   end
 
-  def require_self_registration
-    get_context
-    @context = @domain_root_account || Account.default unless @context.is_a?(Account)
-    @context = @context.root_account
-    unless @context.grants_right?(@current_user, session, :manage_user_logins) ||
-        @context.self_registration_allowed_for?(params[:user] && params[:user][:initial_enrollment_type])
-      flash[:error] = t('no_self_registration', "Self registration has not been enabled for this account")
-      respond_to do |format|
-        format.html { redirect_to root_url }
-        format.json { render :json => {}, :status => 403 }
-      end
-      return false
-    end
-  end
-
   def all_menu_courses
     render :json => Rails.cache.fetch(['menu_courses', @current_user].cache_key) {
       map_courses_for_menu(@current_user.courses_with_primary_enrollment)
     }
   end
-
-  protected :require_self_registration
 
   def teacher_activity
     @teacher = User.find(params[:user_id])
@@ -1973,5 +1963,29 @@ class UsersController < ApplicationController
 
 
     Canvas::ICU.collate_by(data.values) { |e| e[:enrollment].user.sortable_name }
+  end
+
+  protected
+
+  def require_self_registration
+    get_context
+    @context ||= @domain_root_account || Account.default unless @context.is_a?(Account)
+    @context ||= @context.root_account
+    unless @context.grants_right?(@current_user, session, :manage_user_logins) ||
+        @context.self_registration_allowed_for?(params[:user] && params[:user][:initial_enrollment_type])
+      flash[:error] = t('no_self_registration', "Self registration has not been enabled for this account")
+      respond_to do |format|
+        format.html { redirect_to root_url }
+        format.json { render :json => {}, :status => 403 }
+      end
+      return false
+    end
+  end
+
+  private
+
+  def authenticate_observee
+    Pseudonym.authenticate(params[:observee] || {},
+                           [@domain_root_account.id] + @domain_root_account.trusted_account_ids)
   end
 end

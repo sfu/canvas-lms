@@ -205,7 +205,7 @@ define [
 
     getGradingPeriodToShow: () ->
       currentPeriodId = userSettings.contextGet('gradebook_current_grading_period')
-      if currentPeriodId && @gradingPeriodIsActive(currentPeriodId)
+      if currentPeriodId && (@isAllGradingPeriods(currentPeriodId) || @gradingPeriodIsActive(currentPeriodId))
         currentPeriodId
       else
         ENV.GRADEBOOK_OPTIONS.current_grading_period_id
@@ -225,7 +225,7 @@ define [
         false
 
     onShow: ->
-      $(".post-grades-placeholder").show();
+      $(".post-grades-placeholder").show()
       return if @startedInitializing
       @startedInitializing = true
 
@@ -338,18 +338,29 @@ define [
 
     defaultSortType: 'assignment_group'
 
-    studentsThatCanSeeAssignment: (potential_students, assignment) =>
+    studentsThatCanSeeAssignment: (potential_students, assignment) ->
       if ENV.GRADEBOOK_OPTIONS.differentiated_assignments_enabled
         _.pick potential_students, assignment.assignment_visibility...
       else
         potential_students
 
-    getStoredSortOrder: =>
-      @gradebookColumnOrderSettings || {sortType: @defaultSortType}
+    isInvalidCustomSort: =>
+      sortSettings = @gradebookColumnOrderSettings
+      sortSettings && sortSettings.sortType == 'custom' && sortSettings.customOrder.length == 0
 
-    setStoredSortOrder: (newSortOrder) =>
-      url = ENV.GRADEBOOK_OPTIONS.gradebook_column_order_settings_url
-      $.ajaxJSON(url, 'POST', {column_order: newSortOrder})
+    columnOrderHasNotBeenSaved: =>
+      !@gradebookColumnOrderSettings
+
+    getStoredSortOrder: =>
+      if @isInvalidCustomSort() || @columnOrderHasNotBeenSaved()
+        {sortType: @defaultSortType}
+      else
+        @gradebookColumnOrderSettings
+
+    setStoredSortOrder: (newSortOrder) ->
+      unless @isInvalidCustomSort()
+        url = ENV.GRADEBOOK_OPTIONS.gradebook_column_order_settings_url
+        $.ajaxJSON(url, 'POST', {column_order: newSortOrder})
 
     onColumnsReordered: =>
       # determine if assignment columns or custom columns were reordered
@@ -404,7 +415,7 @@ define [
         else throw "unhandled column sort condition"
       @wrapColumnSortFn(fn)
 
-    compareAssignmentPositions: (a, b) =>
+    compareAssignmentPositions: (a, b) ->
       diffOfAssignmentGroupPosition = a.object.assignment_group.position - b.object.assignment_group.position
       diffOfAssignmentPosition = a.object.position - b.object.position
 
@@ -412,7 +423,7 @@ define [
       # will work when there are less than 1000000 assignments in an assignment_group
       return (diffOfAssignmentGroupPosition * 1000000) + diffOfAssignmentPosition
 
-    compareAssignmentDueDates: (a, b) =>
+    compareAssignmentDueDates: (a, b) ->
       aDate = if a.object.due_at then (+a.object.due_at / 1000) else Number.MAX_VALUE
       bDate = if b.object.due_at then (+b.object.due_at / 1000) else Number.MAX_VALUE
       if aDate is bDate
@@ -439,8 +450,8 @@ define [
         else
           return @compareAssignmentPositions(a, b)
 
-    wrapColumnSortFn: (wrappedFn) =>
-      (a, b) =>
+    wrapColumnSortFn: (wrappedFn) ->
+      (a, b) ->
         return -1 if b.type is 'total_grade'
         return  1 if a.type is 'total_grade'
         return -1 if b.type is 'assignment_group' and a.type isnt 'assignment_group'
@@ -525,7 +536,7 @@ define [
             break
           params =
             student_ids: (student.id for student in students)
-            response_fields: ['id', 'user_id', 'url', 'score', 'grade', 'submission_type', 'submitted_at', 'assignment_id', 'grade_matches_current_submission', 'attachments', 'late', 'workflow_state']
+            response_fields: ['id', 'user_id', 'url', 'score', 'grade', 'submission_type', 'submitted_at', 'assignment_id', 'grade_matches_current_submission', 'attachments', 'late', 'workflow_state', 'excused']
           params['grading_period_id'] = @gradingPeriodToShow if @mgpEnabled && @gradingPeriodToShow && @gradingPeriodToShow != '0' && @gradingPeriodToShow != ''
           $.ajaxJSON(@options.submissions_url, "GET", params, @gotSubmissionsChunk)
           @chunk_start += @options.chunk_size
@@ -611,10 +622,10 @@ define [
           else
             (SubmissionCell[assignment.grading_type] || SubmissionCell).formatter(row, col, submission, assignment, @grid)
 
-    staticCellFormatter: (row, col, val) =>
+    staticCellFormatter: (row, col, val) ->
       "<div class='cell-content gradebook-cell'>#{htmlEscape(val)}</div>"
 
-    uneditableCellFormatter: (row, col) =>
+    uneditableCellFormatter: (row, col) ->
       "<div class='cell-content gradebook-cell grayed-out cannot_edit'></div>"
 
     groupTotalFormatter: (row, col, val, columnDef, student) =>
@@ -638,11 +649,11 @@ define [
         templateOpts.hideTooltip = @weightedGroups() and not @totalGradeWarning
       groupTotalCellTemplate templateOpts
 
-    htmlContentFormatter: (row, col, val, columnDef, student) =>
+    htmlContentFormatter: (row, col, val, columnDef, student) ->
       return '' unless val?
       val
 
-    calculateAndRoundGroupTotalScore: (score, possible_points) =>
+    calculateAndRoundGroupTotalScore: (score, possible_points) ->
       grade = (score / possible_points) * 100
       round(grade, DISPLAY_PRECISION)
 
@@ -660,7 +671,7 @@ define [
         @addDroppedClass(student)
 
     addDroppedClass: (student) ->
-      droppedAssignments = (name for name, assignment of student when name.match(/assignment_\d+/) and assignment.drop?)
+      droppedAssignments = (name for name, assignment of student when name.match(/assignment_\d+/) and (assignment.drop? or assignment.excused))
       drops = {}
       drops[student.row] = {}
       for a in droppedAssignments
@@ -754,7 +765,7 @@ define [
         else if submission.score?
           htmlLines.push submission.score
         # add lines for dropped, late, resubmitted
-        Array::push.apply htmlLines, $.map(SubmissionCell.classesBasedOnSubmission(submission, assignment), (c)=> GRADEBOOK_TRANSLATIONS["#submission_tooltip_#{c}"])
+        Array::push.apply htmlLines, $.map(SubmissionCell.classesBasedOnSubmission(submission, assignment), (c)-> GRADEBOOK_TRANSLATIONS["#submission_tooltip_#{c}"])
       else if assignment.points_possible?
         htmlLines.push htmlEscape(I18n.t('points_out_of', "out of %{points_possible}", points_possible: assignment.points_possible))
 
@@ -900,7 +911,7 @@ define [
         currentGradingPeriod: @gradingPeriodToShow)
       @gradingPeriodMenu.render()
 
-    updateCurrentGradingPeriod: (period) =>
+    updateCurrentGradingPeriod: (period) ->
       userSettings.contextSet 'gradebook_current_grading_period', period
       window.location.reload()
 
@@ -1015,7 +1026,7 @@ define [
           )
       , 2000)
 
-    initPreviousGradebookExportLink: () =>
+    initPreviousGradebookExportLink: () ->
       link = $('#csv_export_options').children('li').last().children()
       link.on 'click', (event) ->
         event.preventDefault()
@@ -1038,7 +1049,7 @@ define [
       , 200)
       loading
 
-    setExportButtonTitle: (updated_title) =>
+    setExportButtonTitle: (updated_title) ->
       $($('#download_csv').children('span').contents()[2]).replaceWith(updated_title)
 
     studentNamesToggle: (e) =>
@@ -1090,7 +1101,7 @@ define [
           delete student.beforeFilteredRow
 
       # put the removed items back in their proper order
-      _.each @userFilterRemovedRows.reverse(), (removedStudentItem) =>
+      _.each @userFilterRemovedRows.reverse(), (removedStudentItem) ->
         data.splice removedStudentItem.index, 0, removedStudentItem.data
       @userFilterRemovedRows = []
 
@@ -1101,7 +1112,7 @@ define [
         index = data.length
         while index--
           student = data[index]
-          matched = _.any propertiesToMatch, (prop) =>
+          matched = _.any propertiesToMatch, (prop) ->
             student[prop]?.match new RegExp term, 'i'
           if not matched
             # remove the student, save the item and its index so we can put it
@@ -1135,7 +1146,7 @@ define [
         showPointsPossible: assignment.points_possible?
 
     customColumnDefinitions: ->
-      @customColumns.map (c) =>
+      @customColumns.map (c) ->
         id: "custom_col_#{c.id}"
         name: htmlEscape c.title
         field: "custom_col_#{c.id}"
@@ -1261,7 +1272,7 @@ define [
 
       totalWidth = testWidth("Total", columnWidths.total.min, columnWidths.total.max)
       if @gradebookColumnSizeSettings && @gradebookColumnSizeSettings['total_grade']
-        totalWidth = @gradebookColumnSizeSettings['total_grade']
+        totalWidth = parseInt(@gradebookColumnSizeSettings['total_grade'])
 
       total_column =
         id: "total_grade"
@@ -1379,7 +1390,7 @@ define [
         @addDroppedClass(student)
       @grid.invalidate()
 
-    localeSort: (a, b) =>
+    localeSort: (a, b) ->
       (a || "").localeCompare b || "",
         window.I18n.locale,
         sensitivity: 'accent', numeric: true
@@ -1520,6 +1531,9 @@ define [
         linkContainer.html(showLink())
       else
         linkContainer.html(hideLink())
+
+    isAllGradingPeriods: (currentPeriodId) ->
+      currentPeriodId == "0"
 
     # this method should be removed after a month in production
     alignCoursePreferencesWithLocalStorage: () ->
