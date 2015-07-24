@@ -165,6 +165,10 @@ class UsersController < ApplicationController
     @user = User.where(id: params[:user_id]).first if params[:user_id].present?
     @user ||= @current_user
     if authorized_action(@user, @current_user, :read)
+      crumb_url = polymorphic_url([@current_user]) if @user.grants_right?(@current_user, session, :view_statistics)
+      add_crumb(@current_user.short_name, crumb_url)
+      add_crumb(t('crumbs.grades', 'Grades'), grades_path)
+
       current_active_enrollments = @user.enrollments.current.includes(:course).shard(@user).to_a
 
       @presenter = GradesPresenter.new(current_active_enrollments)
@@ -1064,12 +1068,12 @@ class UsersController < ApplicationController
     @lti_launch.params = adapter.generate_post_payload
 
     @lti_launch.resource_url = @tool.user_navigation(:url)
-    @lti_launch.link_text = @tool.label_for(:user_navigation)
+    @lti_launch.link_text = @tool.label_for(:user_navigation, I18n.locale)
     @lti_launch.analytics_id = @tool.tool_id
 
     @active_tab = @tool.asset_string
     add_crumb(@current_user.short_name, user_profile_path(@current_user))
-    render ExternalToolsController.display_template('default')
+    render Lti::AppUtil.display_template
   end
 
   def new
@@ -1156,6 +1160,9 @@ class UsersController < ApplicationController
   #   automatically validated and no confirmation email or SMS is sent.
   #   Otherwise, the user must respond to a confirmation message to confirm the
   #   channel.
+  #
+  #   If this is true, it is recommended to set <tt>"pseudonym[send_confirmation]"</tt> to true as well.
+  #   Otherwise, the user will not receive any messages about their account creation.
   #
   # @argument force_validations [Boolean]
   #   If true, validations are performed on the newly created user (and their associated pseudonym)
@@ -1439,7 +1446,9 @@ class UsersController < ApplicationController
   # 'course_42'
   #
   # @argument hexcode [String]
-  #   The hexcode of the color to set for the context.
+  #   The hexcode of the color to set for the context, if you choose to pass the
+  #   hexcode as a query parameter rather than in the request body you should
+  #   NOT include the '#' unless you escape it first.
   #
   # @example_request
   #
@@ -1969,8 +1978,8 @@ class UsersController < ApplicationController
 
   def require_self_registration
     get_context
-    @context ||= @domain_root_account || Account.default unless @context.is_a?(Account)
-    @context ||= @context.root_account
+    @context = @domain_root_account || Account.default unless @context.is_a?(Account)
+    @context = @context.root_account
     unless @context.grants_right?(@current_user, session, :manage_user_logins) ||
         @context.self_registration_allowed_for?(params[:user] && params[:user][:initial_enrollment_type])
       flash[:error] = t('no_self_registration', "Self registration has not been enabled for this account")
