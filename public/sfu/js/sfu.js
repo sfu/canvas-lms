@@ -74,6 +74,12 @@
         $('#header.no-user a[href="/register"]').parent().remove()
     }
 
+    // add Canvas Spaces to nav
+    $(document).ready(function() {
+      if (!ENV.CANVAS_SPACES_ENABLED) { return; }
+      $('#menu').append('<li class="menu-item" id="canvas_spaces_menu_item"><a href="/canvas_spaces" class="menu-item-no-drop">Canvas Spaces</a></li>')
+    });
+
     // hijack Start New Course button (CANVAS-192)
     // first, cache the original event handler and disable it
     function hijackStartNewCourseButton() {
