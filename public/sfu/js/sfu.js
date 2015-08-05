@@ -197,7 +197,6 @@
     });
     // END CANVAS-246
 
-    // CANVAS-252 Manage user profile names
     utils.onPage(/^\/profile\/settings\/?$/, function () {
         $(document).ready(function () {
             var $fieldsToLock = $('.full_name.display_data, .sortable_name.display_data');
@@ -211,10 +210,19 @@
             $helpText.append('<br />Changing this will only affect your display name within Canvas, ' +
                 'and not in other systems (e.g. <a href="https://go.sfu.ca" target="_blank">goSFU</a>, ' +
                 '<a href="https://myinfo.sfu.ca" target="_blank">myInfo</a>, etc.)');
+
+            // CANVAS-259 Hide email subscription checkbox
+            $('#update_profile_form').find('label[for="user_subscribe_to_emails"]').parents('tr').hide();
         });
     });
-    // END CANVAS-252
 
+    // CANVAS-259 Hide email subscription checkbox
+    utils.onPage(/^\/register\/\w+/, function () {
+        $(document).ready(function () {
+            $('#registration_confirmation_form').find('label[for="user_subscribe_to_emails"]').parents('.control-group').hide();
+        });
+    });
+    // END CANVAS-259
 
     // Add "Add People" button to Ad-Hoc Groups
     // We only want to add this button to groups in the ad-hoc group set
