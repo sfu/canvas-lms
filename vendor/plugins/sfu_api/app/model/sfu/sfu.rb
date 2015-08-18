@@ -71,6 +71,27 @@ module SFU
         associated_class
       end
 
+      def sections(course_code, term_code, section)
+        details = info(course_code, term_code)
+        raise "Course info REST API call returned non-array: #{details.inspect}" unless details.is_a?(Array)
+
+        sections = []
+        sections << section.upcase if sections_exists?(details, section)
+
+        if details.present? && is_enrollment_section?(details, section)
+          associated_class = associated_class_for_section(details, section)
+          details.each do |info|
+            class_type = info["course"]["classType"]
+            if class_type.eql?("n") && associated_class == info["course"]["associatedClass"]
+              sections << info["course"]["section"]
+            end
+          end
+        end
+
+        sections
+      end
+
+      # NOTE: This has been superseded by #sections, and may be removed in the future.
       def section_tutorials(course_code, term_code, section)
         details = info(course_code, term_code)
         sections = []
