@@ -221,37 +221,7 @@
     });
     // END CANVAS-252
 
-
-    // Add "Add People" button to Ad-Hoc Groups
-    // We only want to add this button to groups in the ad-hoc group set
-    utils.onPage(/^\/groups\/\d+\/users$/, function() {
-        var groupId = /^\/groups\/(\d+)\/users$/.exec(window.location.pathname)[1];
-        var buttonApiUrl = '/sfu/api/v1/adhoc_group_button/' + groupId;
-
-        $.ajax({
-            url: buttonApiUrl,
-            success: function(html) {
-                $('#right-side div').prepend(html);
-                $('#addUsers').on('click', loadFrame);
-            },
-            error: function() { }
-        });
-
-        var loadFrame = function() {
-            $('#addUsers').attr('disabled', 'true');
-            var token = $('#addUsers').data('token');
-            var iframe = $('<iframe />', {
-                name: 'adhoc_group_users_frame',
-                id:   'adhoc_group_users_frame',
-                src: 'https://canvas-group.sfu.ca/' + groupId + '/users?server=' + window.location.hostname + '&token=' + token,
-                style: 'width:100%;min-height:500px;border:none'
-            });
-            $('#content').empty().append(iframe);
-        };
-
-    });
-
-    // Setup Backbone event handler that will be called when all the content DOM elements 
+    // Setup Backbone event handler that will be called when all the content DOM elements
     // have been rendered. This will activate the accordion and tab components on the page.
     function setupAccordionAndTabActivation() {
         $.subscribe('userContent/change', function () {
@@ -262,7 +232,7 @@
 
     // On course and wiki pages, activate accordion and tab components, if they exist.
     utils.onPage(/^\/(courses|groups)\/\d+\/pages\/[A-Za-z0-9_\-+~<>]+$/, setupAccordionAndTabActivation);
-    
+
     // A page designated as a front page has a different url.
     utils.onPage(/^\/(courses|groups)\/\d+\/wiki$/, setupAccordionAndTabActivation);
 
@@ -280,4 +250,3 @@ if (window.location.hostname && 'canvas.sfu.ca' === window.location.hostname) {
         var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
     })();
 }
-
