@@ -1,7 +1,6 @@
 module SFU
   module Copyright
-    def self.initialize
-      true
+    class Engine < ::Rails::Engine
     end
   end
 end
