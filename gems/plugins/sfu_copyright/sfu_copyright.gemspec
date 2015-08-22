@@ -8,7 +8,7 @@ Gem::Specification.new do |s|
   s.name        = "sfu_copyright"
   s.version     = SFU::Copyright::VERSION
   s.authors     = ["Andrew Leung"]
-  s.email       = ["ahl18@sfu.ca"]
+  s.email       = ["andrewleung@sfu.ca"]
   s.description = "Contains materials related to Copyright Compliance"
   s.summary = "Contains materials related to Copyright Compliance"
 
