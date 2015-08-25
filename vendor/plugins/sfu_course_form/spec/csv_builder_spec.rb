@@ -141,7 +141,7 @@ end
 
 describe 'A multiple calendar courses request' do
 
-  before(:all) do
+  before do
     @courses_csv, @sections_csv, @enrollments_csv = SFU::CourseForm::CSVBuilder.build('kipling', selected_courses, 2, 'kipling', '55599068', nil, nil, false)
     @courses = CSV.parse(@courses_csv, :headers => true)
     @sections = CSV.parse(@sections_csv, :headers => true)
@@ -163,7 +163,7 @@ describe 'A multiple calendar courses request' do
   def verify_sections(expected_count, expected_section_ids, expected_names, expected_course_ids)
     @sections.count.should == expected_count
     @sections.each_with_index do |section, index|
-      section['section_id'].start_with?(expected_section_ids[index]).should be_true
+      section['section_id'].start_with?(expected_section_ids[index]).should == true
       section['name'].should == expected_names[index]
       section['course_id'].should == expected_course_ids[index]
       section['status'].should == 'active'
@@ -305,7 +305,7 @@ describe 'A cross-list course request' do
   def verify_sections(expected_count, expected_section_ids, expected_names, expected_course_id)
     @sections.count.should == expected_count
     @sections.each_with_index do |section, index|
-      section['section_id'].start_with?(expected_section_ids[index]).should be_true
+      section['section_id'].start_with?(expected_section_ids[index]).should == true
       section['name'].should == expected_names[index]
       section['course_id'].should == expected_course_id
       section['status'].should == 'active'
