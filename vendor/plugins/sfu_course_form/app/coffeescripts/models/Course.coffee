@@ -17,12 +17,12 @@ define [
         selected: @selected
         displayName: @displayName()
 
-    addSectionTutorials: (newTutorials) ->
-      # NOTE: does not currently check if course already has section tutorials
-      if newTutorials.length > 0
+    addSections: (newSections) ->
+      # NOTE: does not currently check if course already has sections
+      if newSections.length > 0
         @set
-          sectionTutorials: newTutorials
-          key: "#{@get('key')}:::#{newTutorials.join(',').toLowerCase()}"
+          sections: newSections
+          key: "#{@get('key')}:::#{newSections.join(',').toLowerCase()}"
       this
 
     displayName: -> "#{@get('name')}#{@get('number')} - #{@get('section')} #{@get('title')}"

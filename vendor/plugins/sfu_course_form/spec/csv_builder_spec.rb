@@ -137,6 +137,21 @@ describe 'A courses request' do
     end
   end
 
+  context 'with duplicate sections' do
+    it 'should only result in a course with unique sections' do
+      @courses_csv, @sections_csv, @enrollments_csv = SFU::CourseForm::CSVBuilder.build('kipling', ['1141:::dupe:::101:::d100:::Repeat Me:::d100,d101,d101'], 2, 'kipling', '55599068', nil, nil, false)
+      courses = CSV.parse(@courses_csv, :headers => true)
+      courses.count.should == 1
+      courses[0]['long_name'].should == 'DUPE101 D100 Repeat Me'
+      courses[0]['account_id'].should == '2'
+      courses[0]['term_id'].should == '1141'
+      sections = CSV.parse(@sections_csv, :headers => true)
+      sections.count.should == 2
+      sections[0]['section_id'] == '1141-dupe-101-d100'
+      sections[1]['section_id'] == '1141-dupe-101-d101'
+    end
+  end
+
 end
 
 describe 'A multiple calendar courses request' do
@@ -177,8 +192,8 @@ describe 'A multiple calendar courses request' do
     it 'should create two D100 courses' do
       verify_courses(%w(1141-easy-240-d100 1141-hard-840-d100))
     end
-    it 'should create child sections only' do
-      verify_sections(3, %w(1141-easy-240-d101 1141-easy-240-d102 1141-hard-840-d101), ['EASY240 D101', 'EASY240 D102', 'HARD840 D101'], %w(1141-easy-240-d100 1141-easy-240-d100 1141-hard-840-d100))
+    it 'should create all sections each' do
+      verify_sections(5, %w(1141-easy-240-d100 1141-easy-240-d101 1141-easy-240-d102 1141-hard-840-d100 1141-hard-840-d101), ['EASY240 D100', 'EASY240 D101', 'EASY240 D102', 'HARD840 D100', 'HARD840 D101'], %w(1141-easy-240-d100 1141-easy-240-d100 1141-easy-240-d100 1141-hard-840-d100 1141-hard-840-d100))
     end
   end
 
@@ -319,8 +334,8 @@ describe 'A cross-list course request' do
     it 'should create a single cross-listed D100/D100 course' do
       verify_courses('1141-easy-240-d100:1141-hard-840-d100')
     end
-    it 'should create child sections only' do
-      verify_sections(3, %w(1141-easy-240-d101 1141-easy-240-d102 1141-hard-840-d101), ['EASY240 D101', 'EASY240 D102', 'HARD840 D101'], '1141-easy-240-d100:1141-hard-840-d100')
+    it 'should create all sections in a single course' do
+      verify_sections(5, %w(1141-easy-240-d100 1141-easy-240-d101 1141-easy-240-d102 1141-hard-840-d100 1141-hard-840-d101), ['EASY240 D100', 'EASY240 D101', 'EASY240 D102', 'HARD840 D100', 'HARD840 D101'], '1141-easy-240-d100:1141-hard-840-d100')
     end
   end
 
@@ -339,8 +354,8 @@ describe 'A cross-list course request' do
     it 'should create a single cross-listed D100/D100 course' do
       verify_courses('1141-easy-240-d100:1141-hard-840-d100')
     end
-    it 'should create child sections / lecture section only' do
-      verify_sections(3, %w(1141-easy-240-d101 1141-easy-240-d102 1141-hard-840-d100), ['EASY240 D101', 'EASY240 D102', 'HARD840 D100'], '1141-easy-240-d100:1141-hard-840-d100')
+    it 'should create all sections in a single course' do
+      verify_sections(4, %w(1141-easy-240-d100 1141-easy-240-d101 1141-easy-240-d102 1141-hard-840-d100), ['EASY240 D100', 'EASY240 D101', 'EASY240 D102', 'HARD840 D100'], '1141-easy-240-d100:1141-hard-840-d100')
     end
   end
 
@@ -349,8 +364,8 @@ describe 'A cross-list course request' do
     it 'should create a single cross-listed D101/D100 course' do
       verify_courses('1141-easy-240-d101:1141-hard-840-d100')
     end
-    it 'should create all sections / child sections only' do
-      verify_sections(4, %w(1141-easy-240-d101 1141-easy-240-d102 1141-easy-240-d103 1141-hard-840-d101), ['EASY240 D101', 'EASY240 D102', 'EASY240 D103', 'HARD840 D101'], '1141-easy-240-d101:1141-hard-840-d100')
+    it 'should create all sections in a single course' do
+      verify_sections(5, %w(1141-easy-240-d101 1141-easy-240-d102 1141-easy-240-d103 1141-hard-840-d100 1141-hard-840-d101), ['EASY240 D101', 'EASY240 D102', 'EASY240 D103', 'HARD840 D100', 'HARD840 D101'], '1141-easy-240-d101:1141-hard-840-d100')
     end
   end
 
@@ -359,8 +374,8 @@ describe 'A cross-list course request' do
     it 'should create a single cross-listed D001/D100 course' do
       verify_courses('1141-easy-240-d001:1141-hard-840-d100')
     end
-    it 'should create all sections / child sections only' do
-      verify_sections(4, %w(1141-easy-240-d001 1141-easy-240-d002 1141-easy-240-d003 1141-hard-840-d101), ['EASY240 D001', 'EASY240 D002', 'EASY240 D003', 'HARD840 D101'], '1141-easy-240-d001:1141-hard-840-d100')
+    it 'should create all sections in a single course' do
+      verify_sections(5, %w(1141-easy-240-d001 1141-easy-240-d002 1141-easy-240-d003 1141-hard-840-d100 1141-hard-840-d101), ['EASY240 D001', 'EASY240 D002', 'EASY240 D003', 'HARD840 D100', 'HARD840 D101'], '1141-easy-240-d001:1141-hard-840-d100')
     end
   end
 

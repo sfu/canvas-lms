@@ -345,14 +345,14 @@ require [
           section: ui.item.section
           sis_source_id: ui.item.sis_source_id
           title: ui.item.title
-          sectionTutorials: []
+          sections: []
           sectionCode: '' # NOTE: this field is not available with this API call
 
-        # Check if this course has section tutorials. If it does, update the course
+        # Check if this course has sections. If it does, update the course
         $.ajax
-          url: "/sfu/api/v1/amaint/course/#{ui.item.key}/sectionTutorials"
+          url: "/sfu/api/v1/amaint/course/#{ui.item.key}/sections"
           dataType: 'json'
-          success: (data) -> course.addSectionTutorials data.sectionTutorials
+          success: (data) -> course.addSections data.sections
 
         # Check if this course is already in Canvas. If it is, the call will be successful. Otherwise, we'll get a 404.
         $.ajax
