@@ -66,6 +66,7 @@
   sudo: no
   args:
     chdir: /vagrant
+    creates: /home/vagrant/CanvasTestDBSetupDone
 
 - name: db migrate
   shell: RAILS_ENV=production bundle exec rake db:migrate
