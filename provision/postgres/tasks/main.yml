@@ -17,6 +17,7 @@
   sudo_user: postgres
   with_items:
     - "{{canvas_database_name}}"
+    - "{{canvas_test_database_name}}"
     - "{{canvas_queue_database_name}}"
   postgresql_db: name={{ item }}
 
@@ -30,5 +31,6 @@
   sudo_user: postgres
   with_items:
     - "{{canvas_database_name}}"
+    - "{{canvas_test_database_name}}"
     - "{{canvas_queue_database_name}}"
   postgresql_user: user={{ canvas_database_user }} db={{ item }} priv=ALL

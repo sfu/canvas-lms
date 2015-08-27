@@ -6,6 +6,7 @@
     canvas_admin_email: vagrant@localhost
     canvas_admin_password: vagrant
     canvas_database_name: canvas
+    canvas_test_database_name: canvas_test
     canvas_queue_database_name: canvas_queue
     canvas_database_user: canvas
     canvas_database_password: D79A8D01-6904-4798-8A68-DCDA557987B8
