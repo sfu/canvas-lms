@@ -10,16 +10,16 @@
   service: name=canvas_init state=stopped
   ignore_errors: yes
 
-- name: wait for all vendor/bundle files to close
-  shell: lsof | grep "vendor/bundle" | wc -l
+- name: wait for all canvas gem files to close
+  shell: lsof | grep "/home/vagrant/canvas_gems" | wc -l
   register: lsof_output
   ignore_errors: true
   until: lsof_output.stdout.find("0") != -1
   retries: 10
   delay: 5
 
-- name: delete vendor/bundle
-  file: path=/vagrant/vendor/bundle state=absent force=yes
+- name: delete canvas gems 
+  file: path=/home/vagrant/canvas_gems state=absent force=yes
 
 - name: delete Gemfile.lock
   file: path=/vagrant/Gemfile.lock state=absent
@@ -28,7 +28,7 @@
   sudo: no
   remote_user: vagrant
   shell: >
-    bundle install --path=vendor/bundle --without=sqlite mysql
+    bundle install --path=/home/vagrant/canvas_gems --without=sqlite mysql
   args:
     chdir: /vagrant
 
@@ -60,6 +60,14 @@
     chdir: /vagrant
     creates: /home/vagrant/CanvasDBSetupDone
 
+- name: test db setup
+  shell: RAILS_ENV=test bundle exec rake db:test:reset
+  remote_user: vagrant
+  sudo: no
+  args:
+    chdir: /vagrant
+    creates: /home/vagrant/CanvasTestDBSetupDone
+
 - name: db migrate
   shell: RAILS_ENV=production bundle exec rake db:migrate
   args:
@@ -82,3 +90,4 @@
 - name: update-rc.d canvas_init
   sudo: yes
   shell: update-rc.d canvas_init defaults
+

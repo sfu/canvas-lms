@@ -2,9 +2,10 @@
 test:
   adapter: postgresql
   encoding: utf8
-  database: canvas_test
+  database: {{canvas_test_database_name}} 
   host: localhost
   username: canvas
+  password: {{canvas_database_password}}
   timeout: 5000
 
 development:
