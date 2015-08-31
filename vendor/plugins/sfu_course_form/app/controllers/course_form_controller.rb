@@ -13,7 +13,11 @@ class CourseFormController < ApplicationController
     @terms = [@current_term] + future_terms
     # only show current term plus next 2 terms (up to 3 non-nil terms in total)
     @term_options = @terms.compact.take(3).map { |term| [term.name, term.sis_source_id] }
-    roles = SFU::User.roles @sfuid
+    roles = SFU::User.roles(@sfuid) || []
+    unless roles.is_a? (Array)
+      flash[:error] = "Unable to look up your user's account information"
+      return redirect_to dashboard_url
+    end
     @is_student = (roles & %w(undergrad grad fic)).any?
     # deny access unless user has any of the following roles
     unless (roles & %w(staff faculty f_faculty grad other)).any?

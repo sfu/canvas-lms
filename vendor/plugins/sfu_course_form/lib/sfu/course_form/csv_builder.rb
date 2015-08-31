@@ -56,7 +56,7 @@ module SFU
           course_array.push [course_id, short_name, long_name, account_id, term, 'active', selected_term.start_at, selected_term.end_at]
 
           # create section csv
-          sections.each { |section| section_array.concat section_csv(term, section, course_id) }
+          sections.each { |section| section_array.concat section_csv(section, course_id) }
 
           # create enrollment csv to default section
           enrollment_array.push [course_id, teacher_sis_user_id, 'teacher', nil, 'active']
@@ -105,7 +105,7 @@ module SFU
               course_array.push course_info[:course]
 
               # create section csv
-              section_array.concat section_csv(course_info[:term], course_info[:sections], course_info[:course_id])
+              section_array.concat section_csv(course_info[:sections], course_info[:course_id])
 
               enrollment_array.concat course_info[:enrollments]
 
@@ -163,12 +163,9 @@ module SFU
         course
       end
 
-      def section_csv(term, sections, course_id)
+      def section_csv(sections, course_id)
         sections = sections.compact.uniq
         sections.map! do |section_info|
-          # Skip Dx00 section if there are other child sections (except in Fall 2013)
-          next if term.to_i != 1137 && sections.count > 1 && section_info[1].to_s.end_with?('00')
-
           [section_info[0], course_id, section_info[1], 'active', nil, nil, nil]
         end
         sections.compact
