@@ -122,13 +122,14 @@ class AmaintController < ApplicationController
             course_hash["sectionTutorials"] = SFU::Course.section_tutorials(course_code, term_code, course_hash["section"])
           end
         end
+        course_hash["sections"] = SFU::Course.sections(course_code, term_code || course_hash["peopleSoftCode"], course_hash["section"].downcase)
 
         course_hash["key"] = course_hash["peopleSoftCode"] + ":::" +
                              course_hash["name"].downcase +  ":::" +
                              course_hash["number"] + ":::" +
                              course_hash["section"].downcase + ":::" +
                              course_hash["title"]
-        course_hash["key"].concat ":::" + course_hash["sectionTutorials"].join(',').downcase unless course_hash["sectionTutorials"].empty?
+        course_hash["key"].concat ":::" + course_hash["sections"].join(',').downcase if course_hash["sections"].present?
 
         # hide course if already exists in Canvas or is a Tutorial/Lab
         course_array.push course_hash unless course_exists? course_hash["sis_source_id"] unless exclude_sectionCode.include? c["course"].first["sectionCode"].to_s
