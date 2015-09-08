@@ -35,7 +35,7 @@ class CourseFormController < ApplicationController
   def create
     req_user = User.find(@current_user.id).pseudonym.unique_id
     selected_courses = []
-    account_id = Account.find_by_name("Simon Fraser University").id
+    account_id = Account.default.id
     teacher_username = params[:username]
     teacher2_username = params[:enroll_me]
     teacher_sis_user_id = sis_user_id(teacher_username, account_id)

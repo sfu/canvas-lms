@@ -21,9 +21,8 @@ class ApiController < ApplicationController
   end
 
   def user
-    account_id = Account.find_by_name('Simon Fraser University').id
     sfu_id = params[:sfu_id]
-    pseudonym = Pseudonym.where(:unique_id => sfu_id, :account_id => account_id).all
+    pseudonym = Pseudonym.where(:unique_id => sfu_id, :account_id => Account.default.id).all
 
     raise(ActiveRecord::RecordNotFound) if pseudonym.empty?
 
@@ -62,7 +61,7 @@ class ApiController < ApplicationController
   def terms
     term_arr = []
     if params[:term].nil?
-      terms = Account.find_by_name('Simon Fraser University').enrollment_terms.find(:all, :conditions => "workflow_state = 'active'", :order => 'sis_source_id DESC').delete_if {|t| t.name == 'Default Term'}
+      terms = Account.default.enrollment_terms.find(:all, :conditions => "workflow_state = 'active'", :order => 'sis_source_id DESC').delete_if {|t| t.name == 'Default Term'}
       terms.each do |term|
         term_info = {}
         term_info["name"] = term.name
@@ -72,7 +71,7 @@ class ApiController < ApplicationController
         term_arr.push term_info
       end
     else
-      term = Account.find_by_name('Simon Fraser University').enrollment_terms.find(:all, :conditions => "sis_source_id = '#{params[:term]}'")
+      term = Account.default.enrollment_terms.find(:all, :conditions => "sis_source_id = '#{params[:term]}'")
       term_info = {}
       term_info["name"] = term.first.name
       term_info["sis_source_id"] = term.first.sis_source_id
