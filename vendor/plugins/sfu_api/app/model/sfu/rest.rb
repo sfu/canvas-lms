@@ -32,8 +32,7 @@ module SFU
     end
 
     def canvas_sis_import_url
-      account_id = Account.find_by_name("Simon Fraser University").id
-      "#{canvas_server}/api/v1/accounts/#{account_id}/sis_imports.json?extension=csv"
+      "#{canvas_server}/api/v1/accounts/#{Account.default.id}/sis_imports.json?extension=csv"
     end
 
     def text(url, params)
