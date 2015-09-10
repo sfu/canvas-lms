@@ -2,7 +2,7 @@ class TermController < ApplicationController
 
   # get all terms
   def all_terms
-    t = EnrollmentTerm.find(:all, :select => select_fields, :conditions => ["workflow_state = 'active' AND (root_account_id = 2)"])
+    t = EnrollmentTerm.find(:all, :select => select_fields, :conditions => ["workflow_state = 'active' AND (root_account_id = #{Account.default.id})"])
     respond_to do |format|
       format.json {render :json => t}
     end
@@ -10,7 +10,7 @@ class TermController < ApplicationController
 
   # get specific term by sis id
   def term_by_sis_id
-    t = EnrollmentTerm.find(:all, :select => select_fields, :conditions => ["workflow_state = 'active' AND (root_account_id = 2) AND (sis_source_id = '#{params[:sis_id]}')"])
+    t = EnrollmentTerm.find(:all, :select => select_fields, :conditions => ["workflow_state = 'active' AND (root_account_id = #{Account.default.id}) AND (sis_source_id = '#{params[:sis_id]}')"])
     respond_to do |format|
       format.json {render :json => t}
     end
@@ -18,7 +18,7 @@ class TermController < ApplicationController
 
   # get current term
   def current_term
-    t = EnrollmentTerm.find(:all, :select => select_fields, :conditions => ["workflow_state = 'active' AND (root_account_id = 2) AND (:date BETWEEN start_at AND end_at) AND (sis_source_id IS NOT NULL)", {:date => DateTime.now}]).first
+    t = EnrollmentTerm.find(:all, :select => select_fields, :conditions => ["workflow_state = 'active' AND (root_account_id = #{Account.default.id}) AND (:date BETWEEN start_at AND end_at) AND (sis_source_id IS NOT NULL)", {:date => DateTime.now}]).first
     respond_to do |format|
       format.json {render :json => t}
     end
