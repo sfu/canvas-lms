@@ -1,5 +1,3 @@
-require Pathname(File.dirname(__FILE__)) + "../../../sfu_api/app/model/sfu/sfu"
-
 class CourseFormController < ApplicationController
 
   before_filter :require_user
