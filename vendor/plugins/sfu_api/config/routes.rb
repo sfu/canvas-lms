@@ -21,8 +21,4 @@ CanvasRails::Application.routes.draw do
     match "sfu/api/v1/enrollment" => "api#course_enrollment", via: :post
     match "sfu/api/v1/group_memberships/:id/undelete" => "api#undelete_group_membership", via: :put
   end
-
-  scope :format => 'html', :constraints => { :format => 'html' } do
-    match "sfu/api/v1/adhoc_group_button/:group_id" => "adhoc_group#render_button", via: :get
-  end
 end
