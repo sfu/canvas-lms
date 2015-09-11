@@ -159,16 +159,6 @@ class ApiController < ApplicationController
     course_hash
   end
 
-  # Deprecated. Moved to amaint_controller
-  def teaching_terms_for(sfu_id)
-    terms = SFU::Course.terms sfu_id
-    term_array = []
-    terms.each do |term|
-      term_array.push term
-    end
-    term_array
-  end
-
   def mysfu_enrollments_for(user)
     output = {
       "enrolled" => [],

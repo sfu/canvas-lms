@@ -55,7 +55,7 @@ class AmaintController < ApplicationController
   def amaint_course_info(sis_id, property=nil)
     # sis_id format 1131:::math:::100:::d300:::Precalculus
     # or format 1131-math-100-d300
-    sis_id.gsub!(":::","-")    
+    sis_id.gsub!(":::","-")
     course_hash = {}
     course_info = sis_id.split("-")
     course_hash["name"] = course_info[1]
