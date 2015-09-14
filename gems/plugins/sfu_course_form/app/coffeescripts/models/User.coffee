@@ -11,6 +11,9 @@ define [
       @on 'change', ->
         @hasLoaded = true
         $(document).trigger 'userloaded'
+      @on 'error', ->
+        @hasLoaded = false
+        $(document).trigger 'userloaderror'
       super
 
     url: ->
