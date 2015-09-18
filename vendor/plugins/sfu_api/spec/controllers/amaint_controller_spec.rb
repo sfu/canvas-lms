@@ -30,7 +30,7 @@ describe AmaintController do
 
     it 'should return sectionTutorials for a course' do
       get :course_info, :sis_id => '9999-test-100-d100', :property => 'sectionTutorials', :format => :json
-      expect(json_parse['sectionTutorials']).to include('D101', 'D102', 'D103', 'D104', 'D105', 'D106', 'D107', 'D108', 'D109', 'D100')
+      expect(json_parse['sectionTutorials']).to include('D101', 'D102', 'D103', 'D104', 'D105', 'D106', 'D107', 'D108', 'D109')
     end
 
     it 'should return sections for a course' do
