@@ -2,8 +2,7 @@ require 'sfu/course_form/csv_builder'
 
 module SFU
   module CourseForm
-    def self.initialize
-      true
+    class Engine < ::Rails::Engine
     end
   end
 end

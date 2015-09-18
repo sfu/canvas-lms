@@ -155,7 +155,7 @@ require [
 
     if action == 'action-identify-faculty-delegate'
       unless validUserId.test(userId)
-        alert 'Instructor Computer ID is invalid. Please correct it before continuing.'
+        alert 'Instructor Computer ID contains invalid characters. Please correct it before continuing.'
         return
       user = new User(userId)
       user.fetch()
@@ -168,6 +168,19 @@ require [
       showStep '2-loading'
 
     $(document).one 'userloaded', -> showFacultyStep()
+
+    $(document).one 'userloaderror', ->
+      # deregister the successful event listener to avoid duplicates later
+      $(document).off 'userloaded'
+      # bring user to a previous step to allow for correction
+      if action == 'action-identify-faculty-delegate'
+        # user was creating for someone else
+        alert 'Instructor Computing ID is invalid. Please double check before continuing.'
+        showDelegateStep()
+      else
+        # user was creating for him/herself; this error is unlikely, but we handle it anyway
+        alert 'Your Computing ID is invalid. Please contact Canvas help.'
+        showStep '1'
 
   showFacultyStep = ->
     $('.username-display').text(getUsernameToDisplay())

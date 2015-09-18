@@ -1,5 +1,3 @@
-require Pathname(File.dirname(__FILE__)) + "../../../sfu_api/app/model/sfu/sfu"
-
 class CourseFormController < ApplicationController
 
   before_filter :require_user
@@ -78,7 +76,7 @@ class CourseFormController < ApplicationController
   end
 
   def sis_user_id(username, account_id)
-    user = Pseudonym.find_by_unique_id_and_account_id(username, account_id)
+    user = Pseudonym.active.find_by_unique_id_and_account_id(username, account_id)
     user.sis_user_id unless user.nil?
   end
 
