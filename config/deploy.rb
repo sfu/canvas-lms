@@ -16,6 +16,10 @@ set :bundle_path, "vendor/bundle"
 set :bundle_without, nil
 set :bundle_flags,  ""
 
+# resets Account.name and Account.lti_guid according to values in sfu.yml
+# don't do this on production
+set :reset_account_settings, true
+
 set :ssh_options, {
   forward_agent: true,
   keys: [File.join(ENV["HOME"], ".ssh", "id_rsa_canvas")],

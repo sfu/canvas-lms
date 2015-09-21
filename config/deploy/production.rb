@@ -5,6 +5,7 @@ set :copy_local_tar, "/usr/local/bin/gtar" if `uname` =~ /Darwin/
 set :stage, :production
 set :app_node_prefix, "canvas-ap"
 set :canvas_url, 'https://canvas.sfu.ca'
+set :reset_account_settings, false
 
 role :db,  %w{canvas-mp1.tier2.sfu.ca canvas-mp2.tier2.sfu.ca}
 
