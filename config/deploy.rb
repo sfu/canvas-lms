@@ -1,7 +1,7 @@
 lock '3.2.1'
 
 set :application,   'canvas'
-set :repo_url,      'https://github.com/sfu/canvas-lms.git'
+set :repo_url,      ENV['repo'] || 'https://github.com/sfu/canvas-lms.git'
 set :scm,           'git'
 set :branch,        ENV['branch'] || 'sfu-deploy'
 set :user,          'canvasuser'
@@ -15,6 +15,10 @@ set :pty,           true
 set :bundle_path, "vendor/bundle"
 set :bundle_without, nil
 set :bundle_flags,  ""
+
+# resets Account.name and Account.lti_guid according to values in sfu.yml
+# don't do this on production
+set :reset_account_settings, true
 
 set :ssh_options, {
   forward_agent: true,

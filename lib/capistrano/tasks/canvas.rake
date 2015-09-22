@@ -64,4 +64,17 @@ namespace :canvas do
     end
   end
 
+  desc "Reset account settings for non-production environments"
+  task :reset_account_settings do
+    next unless fetch(:reset_account_settings)
+    on primary :db do
+      within release_path do
+        with rails_env: fetch(:rails_env) do
+          stage = fetch :stage
+          execute :rake, "sfu:account_settings[#{stage}]"
+        end
+      end
+    end
+  end
+
 end
