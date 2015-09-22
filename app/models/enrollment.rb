@@ -241,14 +241,17 @@ class Enrollment < ActiveRecord::Base
 
 
   def self.readable_types
-    {
-      'TeacherEnrollment' => t('#enrollment.roles.teacher', "Teacher"),
-      'TaEnrollment' => t('#enrollment.roles.ta', "TA"),
-      'DesignerEnrollment' => t('#enrollment.roles.designer', "Designer"),
-      'StudentEnrollment' => t('#enrollment.roles.student', "Student"),
-      'StudentViewEnrollment' => t('#enrollment.roles.student', "Student"),
-      'ObserverEnrollment' => t('#enrollment.roles.observer', "Observer")
-    }
+    # with enough use, even translations can add up
+    RequestCache.cache('enrollment_readable_types') do
+      {
+        'TeacherEnrollment' => t('#enrollment.roles.teacher', "Teacher"),
+        'TaEnrollment' => t('#enrollment.roles.ta', "TA"),
+        'DesignerEnrollment' => t('#enrollment.roles.designer', "Designer"),
+        'StudentEnrollment' => t('#enrollment.roles.student', "Student"),
+        'StudentViewEnrollment' => t('#enrollment.roles.student', "Student"),
+        'ObserverEnrollment' => t('#enrollment.roles.observer', "Observer")
+      }
+    end
   end
 
   def self.readable_type(type)
@@ -360,7 +363,7 @@ class Enrollment < ActiveRecord::Base
   protected :audit_groups_for_deleted_enrollments
 
   def observers
-    student? ? user.observers : []
+    student? ? user.observers.active : []
   end
 
   def create_linked_enrollments
@@ -384,6 +387,7 @@ class Enrollment < ActiveRecord::Base
     return false unless observer.can_be_enrolled_in_course?(course)
     enrollment ||= observer.observer_enrollments.build
     enrollment.associated_user_id = user_id
+    enrollment.shard = shard if enrollment.new_record?
     enrollment.update_from(self, !!@skip_broadcasts)
   end
 
@@ -391,7 +395,8 @@ class Enrollment < ActiveRecord::Base
     observer.observer_enrollments.where(
       :associated_user_id => user_id,
       :course_id => course_id,
-      :course_section_id => course_section_id_was || course_section_id).first
+      :course_section_id => course_section_id_was || course_section_id).
+        shard(Shard.shard_for(course_id)).first
   end
 
   def active_linked_enrollment_for(observer)

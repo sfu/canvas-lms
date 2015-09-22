@@ -57,6 +57,18 @@ describe "people" do
     enroll_student(student_4)
   end
 
+  def open_dropdown_menu(selector: nil, option: nil, displayed: true)
+    selector ||= ".rosterUser"
+    row = f(selector)
+    driver.action.move_to(row).perform
+    f("#{selector} .admin-links a.al-trigger").click
+    expect(f("#{selector} .admin-links ul.al-options")).to be_displayed
+    if option
+      to_be_or_not_to_be = displayed ? :to : :not_to
+      expect(element_exists("#{selector} .admin-links ul.al-options li a[data-event=#{option}]")).send to_be_or_not_to_be, be_truthy
+    end
+  end
+
   context "people as a teacher" do
 
     before (:each) do
@@ -67,12 +79,9 @@ describe "people" do
       Account.default.settings[:enable_manage_groups2] = false
       Account.default.save!
 
-      e1 = @course.enroll_student(@student_1)
-      e1.workflow_state = 'active'
-      e1.save!
-      @course.reload
+      enroll_student(@student_1)
 
-      #adding users for second selenium test to work correctly
+      #adding users for tests to work correctly
 
       #teacher user
       @test_teacher = create_user('teacher@test.com')
@@ -89,6 +98,14 @@ describe "people" do
 
     it "should have tabs" do
       expect(fj('.collectionViewItems>li:first').text).to match "Everyone"
+    end
+
+    it "should display a dropdown menu when item cog is clicked" do
+      open_dropdown_menu
+    end
+
+    it "should display the option to remove a student from a course if manually enrolled" do
+      open_dropdown_menu(option: 'removeFromCourse')
     end
 
     it "should display activity report on clicking Student Interaction button", priority: "1", test_id: 244446 do
@@ -360,20 +377,48 @@ describe "people" do
       expect(first_selected_option(f('#course_section_id')).text).to eq 'Unnamed Course'
       is_checked('#limit_privileges_to_course_section') == true
     end
+
+    it "should add a student to a section", priority: "1", test_id: 296460 do
+      student = create_user("student@example.com")
+      enroll_student(student)
+      get "/courses/#{@course.id}/users"
+      ff(".icon-settings")[1].click
+      fln("Edit Sections").click
+      f(".token_input.browsable").click
+      section_input_element = driver.find_element(:name, "token_capture")
+      section_input_element.send_keys("section2")
+      f('.last.context').click
+      wait_for_ajaximations
+      ff('.ui-button-text')[1].click
+      wait_for_ajaximations
+      expect(ff(".StudentEnrollment")[0].text).to include_text("section2")
+    end
+
+    it "should remove a student from a section", priority: "1", test_id: 296461 do
+     sec1 = @course.course_sections.create!(name: "section1")
+     sec2 = @course.course_sections.create!(name: "section2")
+     @student = user
+     @course.enroll_student(@student, section: sec1, allow_multiple_enrollments: true)
+     @course.enroll_student(@student, section: sec2, allow_multiple_enrollments: true)
+     get "/courses/#{@course.id}/users"
+     ff(".icon-settings")[1].click
+     fln("Edit Sections").click
+     fln("Remove user from section2").click
+     ff('.ui-button-text')[1].click
+     wait_for_ajaximations
+     expect(ff(".StudentEnrollment")[0].text).not_to include_text("section2")
+    end
   end
 
   it "should get the max total activity time" do
     course_with_admin_logged_in
-    sec1 = @course.course_sections.create!(:name => "section1")
-    sec2 = @course.course_sections.create!(:name => "section2")
-
+    sec1 = @course.course_sections.create!(name: "section1")
+    sec2 = @course.course_sections.create!(name: "section2")
     @student = user
-    e1 = @course.enroll_student(@student, :section => sec1, :allow_multiple_enrollments => true)
-    e2 = @course.enroll_student(@student, :section => sec2, :allow_multiple_enrollments => true)
+    e1 = @course.enroll_student(@student, section: sec1, allow_multiple_enrollments: true)
+    @course.enroll_student(@student, section: sec2, allow_multiple_enrollments: true)
     Enrollment.where(:id => e1).update_all(:total_activity_time => 900)
-
     get "/courses/#{@course.id}/users"
-
     wait_for_ajaximations
     expect(fj("#user_#{@student.id} td:nth-child(7)").text.strip).to eq "15:00"
   end
