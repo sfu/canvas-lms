@@ -15,6 +15,12 @@
   <p>
   <%= mt 'details.allow_application', "%{app_name} is requesting access to your account.", :app_name => @provider.app_name %>
     <br/><br/>
+    <% # SFU MOD - add privacy notice %>
+    By granting access to this application you are agreeing to allow SFU Canvas to send your personal data, such as your name, email address, and potentially other data contained in SFU Canvas to a service neither operated nor controlled by Simon Fraser University.
+    <br/><br/>
+    A summary of what this means to you may be found in the <%= link_to "SFU Cloud Computing FAQ", "https://www.sfu.ca/itservices/info_security/cloud-computing-faq.html", :target => "_blank" %>
+    <br/><br/>
+    <% # END SFU MOD %>
     <%= mt 'details.login_name', "You are logging into this app as %{user_name}.", :user_name => link_to(@current_user.short_name, user_profile_url(@current_user), :popup => true) %>
     <% if @current_user.email.present? && @current_user.email != @current_user.short_name %>
       <br/>

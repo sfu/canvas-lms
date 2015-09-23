@@ -1,3 +1,7 @@
+body.modal #footer {
+    display: none !important;
+}
+
 #header {
     background: #6a7177 url(../images/clf-header-bg-rainbow.png);
 }
