@@ -1,0 +1,11 @@
+:hostname: canvas-new-feature.dev
+:ip_address: 10.10.10.10
+:mount_directories:
+  -
+    :local_path: '/local/path/to/canvas_spaces'
+    :mount_at: '/vagrant/gems/plugins/canvas_spaces'
+  -
+    :local_path: '/local/path/to/canvas_spaces_client_app'
+    :mount_at: '/vagrant/client_apps/canvas_spaces'
+:pre_provision_script: 'cd /vagrant/client_apps/canvas_spaces && npm install && script/canvas_setup'
+:post_provision_script: 'echo "All Done!"'
