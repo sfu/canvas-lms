@@ -1,4 +1,4 @@
-SFU
+SFU API
 =====
 
 Description
@@ -93,7 +93,7 @@ http://<canvas_server>/sfu/api/courses/teaching/<sfu_id>/[term]
       ]
 
 Installation:
- 1. Place under <canvas_install_dir>/vendor/plugins/sfu_api
+ 1. Place under <canvas_install_dir>/gems/plugins/sfu_api
  2. Run 'bundle install'
  3. Restart Canvas
 
