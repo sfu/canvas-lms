@@ -133,6 +133,12 @@ class ApplicationController < ActionController::Base
       @js_env[:TOURS] = tours_to_run
 
       @js_env[:lolcalize] = true if ENV['LOLCALIZE']
+
+      # SFU MOD: Add SFU entries to js_env
+      @js_env[:APP_NODE] = Socket.gethostname().split('.')[0]
+      @js_env[:RELEASE] = File.dirname(__FILE__)
+      @js_env[:CANVAS_SPACES_ENABLED] = PluginSetting.find_by_name(:canvas_spaces).disabled.! rescue false
+      # END SFU MOD
     end
 
     hash.each do |k,v|
