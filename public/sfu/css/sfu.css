@@ -171,9 +171,10 @@ body.modal #footer {
 }
 
 .SFUPrivacyNotice .icon-warning:after {
-    content: "\00";
+    content: "\a0";
 }
 
 .SFUPrivacyNotice.alert {
+    padding: 0.25em 1em;
     color: #695129;
 }
