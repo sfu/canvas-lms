@@ -33,6 +33,7 @@ describe 'CrocodocDocument' do
     before :once do
       teacher_in_course(:active_all => true)
       student_in_course
+      ta_in_course
       @submitter = @student
       student_in_course
       @other_student = @student

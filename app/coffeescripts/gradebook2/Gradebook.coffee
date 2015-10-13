@@ -86,7 +86,6 @@ define [
       @totalColumnInFront = userSettings.contextGet 'total_column_in_front'
       @numberOfFrozenCols = if @totalColumnInFront then 3 else 2
       @mgpEnabled = ENV.GRADEBOOK_OPTIONS.multiple_grading_periods_enabled
-      ++@numberOfFrozenCols # SFU MOD - CANVAS-188 Add extra column for SIS ID
       @gradingPeriods = ENV.GRADEBOOK_OPTIONS.active_grading_periods
       @gradingPeriodToShow = @getGradingPeriodToShow()
       @gradebookColumnSizeSettings = ENV.GRADEBOOK_OPTIONS.gradebook_column_size_settings
@@ -103,18 +102,21 @@ define [
       else
         'students_url'
 
-      gotAllStudents = $.Deferred().done => @gotAllStudents()
+      @gotAllAssignmentGroupsPromise = $.Deferred().done => @gotAllAssignmentGroups()
+      gotAllStudents = $.Deferred().done(()=>
+        @gotAllAssignmentGroupsPromise.then(()=> @gotAllStudents())
+      )
 
       # this method should be removed after a month in production
       @alignCoursePreferencesWithLocalStorage()
 
-      assignmentGroupsParams = {exclude_descriptions: true}
+      @assignmentGroupsParams = {exclude_descriptions: true}
       if @mgpEnabled && @gradingPeriodToShow && @gradingPeriodToShow != '0' && @gradingPeriodToShow != ''
-        $.extend(assignmentGroupsParams, {grading_period_id: @gradingPeriodToShow})
+        $.extend(@assignmentGroupsParams, {grading_period_id: @gradingPeriodToShow})
 
       ajax_calls = [
         $.ajaxJSON(@options[enrollmentsUrl], "GET")
-      , $.ajaxJSON(@options.assignment_groups_url, "GET", assignmentGroupsParams, @gotAssignmentGroups)
+      , $.ajaxJSON(@options.assignment_groups_url, "GET", @assignmentGroupsParams, @gotAssignmentGroups)
       , $.ajaxJSON( @options.sections_url, "GET", {}, @gotSections)
       ]
 
@@ -156,7 +158,7 @@ define [
           gotAllStudents.resolve()
 
       gotCustomColumns = @getCustomColumns()
-      @gotAllData = $.when(gotCustomColumns, gotAllStudents)
+      @gotAllData = $.when(gotCustomColumns, gotAllStudents, @gotAllAssignmentGroupsPromise)
 
       @allSubmissionsLoaded.done =>
         for c in @customColumns
@@ -188,8 +190,8 @@ define [
 
     disableAssignmentsInClosedGradingPeriods: () ->
       closedAdminGradingPeriods = @getClosedAdminGradingPeriods()
-      if closedAdminGradingPeriods.length > 0
 
+      if closedAdminGradingPeriods.length > 0
         assignments = @getAssignmentsInClosedGradingPeriods(closedAdminGradingPeriods)
         @disabledAssignments = assignments.map (a) ->
           a.id
@@ -272,7 +274,8 @@ define [
       @getSubmissionsChunks()
       @initHeader()
 
-    gotAssignmentGroups: (assignmentGroups) =>
+    gotAllAssignmentGroups: () =>
+      assignmentGroups = @allAssignmentGroups;
       @assignmentGroups = {}
       @assignments      = {}
 
@@ -290,6 +293,39 @@ define [
           @assignments[assignment.id] = assignment
 
       @postGradesStore.setGradeBookAssignments @assignments
+
+
+    gotAssignmentGroups: (assignmentGroups, xhr) =>
+      @allAssignmentGroups = [];
+
+      gotAssignmentGroupsChunk = (groups) =>
+        for group in groups
+          @allAssignmentGroups.push(group)
+
+      gotAssignmentGroupsChunk(assignmentGroups)
+
+
+      paginationLinks = xhr.getResponseHeader('Link')
+      lastLink = paginationLinks.match(/<[^>]+>; *rel="last"/)
+      unless lastLink?
+        @gotAllAssignmentGroupsPromise.resolve()
+        return
+      lastPage = lastLink[0].match(/page=(\d+)/)[1]
+      lastPage = parseInt lastPage, 10
+      if lastPage == 1
+        @gotAllAssignmentGroupsPromise.resolve()
+        return
+      agParams = @assignmentGroupsParams
+      fetchAssignmentGroupsChunk = (page) =>
+        $.ajaxJSON @options.assignment_groups_url, "GET", $.extend(agParams, {page})
+      dfds = (fetchAssignmentGroupsChunk(page) for page in [2..lastPage])
+      $.when(dfds...).then (responses...) =>
+        if dfds.length == 1
+          gotAssignmentGroupsChunk(responses[0])
+        else
+          gotAssignmentGroupsChunk(groups) for [groups, x, y] in responses
+        @gotAllAssignmentGroupsPromise.resolve()
+
 
     gotCourse: (course) =>
       @course = course
@@ -319,13 +355,12 @@ define [
 
     gotAllStudents: ->
       @withAllStudents (students) =>
+        #empty the array so this is idempotent, you can end up with too many rows
+        @rows.length = 0
         for student_id, student of students
           student.computed_current_score ||= 0
           student.computed_final_score ||= 0
           student.secondary_identifier = student.sis_login_id || student.login_id
-          # SFU MOD CANVAS-188 Define data for SIS ID column (use dash if not available)
-          student.sis_id = student.sis_user_id || '-'
-          # END SFU MOD
 
           if @sections_enabled
             mySections = (@sections[sectionId].name for sectionId in student.sections when @sections[sectionId])
@@ -472,7 +507,16 @@ define [
         return wrappedFn(a, b)
 
     rowFilter: (student) =>
-      !@sectionToShow || (@sectionToShow in student.sections)
+      matchingSection = !@sectionToShow || (@sectionToShow in student.sections)
+      matchingFilter = if @userFilterTerm == ""
+        true
+      else
+        propertiesToMatch = ['name', 'login_id', 'short_name', 'sortable_name']
+        pattern = new RegExp @userFilterTerm, 'i'
+        matched = _.any propertiesToMatch, (prop) ->
+          student[prop]?.match pattern
+
+      matchingSection and matchingFilter
 
     handleAssignmentMutingChange: (assignment) =>
       idx = @grid.getColumnIndex("assignment_#{assignment.id}")
@@ -549,6 +593,7 @@ define [
           params =
             student_ids: (student.id for student in students)
             response_fields: ['id', 'user_id', 'url', 'score', 'grade', 'submission_type', 'submitted_at', 'assignment_id', 'grade_matches_current_submission', 'attachments', 'late', 'workflow_state', 'excused']
+            exclude_response_fields: ['preview_url']
           params['grading_period_id'] = @gradingPeriodToShow if @mgpEnabled && @gradingPeriodToShow && @gradingPeriodToShow != '0' && @gradingPeriodToShow != ''
           $.ajaxJSON(@options.submissions_url, "GET", params, @gotSubmissionsChunk)
           @submissionChunkCount++
@@ -905,14 +950,14 @@ define [
         showSisSync: @options.post_grades_feature_enabled,
         currentSection: @sectionToShow)
       @sectionMenu.render()
-      @togglePostGrades(not @sectionToShow?)
+      @togglePostGrades(not @sectionToShow? or @sectionList().length is 1)
 
     updateCurrentSection: (section, author) =>
       @sectionToShow = section
       @postGradesStore.setSelectedSection @sectionToShow
       userSettings[if @sectionToShow then 'contextSet' else 'contextRemove']('grading_show_only_section', @sectionToShow)
       @buildRows() if @grid
-      @togglePostGrades(not @sectionToShow?)
+      @togglePostGrades(not @sectionToShow? or @sectionList().length is 1)
 
     showSections: ->
       if @sections_enabled && @options.post_grades_feature_enabled
@@ -1141,42 +1186,8 @@ define [
         new GradeDisplayWarningDialog(dialog_options)
 
     onUserFilterInput: (term) =>
-      # put rows back on the students for dropped assignments
-
-      data = @grid.getData()
-      _.each data, (student) ->
-        if student.beforeFilteredRow?
-          student.row = student.beforeFilteredRow
-          delete student.beforeFilteredRow
-
-      # put the removed items back in their proper order
-      _.each @userFilterRemovedRows.reverse(), (removedStudentItem) ->
-        data.splice removedStudentItem.index, 0, removedStudentItem.data
-      @userFilterRemovedRows = []
-
-      if term != ''
-        # SFU MOD CANVAS-188 Add SIS ID column
-        propertiesToMatch = ['name', 'login_id', 'short_name', 'sortable_name', 'sis_user_id']
-        # END SFU MOD
-        index = data.length
-        while index--
-          student = data[index]
-          matched = _.any propertiesToMatch, (prop) ->
-            student[prop]?.match new RegExp term, 'i'
-          if not matched
-            # remove the student, save the item and its index so we can put it
-            # back in order
-            item =
-              index: index
-              data: data.splice(index, 1)[0]
-            @userFilterRemovedRows.push item
-
-      for student, index in data
-        student.beforeFilteredRow = student.row
-        student.row = index
-
-      @grid.setData(data)
-      @grid.invalidate()
+      @userFilterTerm = term
+      @buildRows()
 
     getVisibleGradeGridColumns: ->
       res = [].concat @parentColumns, @customColumnDefinitions()
@@ -1243,17 +1254,6 @@ define [
         resizable: true
         sortable: true
         formatter: @htmlContentFormatter
-      # SFU MOD CANVAS-188 Add SIS ID column
-      ,      
-        id: 'sis_id'
-        name: I18n.t 'sis_id', 'SIS ID'
-        field: 'sis_id'
-        width: 100
-        cssClass: "meta-cell secondary_identifier_cell"
-        resizable: true
-        sortable: true
-        formatter: @htmlContentFormatter
-      # END SFU MOD
       ]
 
       @allAssignmentColumns = for id, assignment of @assignments
@@ -1369,7 +1369,6 @@ define [
       @grid.onSort.subscribe (event, data) =>
         if data.sortCol.field == "display_name" ||
            data.sortCol.field == "secondary_identifier" ||
-           data.sortCol.field == "sis_id" || # SFU MOD - CANVAS-188 Make SIS ID sortable
            data.sortCol.field.match /^custom_col/
           sortProp = if data.sortCol.field == "display_name"
             "sortable_name"
@@ -1471,41 +1470,48 @@ define [
       @totalGradeWarning = null
 
       if _.any(@assignments, (a) -> a.muted)
-        @totalGradeWarning = I18n.t "This grade differs from the student's view of the grade because some assignments are muted"
+        @totalGradeWarning =
+          warningText: I18n.t "This grade differs from the student's view of the grade because some assignments are muted"
+          icon: "icon-muted"
+      else
+        if @weightedGroups()
+          # assignment group has 0 points possible
+          invalidAssignmentGroups = _.filter @assignmentGroups, (ag) ->
+            pointsPossible = _.inject ag.assignments
+            , ((sum, a) -> sum + (a.points_possible || 0))
+            , 0
+            pointsPossible == 0
 
-      if @weightedGroups()
-        # assignment group has 0 points possible
-        invalidAssignmentGroups = _.filter @assignmentGroups, (ag) ->
-          pointsPossible = _.inject ag.assignments
+          for ag in invalidAssignmentGroups
+            for a in ag.assignments
+              a.invalid = true
+
+          if invalidAssignmentGroups.length > 0
+            groupNames = (ag.name for ag in invalidAssignmentGroups)
+            text = I18n.t 'invalid_assignment_groups_warning',
+              one: "Score does not include %{groups} because it has
+                    no points possible"
+              other: "Score does not include %{groups} because they have
+                      no points possible"
+            ,
+              groups: $.toSentence(groupNames)
+              count: groupNames.length
+            @totalGradeWarning =
+              warningText: text
+              icon: "icon-warning final-warning"
+
+        else
+          # no assignments have points possible
+          pointsPossible = _.inject @assignments
           , ((sum, a) -> sum + (a.points_possible || 0))
           , 0
-          pointsPossible == 0
 
-        for ag in invalidAssignmentGroups
-          for a in ag.assignments
-            a.invalid = true
-
-        if invalidAssignmentGroups.length > 0
-          groupNames = (ag.name for ag in invalidAssignmentGroups)
-          @totalGradeWarning = I18n.t 'invalid_assignment_groups_warning',
-            one: "Score does not include %{groups} because it has
-                  no points possible"
-            other: "Score does not include %{groups} because they have
-                    no points possible"
-          ,
-            groups: $.toSentence(groupNames)
-            count: groupNames.length
-
-      else
-        # no assignments have points possible
-        pointsPossible = _.inject @assignments
-        , ((sum, a) -> sum + (a.points_possible || 0))
-        , 0
-
-        if pointsPossible == 0
-          @totalGradeWarning = I18n.t 'no_assignments_have_points_warning'
-          , "Can't compute score until an assignment has points possible"
-
+          if pointsPossible == 0
+            text = I18n.t 'no_assignments_have_points_warning'
+            , "Can't compute score until an assignment has points possible"
+            @totalGradeWarning =
+              warningText: text
+              icon: "icon-warning final-warning"
     ###
     xsslint jqueryObject.identifier createLink
     xsslint jqueryObject.function showLink hideLink
