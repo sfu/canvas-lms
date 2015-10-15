@@ -8,7 +8,7 @@ There are a few prerequisites to meet before you can start.
 
 * [Virtualbox](https://docs.vagrantup.com/v2/provisioning/basic_usage.html)
 * [Vagrant](https://www.vagrantup.com/)
-  * Vagrant plugin: [vagrant-hostsupdater](https://github.com/cogitatio/vagrant-hostsupdater)
+  * Vagrant plugin: [vagrant-hostmanager](https://github.com/smdahlen/vagrant-hostmanager)
 * [Ansible](http://www.ansible.com/home)
 
 You can install all of these individually using their GUI installer, or you can use the command line:
