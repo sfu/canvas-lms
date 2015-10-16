@@ -8,7 +8,7 @@ There are a few prerequisites to meet before you can start.
 
 * [Virtualbox](https://docs.vagrantup.com/v2/provisioning/basic_usage.html)
 * [Vagrant](https://www.vagrantup.com/)
-  * Vagrant plugin: [vagrant-hostsupdater](https://github.com/cogitatio/vagrant-hostsupdater)
+  * Vagrant plugin: [vagrant-hostmanager](https://github.com/smdahlen/vagrant-hostmanager)
 * [Ansible](http://www.ansible.com/home)
 
 You can install all of these individually using their GUI installer, or you can use the command line:
@@ -25,7 +25,7 @@ brew cask install virtualbox
 
 # install vagrant and plugin(s)
 brew cask install vagrant
-vagrant plugin install vagrant-hostsupdater
+vagrant plugin install vagrant-hostmanager
 
 # install ansible
 brew install ansible
@@ -40,9 +40,39 @@ During `vagrant up` and `vagrant halt`, vagrant will attempt to modify your /etc
 Cmnd_Alias VAGRANT_EXPORTS_ADD = /usr/bin/tee -a /etc/exports
 Cmnd_Alias VAGRANT_NFSD = /sbin/nfsd restart
 Cmnd_Alias VAGRANT_EXPORTS_REMOVE = /usr/bin/sed
-Cmnd_Alias VAGRANT_HOSTSUPDATER_ADD = /bin/sh -c echo "*" >> /etc/hosts
-Cmnd_Alias VAGRANT_HOSTSUPDATER_REMOVE = /usr/bin/sed -i -e /*/ d /etc/hosts
-%admin ALL=(root) NOPASSWD: VAGRANT_EXPORTS_ADD, VAGRANT_NFSD, VAGRANT_EXPORTS_REMOVE, VAGRANT_HOSTSUPDATER_ADD, VAGRANT_HOSTSUPDATER_REMOVE
+Cmnd_Alias VAGRANT_HOSTMANAGER_UPDATE = /bin/cp /Users/YOUR_USER_NAME/.vagrant.d/tmp/hosts.local /etc/hosts
+%admin ALL=(root) NOPASSWD: VAGRANT_EXPORTS_ADD, VAGRANT_NFSD, VAGRANT_EXPORTS_REMOVE, VAGRANT_HOSTMANAGER_UPDATE
+```
+
+**Replace YOUR_USER_NAME with your actual username.**
+
+## Custom Configuration using `vagrantrc.yml`
+
+Placing a YAML file named `vagrantrc.yml` at the root of the canvas directory allows you to customize the Vagrant configuration. The following features are customizable:
+
+* Hostname: By default, the hostname is `canvas.dev`. Setting a `:hostname` property will override this.
+* IP address: DHCP is used by default. Setting an `:ip_address` property will set a static IP.
+* Additional NFS mounts: By default, the canvas root directory is NFS exported and mounted at `/vagrant` on the guest. You can specify additional paths on the host filesystem to be exported and mounted on the guest in a `:mount_directories` list. The `:local_path` property must be the full path on your local disk. The `:mount_at` property must be the full path where the exprort will be mounted.
+* Pre-provision shell script: You can specify shell commands to be called before the main Ansible provisioning starts in a `:pre_provision_script` property.
+* Post-provision shell script: You can specify shell commands to be called after the final shell provisioner in a `:post_provision_script` property.
+
+`vagrantrc.yml` should be ignored in either your global gitignore file or in `.git/info/exclude`
+
+### Example:
+
+The following example sets a custom hostname (instead of `canvas.dev`), a static IP address (instead of DHCP), mounts the Canvas Spaces plugins from the host and runs a pre-provisioner script to set up Canvas Spaces:
+
+```YAML
+:hostname: canvas-spaces-test.dev
+:ip_address: 10.0.5.5
+:mount_directories:
+  -
+    :local_path: '/local/path/to/canvas_spaces'
+    :mount_at: '/vagrant/gems/plugins/canvas_spaces'
+  -
+    :local_path: '/local/path/to/canvas_spaces_client_app'
+    :mount_at: '/vagrant/client_apps/canvas_spaces'
+:pre_provision_script: 'cd /vagrant/client_apps/canvas_spaces && npm install && script/canvas_setup'
 ```
 
 ## TL;DR
@@ -112,6 +142,7 @@ Running `vagrant up` and some of the provisioning steps creates some files that 
 * `.vagrant`
 * `vendor/bundle`
 * `/vendor/plugins/*/public/*/compiled/`
+* `vagrantrc.yml`
 
 Editing the Canvas `.gitignore` file often causes conflicts, so instead you should do one of the following:
 
