@@ -16,6 +16,8 @@ mock_map = [
   { :method => :get, :pattern => /rest.its.sfu.ca\/.*\/rest\/course\/course.js.*/, :mock => mocks[:amaint_mocks][:course] },
   { :method => :get, :pattern => /rest.its.sfu.ca\/.*\/rest\/datastore2\/global\/accountInfo.js.*/, :mock => mocks[:amaint_mocks][:user] },
   { :method => :get, :pattern => /rest.its.sfu.ca\/.*\/rest\/crr\/terms.js.*/, :mock => mocks[:amaint_mocks][:terms] },
+  { :method => :get, :pattern => /rest.its.sfu.ca\/.*\/rest\/crr\/terms.js.*username=inactive/, :mock => mocks[:amaint_mocks][:terms_inactive] },
+  { :method => :get, :pattern => /rest.its.sfu.ca\/.*\/rest\/crr\/terms.js.*username=none/, :mock => mocks[:amaint_mocks][:terms_none] },
   { :method => :get, :pattern => /rest.its.sfu.ca\/.*\/rest\/crr\/resource2.js.*/, :mock => mocks[:amaint_mocks][:crr] }
 ]
 
