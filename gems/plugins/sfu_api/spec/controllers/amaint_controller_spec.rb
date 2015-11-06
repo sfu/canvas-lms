@@ -63,9 +63,21 @@ describe AmaintController do
       expect(json_parse).to include('staff','undergrad','alumnus','grad','faculty','other')
     end
 
-    it 'should return teaching terms for user when asked' do
-      get :user_info, :sfu_id => 'kipling', :property => 'term', :format => :json
-      expect(json_parse.first['peopleSoftCode']).to eq('1157')
+    context 'teaching terms' do
+      it 'should return teaching terms for user when asked' do
+        get :user_info, :sfu_id => 'kipling', :property => 'term', :format => :json
+        expect(json_parse.first['peopleSoftCode']).to eq('1157')
+      end
+
+      it 'should return 404 for a non-teaching user' do
+        get :user_info, :sfu_id => 'inactive', :property => 'term', :format => :json
+        expect(response.code).to eq('404')
+      end
+
+      it 'should return 404 for a non-enrolled user' do
+        get :user_info, :sfu_id => 'none', :property => 'term', :format => :json
+        expect(response.code).to eq('404')
+      end
     end
 
     it 'should return two courses for user when asked' do
