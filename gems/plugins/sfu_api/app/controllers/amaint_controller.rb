@@ -35,7 +35,7 @@ class AmaintController < ApplicationController
       elsif params[:property].to_s.eql? "roles"
         user_array = roles
       elsif params[:filter].nil? && params[:property].to_s.start_with?("term")
-        user_array = teaching_terms_for sfu_id
+        user_array = SFU::Course.terms sfu_id
       elsif params[:property].to_s.start_with?("term")
         user_array = courses_for_user(sfu_id, params[:filter])
       end
@@ -136,19 +136,6 @@ class AmaintController < ApplicationController
       end
     end
     course_array
-  end
-
-  def teaching_terms_for(sfu_id)
-    term_array = []
-    terms = SFU::Course.terms sfu_id
-    if terms == 500 || terms == 404
-      term_array = terms
-    else
-      terms.each do |term|
-        term_array.push term
-      end
-    end
-    term_array
   end
 
 end
