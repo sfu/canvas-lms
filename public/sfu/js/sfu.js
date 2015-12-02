@@ -51,7 +51,7 @@
         '<li>',
         '<select class="sfu_help_links">',
         '<option value="">Help</option>',
-        '<option value="https://canvas.sfu.ca/courses/14504">Help for Students</option>',
+        '<option value="http://www.sfu.ca/canvas/students.html">Help for Students</option>',
         '<option value="http://www.sfu.ca/canvas/instructors.html">Help for Instructors</option>',
         '<option value="http://www.sfu.ca/techforum">Q&A Forum</option>',
         '</li>'
