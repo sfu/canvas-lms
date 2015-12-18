@@ -1,5 +1,5 @@
-require File.expand_path(File.dirname(__FILE__) + '/spec_helper')
-require File.expand_path(File.dirname(__FILE__) + '/../lib/sfu/course_form/csv_builder')
+require_relative './spec_helper'
+require_relative '../lib/sfu/course_form/csv_builder'
 
 describe 'A courses request' do
 
