@@ -23,6 +23,10 @@ class CrocodocDocument < ActiveRecord::Base
 
   belongs_to :attachment
 
+  has_and_belongs_to_many :submissions,
+    join_table: :canvadocs_submissions,
+    readonly: true
+
   MIME_TYPES = %w(
     application/pdf
     application/msword
@@ -31,7 +35,7 @@ class CrocodocDocument < ActiveRecord::Base
     application/vnd.openxmlformats-officedocument.presentationml.presentation
     application/excel
     application/vnd.ms-excel
-  )
+  ).freeze
 
   def upload
     return if uuid.present?
@@ -98,8 +102,6 @@ class CrocodocDocument < ActiveRecord::Base
       where(:context_type => 'Submission').
       preload(context: [:assignment]).
       map(&:context)
-
-    return opts unless submissions
 
     if submissions.any? { |s| s.grants_right? user, :read_grade }
       opts[:filter] = 'all'
