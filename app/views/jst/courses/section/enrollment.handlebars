@@ -2,7 +2,7 @@
 {{#each this}}
 <li id="enrollment_{{id}}" class="user user_{{user_id}} {{typeClass}}" title="{{user.name}}: {{user.login_id}}">
   <span class="links">
-    {{#if can_be_removed}} {{!-- ** WAS `canRemove`, needs testing ** SFU MOD - CANVAS-224 Only show unenroll button if allowed --}}
+    {{#if can_be_removed}}
     <a href="/courses/{{course_id}}/unenroll/{{id}}" class="unenroll_user_link no-hover" title="{{#t "links.unenroll_user"}}Remove User from Course{{/t}}">
       <img alt="delete_enrollment" src="/images/delete_circle.png" />
     </a>
