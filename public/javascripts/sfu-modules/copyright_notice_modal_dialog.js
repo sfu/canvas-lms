@@ -5,10 +5,16 @@ define([
 ], function($, React, SFUCopyrightComplianceModalDialog) {
 
     var render = function(formId) {
-        React.renderComponent(SFUCopyrightComplianceModalDialog({
-            modalIsOpen: true,
-            formId: formId
-        }), document.getElementById('wizard_box'));
+        React.render(
+          React.createElement(
+            SFUCopyrightComplianceModalDialog,
+            {
+                modalIsOpen: true,
+                formId: formId
+            }
+          ),
+          document.getElementById('wizard_box')
+        );
     };
 
     var attachClickHandler = function(formId) {
