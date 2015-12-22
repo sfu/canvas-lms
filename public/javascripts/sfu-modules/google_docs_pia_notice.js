@@ -10,10 +10,17 @@ define([
         usage = 'google_docs_student';
       }
       $('<div id="sfu-google-docs-pia-notice">').appendTo('#google_docs_description td');
-      React.renderComponent(SFUPrivacyNotice({
-        alertStyle: 'alert',
-        usage: usage
-      }), document.getElementById('sfu-google-docs-pia-notice'))
+
+      React.render(
+        React.createElement(
+          SFUPrivacyNotice,
+          {
+            alertStyle: 'alert',
+            usage: usage
+          }
+        ),
+        document.getElementById('sfu-google-docs-pia-notice')
+      );
     });
   };
 
