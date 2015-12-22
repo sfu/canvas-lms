@@ -256,9 +256,14 @@ require [
 
   $(document).ready ->
 
-    React.renderComponent(SFUCopyrightComplianceNotice({
-      className: 'sfu-ic-wizard-box__message-text__copyright_compliance',
-    }), document.getElementsByClassName('copyright')[0])
+
+    React.render(
+      React.createElement(
+        SFUCopyrightComplianceNotice,
+        { className: 'sfu-ic-wizard-box__message-text__copyright_compliance' }
+      ),
+      document.getElementsByClassName('copyright')[0]
+    )
 
     # attach behavior to action links
     $('button.action').bind 'click', handleActionClick
