@@ -108,7 +108,7 @@ class AmaintController < ApplicationController
         course_hash["peopleSoftCode"] = c["course"].first["peopleSoftCode"].to_s
         course_hash["sis_source_id"] = course_hash["peopleSoftCode"] + "-" +
                                        course_hash["name"].downcase +  "-" +
-                                       course_hash["number"] + "-" +
+                                       course_hash["number"].downcase + "-" +
                                        course_hash["section"].downcase
         course_hash["sectionTutorials"] = ""
         course_hash["sectionCode"] = c["course"].first["sectionCode"]
@@ -126,7 +126,7 @@ class AmaintController < ApplicationController
 
         course_hash["key"] = course_hash["peopleSoftCode"] + ":::" +
                              course_hash["name"].downcase +  ":::" +
-                             course_hash["number"] + ":::" +
+                             course_hash["number"].downcase + ":::" +
                              course_hash["section"].downcase + ":::" +
                              course_hash["title"]
         course_hash["key"].concat ":::" + course_hash["sections"].join(',').downcase if course_hash["sections"].present?
