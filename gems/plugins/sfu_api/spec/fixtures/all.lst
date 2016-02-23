@@ -1,6 +1,7 @@
-1:_:test:::100:::Test Course 100:::test100:::test100d100:::test 100 d100 test course 100
-2:_:test:::110:::Test Course 110:::test110:::test110d100:::test 110 d100 test course 110
-3:_:test:::200:::Test Course 200:::test200:::test200d200:::test 200 d200 test course 200
-4:_:test:::300:::Test Course 300:::test300:::test300d100:::test 300 d100 test course 300
-5:_:test:::300:::Test Course 300:::test300:::test300d200:::test 300 d200 test course 300
-6:_:bskt:::100:::Basket Weaving 100:::bskt100:::bskt100d100:::bskt 100 d100 basket weaving 100
+1:_:test:::100:::d100:::Test Course 100:::test100:::test100d100:::test 100 d100 test course 100
+2:_:test:::110:::d100:::Test Course 110:::test110:::test110d100:::test 110 d100 test course 110
+3:_:test:::200:::d200:::Test Course 200:::test200:::test200d200:::test 200 d200 test course 200
+4:_:test:::300:::d100:::Test Course 300:::test300:::test300d100:::test 300 d100 test course 300
+5:_:test:::300:::d200:::Test Course 300:::test300:::test300d200:::test 300 d200 test course 300
+6:_:test:::355w:::d100:::Test Course 355w:::test355w:::test355wd100:::test 355w d100 test course 355w
+7:_:bskt:::100:::d100:::Basket Weaving 100:::bskt100:::bskt100d100:::bskt 100 d100 basket weaving 100

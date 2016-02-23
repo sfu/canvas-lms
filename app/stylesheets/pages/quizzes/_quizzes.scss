@@ -219,8 +219,10 @@ li.quiz {
 }
 
 #submit_quiz_form {
-  .question_holder {
-    overflow: hidden;
+  @if not $use_new_styles {
+    .question_holder {
+      overflow: hidden;
+    }
   }
   .button-container .btn, #submit_quiz_button {
     min-width: 120px;
@@ -574,7 +576,9 @@ li.quiz {
   background-color: #fff;
   position: relative;
   min-height: 50px;
-  min-width: 515px;
+  @if not $use_new_styles {
+    min-width: 515px;
+  }
   margin: 0.7em auto 30px auto;
   _height: 10px;
   &.modified_but_not_saved {
@@ -2074,9 +2078,8 @@ ul#quiz_versions {
 }
 
 .regrade-options {
-  margin-top: 12px;
   color: #333;
-  padding: 2px 10px 13px 10px;
+  padding: 2px 10px;
   h3 {
     margin: 0;
     text-transform: uppercase;
@@ -2088,16 +2091,15 @@ ul#quiz_versions {
     }
   }
   .checkbox {
-    padding-left: 12px;
     input {
       height: 16px;
       margin: 0 9px 0 0;
     }
   }
-}
-
-.regrade-options label {
-  display: block;
+  label {
+    display: block;
+    padding-left: 0px;
+  }
 }
 
 .user-regrade-points {

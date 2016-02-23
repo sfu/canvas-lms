@@ -412,7 +412,7 @@ describe Attachment do
       a.destroy
       expect(a).not_to be_frozen
       expect(a).to be_deleted
-      a.destroy!
+      a.destroy_permanently!
       expect(a).to be_frozen
     end
 
@@ -447,13 +447,13 @@ describe Attachment do
     end
   end
 
-  context "destroy!" do
+  context "destroy_permanently!" do
     it "should not delete the s3 object, even here" do
       s3_storage!
       a = attachment_model
       s3object = a.s3object
       s3object.expects(:delete).never
-      a.destroy!
+      a.destroy_permanently!
     end
   end
 
@@ -1259,6 +1259,9 @@ describe Attachment do
       attachment_model(:context => @user, :uploaded_data => stub_png_data, :filename => "homework.png")
       @attachment.update_attribute(:size, 1.megabyte)
 
+      quota = Attachment.get_quota(@user)
+      expect(quota[:quota_used]).to eq 1.megabyte
+
       @assignment = @course.assignments.create!
       sub = @assignment.submit_homework(@user, attachments: [@attachment])
 
@@ -1268,6 +1271,28 @@ describe Attachment do
       quota = Attachment.get_quota(@user)
       expect(quota[:quota_used]).to eq 1.megabyte
     end
+
+    it "should not count attachments a student has used for graded discussion replies towards the quota" do
+      course_with_student(:active_all => true)
+      attachment_model(:context => @user, :uploaded_data => stub_png_data, :filename => "homework.png")
+      @attachment.update_attribute(:size, 1.megabyte)
+
+      quota = Attachment.get_quota(@user)
+      expect(quota[:quota_used]).to eq 1.megabyte
+
+      assignment = @course.assignments.create!(:title => "asmt")
+      topic = @course.discussion_topics.create!(:title => 'topic', :assignment => assignment)
+      entry = topic.reply_from(:user => @student, :text => "entry")
+      entry.attachment = @attachment
+      entry.save!
+
+      attachment_model(:context => @user, :uploaded_data => stub_png_data, :filename => "otherfile.png")
+      @attachment.update_attribute(:size, 1.megabyte)
+
+      quota = Attachment.get_quota(@user)
+      expect(quota[:quota_used]).to eq 1.megabyte
+    end
+
   end
 
   context "#open" do

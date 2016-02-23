@@ -1,6 +1,6 @@
-# In rails4, this is always true, and in rails5, this setter is removed.
-# In other words, just remove this whole block of code when we drop rails3 support.
-if CANVAS_RAILS3
+# In rails 4.2, this is always true, and in rails 5, this setter is removed.
+# In other words, just remove this whole block of code when we drop rails 4.0 support.
+if CANVAS_RAILS4_0
   ActiveSupport::Cache::Store.instrument = true
   if defined?(PhusionPassenger)
     # For whatever reason this is a thread-local setting, so under Passenger we

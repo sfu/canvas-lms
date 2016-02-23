@@ -189,7 +189,8 @@ class AssessmentQuestion < ActiveRecord::Base
   def question_data
     if data = read_attribute(:question_data)
       if data.class == Hash
-        data = write_attribute(:question_data, data.with_indifferent_access)
+         write_attribute(:question_data, data.with_indifferent_access)
+         data = read_attribute(:question_data)
       end
     end
 
@@ -230,7 +231,7 @@ class AssessmentQuestion < ActiveRecord::Base
   end
 
   def find_or_create_quiz_question(quiz_id, exclude_ids=[])
-    query = quiz_questions.where(quiz_id: quiz_id)
+    query = quiz_questions.where(quiz_id: quiz_id).order(:id)
     query = query.where('id NOT IN (?)', exclude_ids) if exclude_ids.present?
 
     if qq = query.first
@@ -247,7 +248,7 @@ class AssessmentQuestion < ActiveRecord::Base
     text
   end
 
-  alias_method :destroy!, :destroy
+  alias_method :destroy_permanently!, :destroy
   def destroy
     self.workflow_state = 'deleted'
     self.save

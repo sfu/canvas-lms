@@ -185,20 +185,9 @@ class Attachment < ActiveRecord::Base
 
   def touch_context_if_appropriate
     unless context_type == 'ConversationMessage'
-      connection.after_transaction_commit { touch_context }
+      self.class.connection.after_transaction_commit { touch_context }
     end
   end
-
-  def before_attachment_saved
-    run_before_attachment_saved
-  end
-
-  def after_attachment_saved
-    run_after_attachment_saved
-  end
-
-  before_attachment_saved :run_before_attachment_saved
-  after_attachment_saved :run_after_attachment_saved
 
   def run_before_attachment_saved
     @after_attachment_saved_workflow_state = self.workflow_state
@@ -503,7 +492,7 @@ class Attachment < ActiveRecord::Base
       end
       save!
       # normally this would be called by attachment_fu after it had uploaded the file to S3.
-      after_attachment_saved
+      run_after_attachment_saved
     end
   end
 
@@ -607,7 +596,7 @@ class Attachment < ActiveRecord::Base
 
           if context.is_a?(User)
             excluded_attachment_ids = context.attachments.joins(:attachment_associations).where("attachment_associations.context_type = ?", "Submission").pluck(:id)
-            attachment_scope = attachment_scope.where("id NOT IN (?)", excluded_attachment_ids)
+            attachment_scope = attachment_scope.where("id NOT IN (?)", excluded_attachment_ids) if excluded_attachment_ids.any?
           end
 
           min = self.minimum_size_for_quota
@@ -678,7 +667,7 @@ class Attachment < ActiveRecord::Base
   protected :assign_uuid
 
   def inline_content?
-    (self.content_type.match(/\Atext/) && !self.canvadocable?) || self.extension == '.html' || self.extension == '.htm' || self.extension == '.swf'
+    self.content_type.match(/\Atext/) || self.extension == '.html' || self.extension == '.htm' || self.extension == '.swf'
   end
 
   def self.shared_secret
@@ -1161,7 +1150,7 @@ class Attachment < ActiveRecord::Base
     where(condition_sql)
   }
 
-  alias_method :destroy!, :destroy
+  alias_method :destroy_permanently!, :destroy
   # file_state is like workflow_state, which was already taken
   # possible values are: available, deleted
   def destroy
@@ -1226,9 +1215,10 @@ class Attachment < ActiveRecord::Base
     # ... or crocodoc (this will go away soon)
     return if Attachment.skip_3rd_party_submits?
 
-    submit_to_crocodoc_instead = opts[:wants_annotation] &&
-                                 crocodocable? &&
-                                 !Canvadocs.annotations_supported?
+    submit_to_crocodoc_instead = opts[:force_crocodoc] ||
+                                 (opts[:wants_annotation] &&
+                                  crocodocable? &&
+                                  !Canvadocs.annotations_supported?)
     if submit_to_crocodoc_instead
       # get crocodoc off the canvadocs strand
       # (maybe :wants_annotation was a dumb idea)

@@ -164,7 +164,6 @@ define [
         for c in @customColumns
           url = @options.custom_column_data_url.replace /:id/, c.id
           @getCustomColumnData(c.id)
-        @assignment_visibility() if ENV.GRADEBOOK_OPTIONS.differentiated_assignments_enabled
         @disableAssignmentsInClosedGradingPeriods() if @mgpEnabled
 
       @showCustomColumnDropdownOption()
@@ -172,13 +171,14 @@ define [
       @showPostGradesButton()
       @checkForUploadComplete()
 
-    assignment_visibility: ->
-      allStudentIds = _.keys @students
-      for assignmentId, a of @assignments
-        if a.only_visible_to_overrides
-          hiddenStudentIds = @hiddenStudentIdsForAssignment(allStudentIds, a)
-          for studentId in hiddenStudentIds
-            @updateSubmission { assignment_id: assignmentId, user_id: studentId, hidden: true }
+    setAssignmentVisibility: ->
+      @withAllStudents (students) =>
+        allStudentIds = _.keys(students)
+        for assignmentId, a of @assignments
+          if a.only_visible_to_overrides
+            hiddenStudentIds = @hiddenStudentIdsForAssignment(allStudentIds, a)
+            for studentId in hiddenStudentIds
+              @updateSubmission assignment_id: assignmentId, user_id: studentId, hidden: true
 
     hiddenStudentIdsForAssignment: (studentIds, assignment) ->
       _.difference studentIds, assignment.assignment_visibility
@@ -269,6 +269,7 @@ define [
     doSlickgridStuff: =>
       @initGrid()
       @buildRows()
+      @setAssignmentVisibility()
       @getSubmissionsChunks()
       @initHeader()
 
@@ -611,8 +612,8 @@ define [
       for data in student_submissions
         student = @student(data.user_id)
         for submission in data.submissions
-          current_submission = student["assignment_#{submission.assignment_id}"]
-          @updateSubmission(submission) unless current_submission?["hidden"]
+          @updateSubmission(submission)
+
         student.loaded = true
         @grid.invalidateRow(student.row)
         @calculateStudentGrade(student)
@@ -640,7 +641,8 @@ define [
     updateSubmission: (submission) =>
       student = @student(submission.user_id)
       submission.submitted_at = tz.parse(submission.submitted_at)
-      student["assignment_#{submission.assignment_id}"] = submission
+      cell = student["assignment_#{submission.assignment_id}"] ||= {}
+      _.extend(cell, submission)
 
     # this is used after the CurveGradesDialog submit xhr comes back.  it does not use the api
     # because there is no *bulk* submissions#update endpoint in the api.

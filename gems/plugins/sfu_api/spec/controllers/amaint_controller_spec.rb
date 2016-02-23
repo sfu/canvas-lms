@@ -84,5 +84,15 @@ describe AmaintController do
       get :user_info, :sfu_id => 'kipling', :property => 'term', :filter => '1157', :format => :json
       expect(json_parse.size).to eq(2)
     end
+
+    it 'should return key with name, number, and section in all lower case' do
+      get :user_info, :sfu_id => 'kipling', :property => 'term', :filter => '1157', :format => :json
+      expect(json_parse.first['key']).to start_with('1157:::test:::100w:::d100:::')
+    end
+
+    it 'should return sis_source_id in all lower case' do
+      get :user_info, :sfu_id => 'kipling', :property => 'term', :filter => '1157', :format => :json
+      expect(json_parse.first['sis_source_id']).to eq('1157-test-100w-d100')
+    end
   end
 end

@@ -33,7 +33,7 @@ class CourseDataController < ApplicationController
         course_hash = {
             :term => term,
             :name => course_data[0].to_s.upcase,
-            :number => course_data[1],
+            :number => course_data[1].to_s.upcase,
             :section => course_data[2].to_s.upcase,
             :title => course_data[3]
         }
