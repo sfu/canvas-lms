@@ -147,23 +147,6 @@
         });
     });
 
-    // Fixes for Import Content page only
-    utils.onPage(/courses\/\d+\/content_migrations/, function() {
-        // The fixes are for elements that are dynamically generated when a specific XHR call completes
-        $(document).ajaxComplete(function (event, XMLHttpRequest, ajaxOptions) {
-            if (ajaxOptions.url && ajaxOptions.url.match(/users\/\d+\/manageable_courses/)) {
-                // Alphabetize course drop-down list, by sorting <option>s inside each <optgroup>
-                // NOTE: This is no longer needed when XHR results are pre-sorted by Canvas
-                $('optgroup', $('#courseSelect')).each(function (i, termGroup) {
-                    $('option', termGroup)
-                        .sort(function (a, b) { return $(a).text().localeCompare($(b).text()); })
-                        .appendTo(termGroup);
-                });
-                // END Alphabetize course drop-down list
-            }
-        });
-    });
-
     // Fix for the new conversations page - toolbar renders underneath the rainbow bar
     utils.onPage(/conversations/, function() {
         // are we on the new conversations page?
@@ -171,37 +154,6 @@
             jQuery('div#main').css('top', '92px');
         }
     });
-
-    // CANVAS-246 Create button that links to the Start a New Ad Hoc Space form (only on these pages: / and /courses)
-    utils.onPage(/^\/(courses)?$/, function () {
-        // Add the button right after the existing Start a New Course button
-        var addAdHocButton = function () {
-            return; // TODO: Remove this line when Ad Hoc Spaces are ready
-            var $courseButton = $('#start_new_course');
-            var $adhocButton = $courseButton.clone();
-            $adhocButton
-                .text('Start a New Ad Hoc Space')
-                .attr('id', 'start_new_adhoc')
-                .attr('aria-controls', 'new_adhoc_form')
-                .insertAfter($courseButton)
-                .on('click', function () {
-                    window.location = '/sfu/adhoc/new';
-                });
-        }
-
-        // If the button is not there yet, it's likely still being loaded in the sidebar.
-        // Wait for it to complete, and then add the button. This is meant for the home page.
-        if ($('#start_new_course').length == 0) {
-            $(document).ajaxComplete(function (event, XMLHttpRequest, ajaxOptions) {
-                if (ajaxOptions.url && ajaxOptions.url.match(/dashboard-sidebar/)) {
-                    addAdHocButton();
-                }
-            });
-        } else {
-            addAdHocButton();
-        }
-    });
-    // END CANVAS-246
 
     utils.onPage(/^\/profile\/settings\/?$/, function () {
         $(document).ready(function () {
