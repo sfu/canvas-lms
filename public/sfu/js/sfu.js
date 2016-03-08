@@ -42,43 +42,52 @@
 
     }
 
+    if (!ENV.use_new_styles) {
+      // header rainbow
+      $('#header').append('<div id="header-rainbow">');
 
-    // header rainbow
-    $('#header').append('<div id="header-rainbow">');
+      // help links
+      var helpHtml = [
+          '<li>',
+          '<select class="sfu_help_links">',
+          '<option value="">Help</option>',
+          '<option value="http://www.sfu.ca/canvas/students.html">Help for Students</option>',
+          '<option value="http://www.sfu.ca/canvas/instructors.html">Help for Instructors</option>',
+          '<option value="http://www.sfu.ca/techforum">Q&A Forum</option>',
+          '</li>'
+      ].join('');
+      $('#topbar .logout').before(helpHtml);
+      $('#topbar .sfu_help_links').on('change', function(ev) {
+          if (this.value) {
+              window.location = this.value;
+          }
+      });
 
-    // help links
-    var helpHtml = [
-        '<li>',
-        '<select class="sfu_help_links">',
-        '<option value="">Help</option>',
-        '<option value="http://www.sfu.ca/canvas/students.html">Help for Students</option>',
-        '<option value="http://www.sfu.ca/canvas/instructors.html">Help for Instructors</option>',
-        '<option value="http://www.sfu.ca/techforum">Q&A Forum</option>',
-        '</li>'
-    ].join('');
-    $('#topbar .logout').before(helpHtml);
-    $('#topbar .sfu_help_links').on('change', function(ev) {
-        if (this.value) {
-            window.location = this.value;
-        }
-    });
+      // handle no-user case
+      if ($('#header').hasClass('no-user')) {
+          // add in a dummy #menu div
+          $('#header-inner').append('<div id="menu" style="height:41px"></div>');
+          // remove the register link
+          $('#header.no-user a[href="/register"]').parent().remove()
+      }
+
+      // add Canvas Spaces to nav
+      $(document).ready(function() {
+        if (!ENV.CANVAS_SPACES_ENABLED) { return; }
+        $('#menu').append('<li class="menu-item" id="canvas_spaces_menu_item"><a href="/canvas_spaces" class="menu-item-no-drop">Canvas Spaces</a></li>')
+      });
+
+      // Fix for the new conversations page - toolbar renders underneath the rainbow bar
+      utils.onPage(/conversations/, function() {
+          // are we on the new conversations page?
+          if (ENV.CONVERSATIONS && (ENV.CONVERSATIONS.ATTACHMENTS_FOLDER_ID && !ENV.hasOwnProperty('CONTEXT_ACTION_SOURCE'))) {
+              jQuery('div#main').css('top', '92px');
+          }
+      });
+    }
 
     // sfu logo in footer
     $('footer').html('<a href="http://www.sfu.ca/canvas"><img alt="SFU Canvas" src="/sfu/images/sfu-logo.png" width="250" height="38"></a>').show();
-
-    // handle no-user case
-    if ($('#header').hasClass('no-user')) {
-        // add in a dummy #menu div
-        $('#header-inner').append('<div id="menu" style="height:41px"></div>');
-        // remove the register link
-        $('#header.no-user a[href="/register"]').parent().remove()
-    }
-
-    // add Canvas Spaces to nav
-    $(document).ready(function() {
-      if (!ENV.CANVAS_SPACES_ENABLED) { return; }
-      $('#menu').append('<li class="menu-item" id="canvas_spaces_menu_item"><a href="/canvas_spaces" class="menu-item-no-drop">Canvas Spaces</a></li>')
-    });
 
     // hijack Start New Course button (CANVAS-192)
     // first, cache the original event handler and disable it
@@ -145,14 +154,6 @@
         require(['sfu-modules/google_docs_pia_notice'], function(module) {
             module.showGoogleDocsWarning();
         });
-    });
-
-    // Fix for the new conversations page - toolbar renders underneath the rainbow bar
-    utils.onPage(/conversations/, function() {
-        // are we on the new conversations page?
-        if (ENV.CONVERSATIONS && (ENV.CONVERSATIONS.ATTACHMENTS_FOLDER_ID && !ENV.hasOwnProperty('CONTEXT_ACTION_SOURCE'))) {
-            jQuery('div#main').css('top', '92px');
-        }
     });
 
     utils.onPage(/^\/profile\/settings\/?$/, function () {
