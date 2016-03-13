@@ -1,4 +1,4 @@
-lock '3.2.1'
+lock '~> 3.4'
 
 set :application,   'canvas'
 set :repo_url,      ENV['repo'] || 'https://github.com/sfu/canvas-lms.git'
