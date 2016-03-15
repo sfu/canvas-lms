@@ -701,9 +701,13 @@ define [
 
 
     indexedOverrides: ->
-      indexed = { studentOverrides: {}, sectionOverrides: {} }
+      indexed = {
+        studentOverrides: {},
+        groupOverrides: {},
+        sectionOverrides: {}
+      }
       _.each @assignments, (assignment) ->
-        if assignment.has_overrides
+        if assignment.has_overrides && assignment.overrides
           _.each assignment.overrides, (override) ->
             if override.student_ids
               indexed.studentOverrides[assignment.id] ?= {}
@@ -712,6 +716,9 @@ define [
             else if sectionId = override.course_section_id
               indexed.sectionOverrides[assignment.id] ?= {}
               indexed.sectionOverrides[assignment.id][sectionId] = override
+            else if groupId = override.group_id
+              indexed.groupOverrides[assignment.id] ?= {}
+              indexed.groupOverrides[assignment.id][groupId] = override
       indexed
 
     indexedGradingPeriods: ->
@@ -726,23 +733,23 @@ define [
       gradingPeriod = gradingPeriods[selectedPeriodId]
       effectiveDueAt = assignment.due_at
 
-      if assignment.has_overrides
-        # we'll eventually need to consider group overrides here
-        # (group overrides are not yet a feature but are planned)
-        sectionOverrides = []
-        sectionOverridesOnAssignment = overrides.sectionOverrides[assignment.id]
-        if sectionOverridesOnAssignment
-          _.each student.sections, (sectionId) ->
-            sectionOverride = sectionOverridesOnAssignment[sectionId]
-            sectionOverrides.push sectionOverride if sectionOverride
+      if assignment.has_overrides && assignment.overrides
+        IDsByOverrideType = {
+          "sectionOverrides": student.sections
+          "groupOverrides": student.group_ids
+          "studentOverrides": [student.id]
+        }
 
-        studentOverrides = []
-        studentOverridesOnAssignment = overrides.studentOverrides[assignment.id]
-        if studentOverridesOnAssignment
-          studentOverride = studentOverridesOnAssignment[student.id]
-          studentOverrides.push studentOverride if studentOverride
+        getOverridesForType = (typeIds, overrideType) ->
+          _.map typeIds, (typeId) ->
+            overrides[overrideType]?[assignment.id]?[typeId]
 
-        allOverridesForSubmission = sectionOverrides.concat studentOverrides
+        allOverridesForSubmission = _.chain(IDsByOverrideType)
+          .map(getOverridesForType)
+          .flatten()
+          .compact()
+          .value()
+
         overrideDates = _.chain(allOverridesForSubmission)
           .pluck('due_at')
           .map((dateString) -> tz.parse(dateString))
@@ -1089,8 +1096,8 @@ define [
       @drawSectionSelectButton() if @sections_enabled
       @drawGradingPeriodSelectButton() if @mgpEnabled
 
-      $settingsMenu = $('#gradebook_settings').next()
-      $.each ['show_attendance', 'include_ungraded_assignments', 'show_concluded_enrollments'], (i, setting) =>
+      $settingsMenu = $('.gradebook_dropdown')
+      $.each ['show_attendance', 'include_ungraded_assignments', 'show_concluded_enrollments'], (_i, setting) =>
         $settingsMenu.find("##{setting}").prop('checked', !!@[setting]).change (event) =>
           if setting is 'show_concluded_enrollments' and @options.course_is_concluded and @show_concluded_enrollments
             $("##{setting}").prop('checked', true)
@@ -1115,8 +1122,8 @@ define [
         @arrangeColumnsBy(newSortOrder, false)
       @arrangeColumnsBy(@getStoredSortOrder(), true)
 
-      $('#gradebook_settings').kyleMenu()
-      $('#download_csv').kyleMenu()
+      $('#gradebook_settings').kyleMenu(returnFocusTo: $('#gradebook_settings'))
+      $('#download_csv').kyleMenu(returnFocusTo: $('#download_csv'))
       $('#post_grades').kyleMenu()
 
       $settingsMenu.find('.student_names_toggle').click(@studentNamesToggle)
@@ -1149,6 +1156,7 @@ define [
 
       $('.generate_new_csv').click =>
         $('#download_csv').prop('disabled', true)
+        $('.icon-import').parent().focus()
         loading_interval = self.exportingGradebookStatus()
         include_priors = $('#show_concluded_enrollments').prop('checked')
 
@@ -1281,7 +1289,7 @@ define [
                                 submissionType is "attendance" and not @show_attendance
 
       if @gradebookColumnOrderSettings?.sortType
-        columns.sort @makeColumnSortFn(@gradebookColumnOrderSettings)
+        columns.sort @makeColumnSortFn(@getStoredSortOrder())
 
       columns = columns.concat(@aggregateColumns)
       headers = @parentColumns.concat(@customColumnDefinitions())
