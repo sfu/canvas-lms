@@ -18,8 +18,8 @@
   retries: 10
   delay: 5
 
-- name: delete canvas gems 
-  file: path=/home/vagrant/canvas_gems state=absent force=yes
+# - name: delete canvas gems
+#   file: path=/home/vagrant/canvas_gems state=absent force=yes
 
 - name: delete Gemfile.lock
   file: path=/vagrant/Gemfile.lock state=absent
@@ -51,6 +51,22 @@
     chdir: /vagrant
   remote_user: vagrant
   sudo: no
+
+- name: init databases
+  shell: RAILS_ENV=production CANVAS_LMS_ADMIN_EMAIL="{{canvas_admin_email}}" CANVAS_LMS_ADMIN_PASSWORD="{{canvas_admin_password}}" CANVAS_LMS_ACCOUNT_NAME="{{canvas_account_name}}" CANVAS_LMS_STATS_COLLECTION=opt_out bundle exec rake db:initial_setup && touch /home/vagrant/CanvasDBSetupDone
+  remote_user: vagrant
+  sudo: no
+  ignore_errors: true
+  args:
+    chdir: /vagrant
+    creates: /home/vagrant/CanvasDBSetupDone
+
+- name: TEMP run migration
+  shell: RAILS_ENV=production bundle exec rake db:migrate:up VERSION=20150807133223
+  remote_user: vagrant
+  sudo: no
+  args:
+    chdir: /vagrant
 
 - name: init databases
   shell: RAILS_ENV=production CANVAS_LMS_ADMIN_EMAIL="{{canvas_admin_email}}" CANVAS_LMS_ADMIN_PASSWORD="{{canvas_admin_password}}" CANVAS_LMS_ACCOUNT_NAME="{{canvas_account_name}}" CANVAS_LMS_STATS_COLLECTION=opt_out bundle exec rake db:initial_setup && touch /home/vagrant/CanvasDBSetupDone
@@ -90,4 +106,3 @@
 - name: update-rc.d canvas_init
   sudo: yes
   shell: update-rc.d canvas_init defaults
-

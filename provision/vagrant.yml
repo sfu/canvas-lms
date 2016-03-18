@@ -1,7 +1,7 @@
 - hosts: all
   sudo: true
   vars:
-    bundler_version: 1.7.11
+    bundler_version: 1.11.2
     canvas_account_name: Simon Fraser University
     canvas_admin_email: vagrant@localhost
     canvas_admin_password: vagrant
