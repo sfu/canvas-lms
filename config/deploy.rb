@@ -16,6 +16,8 @@ set :bundle_path, "vendor/bundle"
 set :bundle_without, nil
 set :bundle_flags,  ""
 
+set :local_brandable_css_path, lambda { "#{release_path}/public/dist/brandable_css" }
+
 # resets Account.name and Account.lti_guid according to values in sfu.yml
 # don't do this on production
 set :reset_account_settings, true

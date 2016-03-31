@@ -77,4 +77,48 @@ namespace :canvas do
     end
   end
 
+  desc "Rebuild brand_configs"
+  task :build_brand_configs do
+    on primary :db do
+      within release_path do
+        with rails_env: fetch(:rails_env) do
+          execute :rake, "brand_configs:generate_and_upload_all"
+        end
+      end
+    end
+  end
+
+  desc "Move brandable_css"
+  task :move_brandable_css do
+    on primary :db do
+      execute "mkdir -p #{fetch(:shared_brandable_css_base)} && cp -r #{release_path}/public/dist/brandable_css #{fetch(:shared_brandable_css_path)}"
+    end
+  end
+
+  desc "Symlink brandable_css"
+  task :symlink_brandable_css do
+    on roles(:all) do
+      local_path = fetch(:local_brandable_css_path)
+      execute "rm -rf #{local_path} && ln -s #{fetch(:shared_brandable_css_path)} #{local_path}"
+    end
+  end
+
+  desc "Clean up brandable_css"
+  task :cleanup_brandable_css do
+    on primary :db do
+      shared_path = fetch(:shared_brandable_css_base)
+      releases = capture(:ls, "-xtr", shared_path).split
+      if releases.count >= fetch(:keep_releases)
+        directories = (releases - releases.last(fetch(:keep_releases)))
+        if directories.any?
+          directories_str = directories.map do |release|
+            "#{shared_path}/#{release}"
+          end.join(" ")
+          execute :rm, "-rf", directories_str
+        end
+      end
+    end
+  end
+
+
 end
