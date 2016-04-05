@@ -342,8 +342,13 @@ define [
           @studentViewStudents[student.id] ||= htmlEscape(student)
         else
           @students[student.id] ||= htmlEscape(student)
-        @student(student.id).sections ||= []
-        @student(student.id).sections.push(studentEnrollment.course_section_id)
+
+        student = @student(student.id)
+        student.enrollment_states ||= []
+        student.enrollment_states.push(studentEnrollment.enrollment_state)
+
+        student.sections ||= []
+        student.sections.push(studentEnrollment.course_section_id)
 
     gotAllStudents: ->
       @withAllStudents (students) =>
@@ -356,6 +361,7 @@ define [
           student.computed_current_score ||= 0
           student.computed_final_score ||= 0
           student.secondary_identifier = student.sis_login_id || student.login_id
+          student.is_inactive = _.all student.enrollment_states, (state) -> state == 'inactive'
           # SFU MOD CANVAS-188 Define data for SIS ID column (use dash if not available)
           student.sis_id = student.sis_user_id || '-'
           # END SFU MOD
@@ -383,7 +389,7 @@ define [
     defaultSortType: 'assignment_group'
 
     studentsThatCanSeeAssignment: (potential_students, assignment) ->
-      if ENV.GRADEBOOK_OPTIONS.differentiated_assignments_enabled
+      if assignment.only_visible_to_overrides
         _.pick potential_students, assignment.assignment_visibility...
       else
         potential_students
