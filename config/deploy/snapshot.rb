@@ -13,3 +13,6 @@ set :branch, ENV['branch'] || 'sfu-deploy'
 set :default_env, {
   'PATH' => '/usr/pgsql-9.1/bin:$PATH'
 }
+
+set :shared_brandable_css_base, "#{shared_path}/public/brandable_css/"
+set :shared_brandable_css_path, "#{fetch(:shared_brandable_css_base)}#{release_timestamp}"
