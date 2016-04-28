@@ -35,16 +35,13 @@ define([
   'jqueryui/dialog',
   'jquery.instructure_misc_helpers' /* scrollSidebar */,
   'compiled/jquery.rails_flash_notifications',
-  'compiled/tinymce',
-  'tinymce.editor_box' /* editorBox */,
   'vendor/jquery.scrollTo' /* /\.scrollTo/ */,
   'compiled/behaviors/quiz_selectmenu'
 ], function(FileUploadQuestionView, File, I18n, $, autoBlurActiveInput, _,
             LDBLoginPopup, QuizTakingPolice, QuizLogAuditing,
             QuizLogAuditingEventDumper, KeyboardShortcuts, RichContentEditor) {
 
-  var richContentEditor = new RichContentEditor({riskLevel: "highrisk"});
-  richContentEditor.preloadRemoteModule();
+  RichContentEditor.preloadRemoteModule();
 
   var lastAnswerSelected = null;
   var lastSuccessfulSubmissionData = null;
@@ -560,7 +557,14 @@ define([
         }
 
         if (tagName == "TEXTAREA") {
-          val = richContentEditor.callOnRCE($this, 'get_code');
+          val = RichContentEditor.callOnRCE($this, 'get_code');
+          var $tagInstance = $this;
+          $this.siblings('.rce_links').find('.toggle_question_content_views_link').click(function(event) {
+            event.preventDefault();
+            RichContentEditor.callOnRCE($tagInstance, 'toggle');
+            //  todo: replace .andSelf with .addBack when JQuery is upgraded.
+            $(this).siblings(".toggle_question_content_views_link").andSelf().toggle();
+          });
         } else if ($this.attr('type') == "text" || $this.attr('type') == 'hidden') {
           val = $this.val();
         } else if (tagName == "SELECT") {
@@ -581,11 +585,6 @@ define([
 
     $questions.find(".question_input").trigger('change', [false, {}]);
 
-    setInterval(function() {
-      $("textarea.question_input").each(function() {
-        $(this).triggerHandler('change', false);
-      });
-    }, 2500);
 
     $(".hide_time_link").click(function(event) {
       event.preventDefault();
@@ -673,7 +672,7 @@ define([
     setTimeout(function() {
       $(".question_holder textarea.question_input").each(function() {
         $(this).attr('id', 'question_input_' + quizSubmission.contentBoxCounter++);
-        richContentEditor.loadNewEditor($(this));
+        RichContentEditor.loadNewEditor($(this));
       });
     }, 2000);
 
@@ -781,5 +780,5 @@ define([
     $('.loading').hide();
   });
 
-  $('.essay_question .answers').before((new KeyboardShortcuts()).render().el);
+  $('.essay_question .answers .rce_links').append((new KeyboardShortcuts()).render().el);
 });
