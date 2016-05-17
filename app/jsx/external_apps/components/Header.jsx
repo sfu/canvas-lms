@@ -2,9 +2,8 @@ define([
   'underscore',
   'i18n!external_tools',
   'react',
-  'react-router',
   /* SFU MOD */ '../../sfu_pia_notice/SFUPrivacyNotice' /* END SFU MOD */
-], function (_, I18n, React, {Link}, SFUPrivacyNotice) {
+], function (_, I18n, React, SFUPrivacyNotice) {
 
   return React.createClass({
     displayName: 'Header',
