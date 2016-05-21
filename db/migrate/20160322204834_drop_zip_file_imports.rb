@@ -20,6 +20,11 @@ class DropZipFileImports < ActiveRecord::Migration
           end
         else
           child.uploaded_data = root.open
+
+          # SFU MOD
+          child.root_attachment_id = nil
+          child.filename ||= root.filename
+          # END SFU MOD
         end
         child.save!
         Attachment.where(root_attachment_id: root).where.not(:id => child).update_all(root_attachment_id: child)
