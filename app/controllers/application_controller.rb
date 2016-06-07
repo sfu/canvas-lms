@@ -118,7 +118,8 @@ class ApplicationController < ActionController::Base
         k12: k12?,
         use_high_contrast: @current_user.try(:prefers_high_contrast?),
         SETTINGS: {
-          open_registration: @domain_root_account.try(:open_registration?)
+          open_registration: @domain_root_account.try(:open_registration?),
+          eportfolios_enabled: @current_user.try(:eportfolios_enabled?)
         }
       }
       @js_env[:page_view_update_url] = page_view_path(@page_view.id, page_view_token: @page_view.token) if @page_view
@@ -587,7 +588,8 @@ class ApplicationController < ActionController::Base
         params[:context_id] = params[:course_section_id]
         params[:context_type] = "CourseSection"
         @context = api_find(CourseSection, params[:course_section_id])
-      elsif request.path.match(/\A\/profile/) || request.path == '/' || request.path.match(/\A\/dashboard\/files/) || request.path.match(/\A\/calendar/) || request.path.match(/\A\/assignments/) || request.path.match(/\A\/files/)
+      elsif request.path.match(/\A\/profile/) || request.path == '/' || request.path.match(/\A\/dashboard\/files/) || request.path.match(/\A\/calendar/) || request.path.match(/\A\/assignments/) || request.path.match(/\A\/files/) || request.path == '/api/v1/calendar_events/visible_contexts'
+        # ^ this should be split out into things on the individual controllers
         @context = @current_user
         @context_membership = @context
       end
@@ -1087,6 +1089,7 @@ class ApplicationController < ActionController::Base
       if @page_view && @page_view_update
         @page_view.context = @context if !@page_view.context_id
         @page_view.account_id = @domain_root_account.id
+        @page_view.developer_key_id = @access_token.try(:developer_key_id)
         @page_view.store
         RequestContextGenerator.store_page_view_meta(@page_view)
       end
@@ -1094,6 +1097,7 @@ class ApplicationController < ActionController::Base
       @page_view.destroy if @page_view && !@page_view.new_record?
     end
   rescue StandardError, CassandraCQL::Error::InvalidRequestException => e
+    Canvas::Errors.capture_exception(:page_view, e)
     logger.error "Pageview error!"
     raise e if Rails.env.development?
     true
@@ -1340,6 +1344,7 @@ class ApplicationController < ActionController::Base
     elsif tag.content_type == 'Rubric'
       redirect_to named_context_url(context, :context_rubric_url, tag.content_id, url_params)
     elsif tag.content_type == 'Lti::MessageHandler'
+      url_params[:module_item_id] = params[:module_item_id] if params[:module_item_id]
       url_params[:resource_link_fragment] = "ContentTag:#{tag.id}"
       redirect_to named_context_url(context, :context_basic_lti_launch_request_url, tag.content_id, url_params)
     elsif tag.content_type == 'ExternalUrl'
