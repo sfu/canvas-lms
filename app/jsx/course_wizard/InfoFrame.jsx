@@ -66,9 +66,6 @@ define([
             $messageIcon.addClass('ic-wizard-box__message-icon--is-fired');
           }, 100);
 
-
-
-
           // Set the focus to the call to action 'button' if it's there
           // otherwise the text.
           if (this.refs.callToAction) {
@@ -76,6 +73,7 @@ define([
           } else {
             this.refs.messageBox.getDOMNode().focus();
           }
+
         });
       },
 
@@ -92,7 +90,7 @@ define([
 
       renderButton: function () {
         if (this.state.itemShown.key === 'home_page') {
-          return (<a ref="callToAction" onClick={this.chooseHomePage} className="Button Button--primary">
+          return (<a ref="callToAction" onClick={this.chooseHomePage} className="Button Button--primary" aria-label={"Start task: "+this.state.itemShown.title} aria-describedby="ic-wizard-box__message-text">
             {this.state.itemShown.title}
           </a>
           );
@@ -116,7 +114,7 @@ define([
         }
         if (this.state.itemShown.hasOwnProperty('title')) {
           return (
-            <a ref="callToAction" href={this.getHref()} className="Button Button--primary">
+            <a ref="callToAction" href={this.getHref()} className="Button Button--primary" aria-label={"Start task: "+this.state.itemShown.title} aria-describedby="ic-wizard-box__message-text">
               {this.state.itemShown.title}
             </a>
           );
@@ -153,7 +151,7 @@ define([
                   <i className={this.state.itemShown.iconClass}></i>
                 </div>
                 <div ref='messageBox' tabIndex='-1' className='ic-wizard-box__message-inner ic-wizard-box__message-inner--is-fired'>
-                  <p className='ic-wizard-box__message-text'>
+                  <p className='ic-wizard-box__message-text' id='ic-wizard-box__message-text'>
                     {this.state.itemShown.text}
                   </p>
                   {/* SFU MOD */}
