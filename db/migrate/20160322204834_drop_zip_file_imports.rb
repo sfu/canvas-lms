@@ -21,11 +21,6 @@ class DropZipFileImports < ActiveRecord::Migration
         else
           Attachment.where(:id => root).update_all(:content_type => "invalid/invalid") # prevents find_existing_attachment_for_md5 from reattaching the child to the old root
           child.uploaded_data = root.open
-
-          # SFU MOD
-          child.root_attachment_id = nil
-          child.filename ||= root.filename
-          # END SFU MOD
         end
         child.save!
         Attachment.where(root_attachment_id: root).where.not(:id => child).update_all(root_attachment_id: child)
