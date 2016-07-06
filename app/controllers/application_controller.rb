@@ -112,6 +112,7 @@ class ApplicationController < ActionController::Base
         current_user_id: @current_user.try(:id),
         current_user: user_display_json(@current_user, :profile),
         current_user_roles: @current_user.try(:roles, @domain_root_account),
+        current_user_disabled_inbox: @current_user.try(:disabled_inbox?),
         files_domain: HostUrl.file_host(@domain_root_account || Account.default, request.host_with_port),
         DOMAIN_ROOT_ACCOUNT_ID: @domain_root_account.try(:global_id),
         use_new_styles: use_new_styles?,
@@ -1068,8 +1069,7 @@ class ApplicationController < ActionController::Base
       if @accessed_asset && (@accessed_asset[:level] == 'participate' || !@page_view_update)
         @access = AssetUserAccess.where(user_id: user.id, asset_code: @accessed_asset[:code]).first_or_initialize
         @accessed_asset[:level] ||= 'view'
-        access_context = @context.is_a?(UserProfile) ? @context.user : @context
-        @access.log access_context, @accessed_asset
+        @access.log @context, @accessed_asset
 
         if @page_view.nil? && page_views_enabled? && %w{participate submit}.include?(@accessed_asset[:level])
           generate_page_view(user)

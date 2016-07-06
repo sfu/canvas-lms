@@ -219,8 +219,7 @@ module Api::V1::User
       json[:enrollment_state] = json.delete('workflow_state')
       json[:role] = enrollment.role.name
       json[:role_id] = enrollment.role_id
-      json[:sis_source_id] = enrollment.sis_source_id # SFU MOD - CANVAS-224
-      json[:sis_batch_id] = enrollment.sis_batch_id
+      json[:sis_batch_id] = enrollment.sis_batch_id # SFU MOD - For the user enrollment API (9789f39 by ronvs)
       json[:last_activity_at] = enrollment.last_activity_at
       json[:total_activity_time] = enrollment.total_activity_time
       if enrollment.root_account.grants_right?(user, session, :manage_sis)
@@ -230,7 +229,6 @@ module Api::V1::User
         json[:grades] = grades_hash(enrollment, user, opts[:grading_period])
       end
       if user_can_read_sis_data?(@current_user, enrollment.course)
-        json[:sis_source_id] = enrollment.sis_source_id
         json[:sis_course_id] = enrollment.course.sis_source_id
         json[:course_integration_id] = enrollment.course.integration_id
         json[:sis_section_id] = enrollment.course_section.sis_source_id
