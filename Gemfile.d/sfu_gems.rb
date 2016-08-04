@@ -1,5 +1,5 @@
 group :development do
-  gem 'capistrano', '~> 3.4', require: false
+  gem 'capistrano', '3.5', require: false
   gem 'capistrano-rails',   '~> 1.1', require: false
   gem 'capistrano-bundler', '~> 1.1', require: false
   gem 'capistrano-canvas', :git => 'https://github.com/grahamb/capistrano-canvas.git', require: false
