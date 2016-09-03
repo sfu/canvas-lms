@@ -154,7 +154,7 @@ class CommunicationChannelsController < ApplicationController
         return render :json => { errors: { type: 'Push is only supported when using an access token'}}, status: :bad_request
       end
       if !@access_token.developer_key.try(:sns_arn)
-        return render :json => { errors: { type: 'SNS is not configured for this developer key'}}, status: :bad_request
+        return render :json => { errors: { type: 'SNS is not configured for this developer key'}}, status: 200 # SFU MOD - Temporarily suppress mobile app error (CANVAS-261)
       end
       endpoint = @current_user.notification_endpoints.where(token: params[:communication_channel][:token]).first
       endpoint ||= @access_token.notification_endpoints.create!(token: params[:communication_channel][:token])
