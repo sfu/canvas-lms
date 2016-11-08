@@ -2,7 +2,7 @@ class TermController < ApplicationController
 
   # get all terms
   def all_terms
-    t = EnrollmentTerm.find(:all, :select => select_fields, :conditions => ["workflow_state = 'active' AND (root_account_id = #{Account.default.id})"])
+    t = EnrollmentTerm.active.select(select_fields).where(root_account: Account.default)
     respond_to do |format|
       format.json {render :json => t}
     end
@@ -10,7 +10,7 @@ class TermController < ApplicationController
 
   # get specific term by sis id
   def term_by_sis_id
-    t = EnrollmentTerm.find(:all, :select => select_fields, :conditions => ["workflow_state = 'active' AND (root_account_id = #{Account.default.id}) AND (sis_source_id = '#{params[:sis_id]}')"])
+    t = EnrollmentTerm.active.select(select_fields).where(root_account: Account.default, sis_source_id: params[:sis_id])
     respond_to do |format|
       format.json {render :json => t}
     end
@@ -18,7 +18,7 @@ class TermController < ApplicationController
 
   # get current term
   def current_term
-    t = EnrollmentTerm.find(:all, :select => select_fields, :conditions => ["workflow_state = 'active' AND (root_account_id = #{Account.default.id}) AND (:date BETWEEN start_at AND end_at) AND (sis_source_id IS NOT NULL)", {:date => DateTime.now}]).first
+    t = EnrollmentTerm.active.select(select_fields).where(root_account: Account.default).where(':date BETWEEN start_at AND end_at', {:date => DateTime.now}).where.not(sis_source_id: nil).first
     respond_to do |format|
       format.json {render :json => t}
     end
@@ -26,7 +26,7 @@ class TermController < ApplicationController
 
   # get next n term(s)
   def next_terms
-    t = EnrollmentTerm.find(:all, :select => select_fields, :conditions => ["workflow_state = 'active' AND (start_at > :date) AND (sis_source_id IS NOT NULL)", {:date => DateTime.now}], :order => "sis_source_id", :limit => params[:num_terms])
+    t = EnrollmentTerm.active.select(select_fields).where('start_at > :date', {:date => DateTime.now}).where.not(sis_source_id: nil).order(:sis_source_id).limit(params[:num_terms])
     respond_to do |format|
       format.json {render :json => t}
     end
@@ -34,7 +34,7 @@ class TermController < ApplicationController
 
   # get prev n term(s)
   def prev_terms(num_terms=1)
-    t = EnrollmentTerm.find(:all, :select => select_fields, :conditions => ["workflow_state = 'active' AND (end_at < :date) AND (sis_source_id IS NOT NULL)", {:date => DateTime.now}], :order => "sis_source_id DESC", :limit => params[:num_terms])
+    t = EnrollmentTerm.active.select(select_fields).where('end_at < :date', {:date => DateTime.now}).where.not(sis_source_id: nil).order(sis_source_id: :desc).limit(params[:num_terms])
     respond_to do |format|
       format.json {render :json => t}
     end
@@ -42,7 +42,7 @@ class TermController < ApplicationController
 
   private
   def select_fields
-    "id, name, sis_source_id, start_at, end_at"
+    %i(id name sis_source_id start_at end_at)
   end
 
 end
