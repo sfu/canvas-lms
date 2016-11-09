@@ -61,7 +61,7 @@ class ApiController < ApplicationController
   def terms
     term_arr = []
     if params[:term].nil?
-      terms = Account.default.enrollment_terms.find(:all, :conditions => "workflow_state = 'active'", :order => 'sis_source_id DESC').delete_if {|t| t.name == 'Default Term'}
+      terms = Account.default.enrollment_terms.active.order(sis_source_id: :desc).delete_if {|t| t.name == 'Default Term'}
       terms.each do |term|
         term_info = {}
         term_info["name"] = term.name
@@ -71,7 +71,7 @@ class ApiController < ApplicationController
         term_arr.push term_info
       end
     else
-      term = Account.default.enrollment_terms.find(:all, :conditions => "sis_source_id = '#{params[:term]}'")
+      term = Account.default.enrollment_terms.where(sis_source_id: params[:term])
       term_info = {}
       term_info["name"] = term.first.name
       term_info["sis_source_id"] = term.first.sis_source_id
@@ -195,7 +195,7 @@ class ApiController < ApplicationController
 
   def sandbox_for(user)
     # Find user's courses with sis_source_id that starts with 'sandbox'
-    courses = Course.find(:all, :conditions => ['id IN (?) AND sis_source_id LIKE ?', user.courses.map(&:id), 'sandbox%'])
+    courses = Course.where(id: user.courses.map(&:id)).where('sis_source_id LIKE ?', 'sandbox%')
     courses.map do |course|
       {
         :id => course.id,
@@ -207,7 +207,7 @@ class ApiController < ApplicationController
 
   def group_membership_for(user)
     # Find user's groups
-    GroupMembership.find(:all, :conditions => ['user_id = ? AND workflow_state != ?', user.id, "deleted"]).map do |group_membership|
+    GroupMembership.active.where(user: user).map do |group_membership|
       group = group_membership.group
       {
         :id => group.id,

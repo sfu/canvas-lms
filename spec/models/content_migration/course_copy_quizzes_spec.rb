@@ -716,6 +716,50 @@ equation: <img class="equation_image" title="Log_216" src="/equation_images/Log_
       expect(q2.quiz_questions[1].question_data["answers"][0]["margin"].to_s).to eq "0.0001"
     end
 
+    it "should copy precision answers for numeric questions" do
+      q = @copy_from.quizzes.create!(:title => "blah")
+      data = {:question_type => "numerical_question",
+        :question_text => "how many people think about course copy when they add things?",
+        :answers => [{
+          :text => "answer_text",
+          :weight => 100,
+          :numerical_answer_type => "precision_answer",
+          :answer_approximate => 0.0042,
+          :answer_precision => 3
+        }]}.with_indifferent_access
+      q.quiz_questions.create!(:question_data => data)
+
+      run_course_copy
+
+      q2 = @copy_to.quizzes.where(migration_id: mig_id(q)).first
+      answer = q2.quiz_questions[0].question_data["answers"][0]
+      expect(answer["numerical_answer_type"]).to eq "precision_answer"
+      expect(answer["approximate"]).to eq 0.0042
+      expect(answer["precision"]).to eq 3
+    end
+
+    it "should copy range answers for numeric questions" do
+      q = @copy_from.quizzes.create!(:title => "blah")
+      data = {:question_type => "numerical_question",
+        :question_text => "how many people think about course copy when they add things?",
+        :answers => [{
+          :text => "answer_text",
+          :weight => 100,
+          :numerical_answer_type => "range_answer",
+          :answer_range_start => -1,
+          :answer_range_end => 2
+        }]}.with_indifferent_access
+      q.quiz_questions.create!(:question_data => data)
+
+      run_course_copy
+
+      q2 = @copy_to.quizzes.where(migration_id: mig_id(q)).first
+      answer = q2.quiz_questions[0].question_data["answers"][0]
+      expect(answer["numerical_answer_type"]).to eq "range_answer"
+      expect(answer["start"]).to eq -1
+      expect(answer["end"]).to eq 2
+    end
+
     it "should not combine when copying question banks with the same title" do
       data = {'question_name' => 'test question 1', 'question_type' => 'essay_question', 'question_text' => 'blah'}
 
@@ -953,6 +997,42 @@ equation: <img class="equation_image" title="Log_216" src="/equation_images/Log_
       q2 = @copy_to.assessment_questions.first
       expect(q2.question_data['correct_comments_html']).to eq text
       expect(q2.question_data['answers'].first['comments_html']).to eq text
+    end
+
+    describe "assignment overrides" do
+      before :once do
+        @quiz_plain = @copy_from.quizzes.create!(title: 'my quiz')
+        @quiz_assigned = @copy_from.quizzes.create!(title: 'assignment quiz')
+        @quiz_assigned.did_edit
+        @quiz_assigned.offer!
+      end
+
+      it "should copy only noop overrides" do
+        assignment_override_model(quiz: @quiz_plain, set_type: 'Noop', set_id: 1, title: 'Tag 3')
+        assignment_override_model(quiz: @quiz_assigned, set_type: 'Noop', set_id: 1, title: 'Tag 4')
+        run_course_copy
+        to_quiz_plain = @copy_to.quizzes.where(migration_id: mig_id(@quiz_plain)).first
+        to_quiz_assigned = @copy_to.quizzes.where(migration_id: mig_id(@quiz_assigned)).first
+        expect(to_quiz_plain.assignment_overrides.pluck(:title)).to eq ['Tag 3']
+        expect(to_quiz_assigned.assignment_overrides.pluck(:title)).to eq ['Tag 4']
+      end
+    end
+
+    it "should not destroy assessment questions when copying twice" do
+      bank1 = @copy_from.assessment_question_banks.create!(:title => 'bank')
+      data = {
+        "question_type" => "multiple_choice_question", 'name' => 'test question',
+        'answers' => [{'id' => 1, "text" => "Correct", "weight" => 100},
+          {'id' => 2, "text" => "inorrect", "weight" => 0}],
+      }
+      aq = bank1.assessment_questions.create!(:question_data => data)
+
+      run_course_copy
+
+      run_course_copy # run it twice
+      
+      aq_to = @copy_to.assessment_questions.where(:migration_id => mig_id(aq)).first
+      expect(aq_to.data['question_type']).to eq "multiple_choice_question"
     end
   end
 end

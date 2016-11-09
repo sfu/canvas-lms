@@ -3,7 +3,7 @@ class StatsController < ApplicationController
   before_filter :require_user
   def index
     @current_term = current_term || default_term
-    @terms = Account.default.enrollment_terms.find(:all, :conditions => "workflow_state = 'active'", :order => 'sis_source_id DESC')
+    @terms = Account.default.enrollment_terms.active.order(sis_source_id: :desc)
     @enrollments = enrollments_for_term(current_term)
   end
 
@@ -45,7 +45,7 @@ class StatsController < ApplicationController
 
   private
   def current_term
-    EnrollmentTerm.find(:all, :conditions => ["workflow_state = 'active' AND (:date BETWEEN start_at AND end_at)", {:date => DateTime.now}]).first
+    EnrollmentTerm.active.find_by(':date BETWEEN start_at AND end_at', {:date => DateTime.now})
   end
 
   def default_term
@@ -61,7 +61,7 @@ class StatsController < ApplicationController
       "claimed" => "unpublished",
       "completed" => "concluded"
     }
-    courses = EnrollmentTerm.find(term_id).courses.find(:all, :select => fields, :conditions => ["workflow_state != 'deleted'"])
+    courses = EnrollmentTerm.find(term_id).courses.active.select(fields)
     courses.each { |course| course[:workflow_state] = workflow_state_translation[course[:workflow_state]] }
   end
 
@@ -84,17 +84,17 @@ class StatsController < ApplicationController
   end
 
   def unique_enrollments(term_id)
-    prep_enrollment_hash.merge Enrollment.active_or_pending.count(:select => "enrollments.user_id", :joins => :course, :distinct => true, :conditions => ["courses.workflow_state != 'deleted' AND enrollments.root_account_id = ? AND enrollments.course_id = courses.id AND courses.enrollment_term_id = ? AND courses.sis_source_id IS NOT NULL", Account.default.id, term_id], :group => 'enrollments.type')
+    prep_enrollment_hash.merge Enrollment.active_or_pending.joins(:course).where("courses.workflow_state != 'deleted' AND enrollments.root_account_id = ? AND enrollments.course_id = courses.id AND courses.enrollment_term_id = ? AND courses.sis_source_id IS NOT NULL", Account.default.id, term_id).group('enrollments.type').count('DISTINCT enrollments.user_id')
   end
 
   def total_enrollments(term_id)
     # this is probably not very efficient but I can't seem to come up with a better way,
     # and plus it's pretty explicit in what it's doing
-    courses = Course.all(:conditions => ["root_account_id = ? AND enrollment_term_id = ? AND workflow_state != 'deleted'", Account.default.id, term_id])
+    courses = Course.active.where(root_account: Account.default, enrollment_term_id: term_id)
     types = ['StudentEnrollment', 'TeacherEnrollment', 'TaEnrollment', 'DesignerEnrollment', 'ObserverEnrollment', 'StudentViewEnrollment']
     total_enrollments = prep_enrollment_hash
     courses.each do |c|
-      enrollments = c.enrollments.active_or_pending.count(:distinct => true, :group => 'enrollments.type', :select => 'enrollments.user_id')
+      enrollments = c.enrollments.active_or_pending.group('enrollments.type').count('DISTINCT enrollments.user_id')
       enrollments.each do |type, num|
         total_enrollments[type] = (total_enrollments[type] + num)
       end

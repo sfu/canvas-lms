@@ -86,11 +86,11 @@ class CourseFormController < ApplicationController
   end
 
   def current_term
-    EnrollmentTerm.find(:all, :conditions => ["workflow_state = 'active' AND (:date BETWEEN start_at AND end_at)", {:date => DateTime.now}]).first
+    EnrollmentTerm.active.find_by(':date BETWEEN start_at AND end_at', {:date => DateTime.now})
   end
 
   def future_terms
-    EnrollmentTerm.find(:all, :conditions => ["workflow_state = 'active' AND (:date <= start_at)", {:date => DateTime.now}], :order => 'sis_source_id')
+    EnrollmentTerm.active.where(':date <= start_at', {:date => DateTime.now}).order(:sis_source_id)
   end
 
 end
