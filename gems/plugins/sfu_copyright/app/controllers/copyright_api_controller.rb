@@ -25,8 +25,8 @@ class CopyrightApiController < ApplicationController
     end
 
     # Randomly select a course and instructor
-    course = courses.first(:order => 'RANDOM()')
-    teacher = course.teachers.first(:order => 'RANDOM()')
+    course = courses.order('RANDOM()').first
+    teacher = course.teachers.order('RANDOM()').first
 
     # Determine the SFU Computing ID and email address of the instructor
     # NOTE: The course could (very rarely) be teacher-less

@@ -235,7 +235,7 @@ module SFU
       end
 
       def self.term(term_code)
-        EnrollmentTerm.find(:all, :conditions => ["workflow_state = 'active' AND sis_source_id = :term", {:term => term_code}]).first
+        EnrollmentTerm.active.find_by(sis_source_id: term_code)
       end
 
       def csv_string(data)
