@@ -108,6 +108,10 @@ require 'securerandom'
 #     }
 #
 class FilesController < ApplicationController
+  # SFU MOD: exempt show_relative from protect_from_forgery so that uploaded CSS & JS files
+  # still load. Opened https://github.com/instructure/canvas-lms/pull/945 to pull into upstream.
+  protect_from_forgery except: :show_relative
+  # END SFU MOD
   before_filter :require_user, only: :create_pending
   before_filter :require_context, except: [
     :assessment_question_show, :image_thumbnail, :show_thumbnail, :preflight,
