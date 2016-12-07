@@ -170,7 +170,7 @@ class ApiController < ApplicationController
       "TaEnrollment"      => "teaching"
     }
     enrollments = user.enrollments.shard(user) { |scope| scope.scoped(:conditions => "enrollments.workflow_state<>'deleted' AND courses.workflow_state<>'deleted'", :include => [{:course => { :enrollment_term => :enrollment_dates_overrides }}, :associated_user, :course_section]) }
-    enrollments.sort_by! {|e| e.course.enrollment_term_id }
+    enrollments.to_a.sort_by! {|e| e.course.enrollment_term_id }
     enrollments.each do |e|
       sis_source_id = e.course.sis_source_id
       course_id = e.course.id
