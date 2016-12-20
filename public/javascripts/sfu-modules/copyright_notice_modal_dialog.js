@@ -1,11 +1,12 @@
 define([
   'jquery',
   'react',
+  'react-dom',
   '../jsx/sfu_copyright_compliance_notice/SFUCopyrightComplianceNoticeModalDialog'
-], function($, React, SFUCopyrightComplianceModalDialog) {
+], function($, React, ReactDOM, SFUCopyrightComplianceModalDialog) {
 
     var render = function(formId) {
-        React.render(
+        ReactDOM.render(
           React.createElement(
             SFUCopyrightComplianceModalDialog,
             {

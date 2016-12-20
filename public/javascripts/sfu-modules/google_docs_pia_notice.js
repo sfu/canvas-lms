@@ -1,5 +1,7 @@
 define([
   'jquery',
+  'react',
+  'react-dom',
   '../jsx/sfu_pia_notice/SFUPrivacyNotice'
 ], function($, SFUPrivacyNotice) {
   var showGoogleDocsWarning = function() {
@@ -11,7 +13,7 @@ define([
       }
       $('<div id="sfu-google-docs-pia-notice">').appendTo('#google_docs_description td');
 
-      React.render(
+      ReactDOM.render(
         React.createElement(
           SFUPrivacyNotice,
           {
