@@ -42,43 +42,52 @@
 
     }
 
+    if (!ENV.use_new_styles) {
+      // header rainbow
+      $('#header').append('<div id="header-rainbow">');
 
-    // header rainbow
-    $('#header').append('<div id="header-rainbow">');
+      // help links
+      var helpHtml = [
+          '<li>',
+          '<select class="sfu_help_links">',
+          '<option value="">Help</option>',
+          '<option value="http://www.sfu.ca/canvas/students.html">Help for Students</option>',
+          '<option value="http://www.sfu.ca/canvas/instructors.html">Help for Instructors</option>',
+          '<option value="http://www.sfu.ca/techforum">Q&A Forum</option>',
+          '</li>'
+      ].join('');
+      $('#topbar .logout').before(helpHtml);
+      $('#topbar .sfu_help_links').on('change', function(ev) {
+          if (this.value) {
+              window.location = this.value;
+          }
+      });
 
-    // help links
-    var helpHtml = [
-        '<li>',
-        '<select class="sfu_help_links">',
-        '<option value="">Help</option>',
-        '<option value="http://www.sfu.ca/canvas/students.html">Help for Students</option>',
-        '<option value="http://www.sfu.ca/canvas/instructors.html">Help for Instructors</option>',
-        '<option value="http://www.sfu.ca/techforum">Q&A Forum</option>',
-        '</li>'
-    ].join('');
-    $('#topbar .logout').before(helpHtml);
-    $('#topbar .sfu_help_links').on('change', function(ev) {
-        if (this.value) {
-            window.location = this.value;
-        }
-    });
+      // handle no-user case
+      if ($('#header').hasClass('no-user')) {
+          // add in a dummy #menu div
+          $('#header-inner').append('<div id="menu" style="height:41px"></div>');
+          // remove the register link
+          $('#header.no-user a[href="/register"]').parent().remove()
+      }
+
+      // add Canvas Spaces to nav
+      $(document).ready(function() {
+        if (!ENV.CANVAS_SPACES_ENABLED) { return; }
+        $('#menu').append('<li class="menu-item" id="canvas_spaces_menu_item"><a href="/canvas_spaces" class="menu-item-no-drop">Canvas Spaces</a></li>')
+      });
+
+      // Fix for the new conversations page - toolbar renders underneath the rainbow bar
+      utils.onPage(/conversations/, function() {
+          // are we on the new conversations page?
+          if (ENV.CONVERSATIONS && (ENV.CONVERSATIONS.ATTACHMENTS_FOLDER_ID && !ENV.hasOwnProperty('CONTEXT_ACTION_SOURCE'))) {
+              jQuery('div#main').css('top', '92px');
+          }
+      });
+    }
 
     // sfu logo in footer
     $('footer').html('<a href="http://www.sfu.ca/canvas"><img alt="SFU Canvas" src="/sfu/images/sfu-logo.png" width="250" height="38"></a>').show();
-
-    // handle no-user case
-    if ($('#header').hasClass('no-user')) {
-        // add in a dummy #menu div
-        $('#header-inner').append('<div id="menu" style="height:41px"></div>');
-        // remove the register link
-        $('#header.no-user a[href="/register"]').parent().remove()
-    }
-
-    // add Canvas Spaces to nav
-    $(document).ready(function() {
-      if (!ENV.CANVAS_SPACES_ENABLED) { return; }
-      $('#menu').append('<li class="menu-item" id="canvas_spaces_menu_item"><a href="/canvas_spaces" class="menu-item-no-drop">Canvas Spaces</a></li>')
-    });
 
     // hijack Start New Course button (CANVAS-192)
     // first, cache the original event handler and disable it
@@ -146,62 +155,6 @@
             module.showGoogleDocsWarning();
         });
     });
-
-    // Fixes for Import Content page only
-    utils.onPage(/courses\/\d+\/content_migrations/, function() {
-        // The fixes are for elements that are dynamically generated when a specific XHR call completes
-        $(document).ajaxComplete(function (event, XMLHttpRequest, ajaxOptions) {
-            if (ajaxOptions.url && ajaxOptions.url.match(/users\/\d+\/manageable_courses/)) {
-                // Alphabetize course drop-down list, by sorting <option>s inside each <optgroup>
-                // NOTE: This is no longer needed when XHR results are pre-sorted by Canvas
-                $('optgroup', $('#courseSelect')).each(function (i, termGroup) {
-                    $('option', termGroup)
-                        .sort(function (a, b) { return $(a).text().localeCompare($(b).text()); })
-                        .appendTo(termGroup);
-                });
-                // END Alphabetize course drop-down list
-            }
-        });
-    });
-
-    // Fix for the new conversations page - toolbar renders underneath the rainbow bar
-    utils.onPage(/conversations/, function() {
-        // are we on the new conversations page?
-        if (ENV.CONVERSATIONS && (ENV.CONVERSATIONS.ATTACHMENTS_FOLDER_ID && !ENV.hasOwnProperty('CONTEXT_ACTION_SOURCE'))) {
-            jQuery('div#main').css('top', '92px');
-        }
-    });
-
-    // CANVAS-246 Create button that links to the Start a New Ad Hoc Space form (only on these pages: / and /courses)
-    utils.onPage(/^\/(courses)?$/, function () {
-        // Add the button right after the existing Start a New Course button
-        var addAdHocButton = function () {
-            return; // TODO: Remove this line when Ad Hoc Spaces are ready
-            var $courseButton = $('#start_new_course');
-            var $adhocButton = $courseButton.clone();
-            $adhocButton
-                .text('Start a New Ad Hoc Space')
-                .attr('id', 'start_new_adhoc')
-                .attr('aria-controls', 'new_adhoc_form')
-                .insertAfter($courseButton)
-                .on('click', function () {
-                    window.location = '/sfu/adhoc/new';
-                });
-        }
-
-        // If the button is not there yet, it's likely still being loaded in the sidebar.
-        // Wait for it to complete, and then add the button. This is meant for the home page.
-        if ($('#start_new_course').length == 0) {
-            $(document).ajaxComplete(function (event, XMLHttpRequest, ajaxOptions) {
-                if (ajaxOptions.url && ajaxOptions.url.match(/dashboard-sidebar/)) {
-                    addAdHocButton();
-                }
-            });
-        } else {
-            addAdHocButton();
-        }
-    });
-    // END CANVAS-246
 
     utils.onPage(/^\/profile\/settings\/?$/, function () {
         $(document).ready(function () {
