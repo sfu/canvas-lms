@@ -133,7 +133,7 @@
 
             // CANVAS-253 Temporarily make full/sortable names read-only
             $fieldsToLock.removeClass('display_data').addClass('edit_or_show_data');
-            $fieldsToLock.siblings('input').remove();
+            $fieldsToLock.siblings('input').hide();
 
             // CANVAS-254 Add verbiage about Display Name
             $helpText.append('<br />Changing this will only affect your display name within Canvas, ' +
