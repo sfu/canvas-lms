@@ -3,7 +3,7 @@ define([
   'react',
   'react-dom',
   '../jsx/sfu_pia_notice/SFUPrivacyNotice'
-], function($, SFUPrivacyNotice) {
+], function($, React, ReactDOM, SFUPrivacyNotice) {
   var showGoogleDocsWarning = function() {
     $.getJSON('/api/v1/courses/' + ENV.context_asset_string.split('_')[1] + '/enrollments?user_id=self', function(enrollments) {
       var usage = 'google_docs';
