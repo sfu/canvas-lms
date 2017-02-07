@@ -14,7 +14,8 @@ require [
   'sfu_course_form/compiled/views/courses/SelectableCourseListView'
   'sfu_course_form/compiled/collections/SandboxList'
   'sfu_course_form/compiled/views/sandboxes/SandboxListView',
-  'jsx/sfu_copyright_compliance_notice/SFUCopyrightComplianceNotice'
+  'jsx/sfu_copyright_compliance_notice/SFUCopyrightComplianceNotice',
+  'jqueryui/autocomplete'
 ], ($, _, Backbone, React, User, Term, Course, AmaintTermList, TermList, TermListView, CourseList, CourseListView, SelectableCourseListView, SandboxList, SandboxListView, SFUCopyrightComplianceNotice) ->
 
   user = {}
