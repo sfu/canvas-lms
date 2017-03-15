@@ -19,7 +19,7 @@ module Api::V1::Quiz
   include Api::V1::Json
 
   API_ALLOWED_QUIZ_INPUT_FIELDS = {
-    :only => %w(
+    :only => (%w(
       access_code
       allowed_attempts
       anonymous_submissions
@@ -28,7 +28,6 @@ module Api::V1::Quiz
       description
       due_at
       hide_correct_answers_at
-      hide_results
       ip_filter
       lock_at
       lockdown_browser_monitor_data
@@ -48,15 +47,14 @@ module Api::V1::Quiz
       time_limit
       title
       unlock_at
+    ) + [{'hide_results' => ArbitraryStrongishParams::ANYTHING}] # because sometimes this is a hash :/
     ).freeze
   }.freeze
 
   def quizzes_json(quizzes, context, user, session, options={})
     options[:description_formatter] = description_formatter(context, user)
-    check_for_restrictions = master_courses? && context.grants_right?(user, session, :manage_assignments)
-    if check_for_restrictions
-      MasterCourses::Restrictor.preload_restrictions(quizzes)
-      options[:include_master_course_restrictions] = true
+    if context.grants_right?(user, session, :manage_assignments)
+      options[:master_course_status] = setup_master_course_restrictions(quizzes, context)
     end
 
     quizzes.map do |quiz|

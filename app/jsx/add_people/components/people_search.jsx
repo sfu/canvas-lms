@@ -2,16 +2,18 @@ define([
   'i18n!roster',
   'react',
   'instructure-ui',
-  './shapes'
+  './shapes',
+  '../helpers'
 ], (I18n, React, {Button, Typography, RadioInputGroup,
     RadioInput, Select, TextArea, ScreenReaderContent,
-    Checkbox, Alert}, {courseParamsShape, inputParamsShape}) => {
+    Checkbox, Alert}, {courseParamsShape, inputParamsShape},
+    {parseNameList, findEmailInEntry, emailValidator}) => {
   class PeopleSearch extends React.Component {
     static propTypes = Object.assign({}, inputParamsShape, courseParamsShape);
 
     static defaultProps = {
       searchType: 'cc_path',
-      nameList: []
+      nameList: ''
     };
 
     constructor (props) {
@@ -19,14 +21,14 @@ define([
 
       this.namelistta = null;
     }
-    shouldComponentUpdate (nextProps /* , nextState */) {
+
+    shouldComponentUpdate (nextProps, /* nextState */) {
       return nextProps.searchType !== this.props.searchType
-          || nextProps.nameList.join(',') !== this.props.nameList.join(',')
+          || nextProps.nameList !== this.props.nameList
           || nextProps.role !== this.props.role
           || nextProps.section !== this.props.section
           || nextProps.limitPrivilege !== this.props.limitPrivilege;
     }
-
 
     // event handlers ------------------------------------
     // inst-ui form elements are currently inconsistent in what args they send
@@ -37,12 +39,9 @@ define([
       this.props.onChange({searchType: newValue});
     }
     onChangeNameList = (newValue) => {
-      let nameList = newValue.trim();
-      // split the user enteredd name list on commas,
-      // then trim each result
-      nameList = nameList.length ? nameList.split(/\s*,\s*/).map(n => n.trim()) : [];
-      this.props.onChange({nameList});
+      this.props.onChange({nameList: newValue});
     }
+
     onChangeSection = (event) => {
       this.props.onChange({section: event.target.value});
     }
@@ -53,10 +52,30 @@ define([
       this.props.onChange({limitPrivilege: event.target.checked});
     }
 
+    // validate the user's input of names in the textbox
+    // @returns: a message for <TextArea> or null
+    getHint () {
+      let message = ' '; // that's a copy/pasted en-space to trick TextArea into
+                         // reserving space for the message so the UI doesn't jump
+      if (this.props.nameList.length > 0 && this.props.searchType === 'cc_path') {   // search by email
+        const users = parseNameList(this.props.nameList);
+        const badEmail = users.find((u) => {
+          const email = findEmailInEntry(u);
+          return !emailValidator.test(email);
+        });
+        if (badEmail) {
+          message = I18n.t('It looks like you have an invalid email address: "%{addr}"', {addr: badEmail});
+        }
+      }
+      return [{text: message, type: 'hint'}];
+    }
+
     // rendering ------------------------------------
     render () {
       let exampleText = '';
       let labelText = '';
+      const message = this.getHint()
+
       switch (this.props.searchType) {
         case 'sis_user_id':
           exampleText = 'student_2708, student_3693';
@@ -109,7 +128,8 @@ define([
             <TextArea
               label={<ScreenReaderContent>{labelText}</ScreenReaderContent>}
               autoGrow={false} resize="vertical" height="9em"
-              value={this.props.nameList.join(',')} textareaRef={(ta) => { this.namelistta = ta; }}
+              value={this.props.nameList} textareaRef={(ta) => { this.namelistta = ta; }}
+              messages={message}
               onChange={this.onChangeNameList}
             />
           </fieldset>
@@ -155,8 +175,7 @@ define([
           <div className="peoplesearch__instructions">
             <i className="icon-user" />
             <Typography size="medium">
-              {I18n.t('Add user by Email Address, Login ID, or SIS ID.')}<br />
-              {I18n.t('Use "," between for adding multiple users.')}
+              {I18n.t('When adding multiple users, use a comma or line break to separate users.')}
             </Typography>
           </div>
         </div>

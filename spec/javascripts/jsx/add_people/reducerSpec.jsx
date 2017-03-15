@@ -178,7 +178,7 @@ define([
     },
     inputParams: {
       searchType: 'cc_path',
-      nameList: [],
+      nameList: '',
       role: '',
       section: '',
       limitPrivilege: false,
@@ -222,7 +222,7 @@ define([
   const API_ENROLL_RESPONSE = [{}, {}];
 
   // the tests ---------------------
-  module('Course Enrollment Add Prople Reducer')
+  QUnit.module('Course Enrollment Add People Reducer')
 
   const reduce = (action, state = INITIAL_STATE) => reducer(state, action)
 
@@ -231,7 +231,7 @@ define([
   test('set input paramaters', () => {
     const newSearchParams = {
       fieldType: 'unique_id',
-      nameList: ['foo', 'bar', 'baz'],
+      nameList: 'foo, bar, baz',
       role: '2',
       secion: '2',
       limitPrivilege: true

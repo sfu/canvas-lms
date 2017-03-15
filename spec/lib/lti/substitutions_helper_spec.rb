@@ -136,16 +136,25 @@ module Lti
         expect(roles).to include 'http://purl.imsglobal.org/vocab/lis/v2/institution/person#Student'
         expect(roles).to include 'http://purl.imsglobal.org/vocab/lis/v2/institution/person#Instructor'
         expect(roles).to include 'http://purl.imsglobal.org/vocab/lis/v2/institution/person#Administrator'
-        expect(roles).to include 'http://purl.imsglobal.org/vocab/lis/v2/person#Learner'
-        expect(roles).to include 'http://purl.imsglobal.org/vocab/lis/v2/person#Instructor'
+        expect(roles).to include 'http://purl.imsglobal.org/vocab/lis/v2/membership#Learner'
+        expect(roles).to include 'http://purl.imsglobal.org/vocab/lis/v2/membership#Instructor'
         expect(roles).to include 'http://purl.imsglobal.org/vocab/lis/v2/membership#ContentDeveloper'
-        expect(roles).to include 'http://purl.imsglobal.org/vocab/lis/v2/person#Observer'
-        expect(roles).to include 'http://purl.imsglobal.org/vocab/lis/v2/membership#TeachingAssistant'
+        expect(roles).to include 'http://purl.imsglobal.org/vocab/lis/v2/membership#Mentor'
+        expect(roles).to include 'http://purl.imsglobal.org/vocab/lis/v2/membership/instructor#TeachingAssistant'
       end
 
       it "returns none if no user for lis 2" do
         helper = SubstitutionsHelper.new(course, root_account, nil)
         expect(helper.all_roles('lis2')).to eq ['http://purl.imsglobal.org/vocab/lis/v2/person#None']
+      end
+
+      it "includes main and subrole for TeachingAssistant" do
+        subject.stubs(:course_enrollments).returns([TaEnrollment.new])
+        roles = subject.all_roles('lis2')
+        expected_roles = ["http://purl.imsglobal.org/vocab/lis/v2/membership/instructor#TeachingAssistant",
+                          "http://purl.imsglobal.org/vocab/lis/v2/membership#Instructor",
+                          "http://purl.imsglobal.org/vocab/lis/v2/system/person#User"]
+        expect(roles.split(',')).to match_array expected_roles
       end
     end
 
@@ -372,6 +381,92 @@ module Lti
       end
     end
 
+    context "email" do
+      let(:course) { Course.create!(root_account: root_account, account: account) }
 
+      let(:tool) do
+        ContextExternalTool.create!(
+          name: 'test tool',
+          context: course,
+          consumer_key: 'key',
+          shared_secret: 'secret',
+          url: 'http://exmaple.com/launch'
+        )
+      end
+
+      let(:substitution_helper) { SubstitutionsHelper.new(course, root_account, user, tool) }
+
+      let(:user) do
+        user = User.create!
+        user.email ='test@foo.com'
+        user.save!
+        user
+      end
+
+      describe "#email" do
+        it "returns the users email" do
+          expect(substitution_helper.email).to eq user.email
+        end
+
+        let(:sis_email) {'sis@example.com'}
+
+        let(:sis_pseudonym) do
+          cc = user.communication_channels.email.create!(path: sis_email)
+          cc.user = user
+          cc.save!
+          pseudonym = cc.user.pseudonyms.build(:unique_id => cc.path, :account => Account.default)
+          pseudonym.sis_communication_channel_id=cc.id
+          pseudonym.communication_channel_id=cc.id
+          pseudonym.sis_user_id="some_sis_id"
+          pseudonym.save
+          pseudonym
+        end
+
+        it "returns the sis email if it's an LTI2 tool" do
+          tool = class_double("Lti::ToolProxy")
+          sub_helper = SubstitutionsHelper.new(course, root_account, user, tool)
+          sis_pseudonym
+          expect(sub_helper.email).to eq sis_email
+        end
+
+        context "prefer_sis_email" do
+          before(:each) do
+            tool.settings[:prefer_sis_email] = "true"
+            tool.save!
+          end
+
+          it "returns the sis_email" do
+            sis_pseudonym
+            expect(substitution_helper.email).to eq sis_email
+          end
+
+          it "returns the users email if there isn't an sis email" do
+            expect(substitution_helper.email).to eq user.email
+          end
+
+        end
+      end
+
+      describe "#sis_email" do
+
+        it "returns the sis email" do
+          sis_email = 'sis@example.com'
+          cc = user.communication_channels.email.create!(path: sis_email)
+          cc.user = user
+          cc.save!
+          pseudonym = cc.user.pseudonyms.build(:unique_id => cc.path, :account => Account.default)
+          pseudonym.sis_communication_channel_id=cc.id
+          pseudonym.communication_channel_id=cc.id
+          pseudonym.sis_user_id="some_sis_id"
+          pseudonym.save
+          expect(substitution_helper.sis_email).to eq sis_email
+        end
+
+        it "returns nil if there isn't an sis email" do
+          expect(substitution_helper.sis_email).to eq nil
+        end
+
+      end
+    end
   end
 end
