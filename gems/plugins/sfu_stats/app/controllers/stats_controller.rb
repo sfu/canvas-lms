@@ -1,6 +1,6 @@
 class StatsController < ApplicationController
   include Common
-  before_filter :require_user
+  before_action :require_user
   def index
     @current_term = current_term || default_term
     @terms = Account.default.enrollment_terms.active.order(sis_source_id: :desc)

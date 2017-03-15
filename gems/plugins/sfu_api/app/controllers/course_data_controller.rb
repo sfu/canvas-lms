@@ -1,7 +1,7 @@
 require Pathname(File.dirname(__FILE__)) + "../helpers/common"
 
 class CourseDataController < ApplicationController
-  before_filter :require_user
+  before_action :require_user
   include Common
   
   def base_dir

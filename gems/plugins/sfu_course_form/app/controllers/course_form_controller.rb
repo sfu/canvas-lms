@@ -1,6 +1,6 @@
 class CourseFormController < ApplicationController
 
-  before_filter :require_user
+  before_action :require_user
 
   def new
     @user = User.find(@current_user.id)

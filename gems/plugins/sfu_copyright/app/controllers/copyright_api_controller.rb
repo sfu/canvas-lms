@@ -1,5 +1,5 @@
 class CopyrightApiController < ApplicationController
-  before_filter :require_user
+  before_action :require_user
 
   # Return a list of files (up to 10) for a randomly selected course that is active in the specified term. Includes
   # information about the course and instructor.
