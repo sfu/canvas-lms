@@ -40,7 +40,7 @@ ApplicationController.class_eval do
     sfuid
   end
 
-  before_filter :add_tc_warning
+  before_action :add_tc_warning
   def add_tc_warning
     return true unless ApplicationController.test_cluster?
     @fixed_warnings ||= []
@@ -51,7 +51,7 @@ ApplicationController.class_eval do
     }
   end
 
-  before_filter :block_student_access
+  before_action :block_student_access
   def block_student_access
     return true unless ApplicationController.test_cluster?
     return true if @files_domain
