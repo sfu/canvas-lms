@@ -81,7 +81,7 @@ module SFU
         if details.present? && is_enrollment_section?(details, section)
           associated_class = associated_class_for_section(details, section)
           details.each do |info|
-            class_type = info["course"]["classType"]
+            class_type = info["course"]["classType"].to_s.downcase
             if class_type.eql?("n") && associated_class == info["course"]["associatedClass"]
               sections << info["course"]["section"]
             end
