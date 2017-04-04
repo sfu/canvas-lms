@@ -13,6 +13,7 @@ Gem::Specification.new do |s|
   s.summary     = 'SFU-specific API routes'
   s.files       = Dir['{app,config,db,lib}/**/*'] + ['README']
 
+  s.add_dependency "rails", ">= 3.2", "< 5.1"
   s.add_dependency 'rest-client'
   s.add_dependency 'httpclient'
 end
