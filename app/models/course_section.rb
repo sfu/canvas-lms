@@ -179,6 +179,7 @@ class CourseSection < ActiveRecord::Base
     return true unless scope.exists?
 
     self.errors.add(:sis_source_id, t('sis_id_taken', "SIS ID \"%{sis_id}\" is already in use", :sis_id => self.sis_source_id))
+    throw :abort unless CANVAS_RAILS4_2
     false
   end
 
@@ -228,7 +229,7 @@ class CourseSection < ActiveRecord::Base
     assignment_overrides.active.destroy_all
     user_ids = self.all_enrollments.map(&:user_id).uniq
 
-    all_attrs = { course_id: course }
+    all_attrs = { course_id: course.id }
     if self.root_account_id_changed?
       all_attrs[:root_account_id] = self.root_account_id
     end
@@ -242,8 +243,11 @@ class CourseSection < ActiveRecord::Base
     if old_course.id != self.course_id && old_course.id != self.nonxlist_course_id
       old_course.send_later_if_production(:update_account_associations) unless Course.skip_updating_account_associations?
     end
-    recompute_method = opts.include?(:run_jobs_immediately) ? :recompute_final_score : :recompute_final_score_in_singleton
-    Enrollment.send(recompute_method, user_ids, course.id)
+    if opts.include?(:run_jobs_immediately)
+      course.recompute_student_scores_without_send_later(user_ids)
+    else
+      course.recompute_student_scores(user_ids)
+    end
   end
 
   def crosslist_to_course(course, *opts)

@@ -119,7 +119,7 @@ define([
         });
       } else if (!INST.disableGooglePreviews && (!opts.mimeType || $.isPreviewable(opts.mimeType, 'google')) && opts.attachment_id || opts.public_url){
         // else if it's something google docs preview can handle and we can get a public url to this document.
-        function loadGooglePreview(){
+        var loadGooglePreview = function () {
           // this handles both ssl and plain http.
           // SFU MOD CANVAS-205 Predoc: In-place Replacement for Google Doc Preview
           var googleDocPreviewUrl = '//docview.sfu.ca/viewer?' + $.param({

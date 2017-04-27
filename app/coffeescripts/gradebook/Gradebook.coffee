@@ -279,7 +279,6 @@ define [
       $('#gradebook-grid-wrapper').hide()
 
     gotCustomColumns: (columns) =>
-      @numberOfFrozenCols += columns.length
       @customColumns = columns
 
     gotCustomColumnDataChunk: (column, columnData) =>
@@ -482,7 +481,7 @@ define [
       @setStoredSortOrder(newSortOrder) unless isFirstArrangement
 
       columns = @grid.getColumns()
-      frozen = columns.splice(0, @numberOfFrozenCols)
+      frozen = columns.splice(0, @getFrozenColumnCount())
       columns.sort @makeColumnSortFn(newSortOrder)
       columns.splice(0, 0, frozen...)
       @grid.setColumns(columns)
@@ -1137,8 +1136,7 @@ define [
         cols = @grid.getColumns()
         col.sortable = true for col in cols
         @grid.setColumns(cols)
-        @renderTotalHeader()
-        @initHeaderDropMenus()
+        @fixColumnReordering()
 
       @userFilter = new InputFilterView el: '.gradebook_filter input'
       @userFilter.on 'input', @onUserFilterInput
@@ -1465,7 +1463,7 @@ define [
         syncColumnCellResize: true
         rowHeight: 35
         headerHeight: 38
-        numberOfColumnsToFreeze: @numberOfFrozenCols
+        numberOfColumnsToFreeze: @getFrozenColumnCount()
       }, @options)
 
       @grid = new Slick.Grid('#gradebook_grid', @rows, @getVisibleGradeGridColumns(), options)
@@ -1660,9 +1658,8 @@ define [
           for c, i in @customColumns
             if c.teacher_notes
               @customColumns.splice i, 1
-              @numberOfFrozenCols -= 1
               break
-          @grid.setNumberOfColumnsToFreeze @numberOfFrozenCols
+          @grid.setNumberOfColumnsToFreeze @getFrozenColumnCount()
         linkContainer.html(showLink())
 
       linkContainer.click (e) =>
@@ -1696,7 +1693,7 @@ define [
         linkContainer.html(hideLink())
 
     toggleNotesColumn: (callback) =>
-      columnsToReplace = @numberOfFrozenCols
+      columnsToReplace = @getFrozenColumnCount()
       callback()
       cols = @grid.getColumns()
       cols.splice 0, columnsToReplace,
@@ -1711,7 +1708,10 @@ define [
 
       @toggleNotesColumn =>
         @customColumns.splice 0, 0, @options.teacher_notes
-        @grid.setNumberOfColumnsToFreeze ++@numberOfFrozenCols
+        @grid.setNumberOfColumnsToFreeze @getFrozenColumnCount()
+
+    getFrozenColumnCount: ->
+      @parentColumns.length + @customColumns.length
 
     isAllGradingPeriods: (currentPeriodId) ->
       currentPeriodId == "0"
