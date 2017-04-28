@@ -6,7 +6,7 @@
       $('.enrollment_term_switcher select').on('change', function () {
         var el = $(this),
           term = el.val(),
-          url = '/sfu/stats/enrollments/${term}.json',
+          url = '/sfu/stats/enrollments/' + term + '.json',
           totalOrUnique = el.data('totalorunique'),
           enrollmentType = '/sfu/stats/enrollments/' + term + '.json',
           target = el.parentsUntil('.stats_enrollment_box').prev()[0],
