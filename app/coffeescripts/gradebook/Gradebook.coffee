@@ -120,8 +120,6 @@ define [
       @showInactiveEnrollments =
         @options.settings['show_inactive_enrollments'] == "true"
       @totalColumnInFront = UserSettings.contextGet 'total_column_in_front'
-      @numberOfFrozenCols = if @totalColumnInFront then 3 else 2
-      ++@numberOfFrozenCols # SFU MOD - CANVAS-188 Add extra column for SIS ID
       @gradingPeriods = GradingPeriodsApi.deserializePeriods(@options.active_grading_periods)
       if @options.grading_period_set
         @gradingPeriodSet = GradingPeriodSetsApi.deserializeSet(@options.grading_period_set)
