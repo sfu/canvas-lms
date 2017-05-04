@@ -106,26 +106,26 @@
 
         If the course is published, nothing happens.
     */
-    utils.onPage(/^\/courses\/\d+$/, function() {
-        var $publishButton = $('.btn-publish')
-        if ($publishButton.length) {
-            $publishButton.attr('disabled', true);
-            require(['sfu-modules/copyright_notice_modal_dialog'], function(module) {
-                module.attachClickHandlerTo(location.pathname.replace('/courses/', 'edit_course_'));
-            });
-        }
-    });
+    // utils.onPage(/^\/courses\/\d+$/, function() {
+    //     var $publishButton = $('.btn-publish')
+    //     if ($publishButton.length) {
+    //         $publishButton.attr('disabled', true);
+    //         require(['sfu-modules/copyright_notice_modal_dialog'], function(module) {
+    //             module.attachClickHandlerTo(location.pathname.replace('/courses/', 'edit_course_'));
+    //         });
+    //     }
+    // });
 
     /*  Add PIA notice to Google Docs section on /courses/DDDDD/collaborations
         When the collaboration page loads, load the google_docs_pia_notice bundle
         In the bundle, check the current user's role within the current course and
         display the appropriate message.
     */
-    utils.onPage(/^\/courses\/\d+\/collaborations\/?$/, function () {
-        require(['sfu-modules/google_docs_pia_notice'], function(module) {
-            module.showGoogleDocsWarning();
-        });
-    });
+    // utils.onPage(/^\/courses\/\d+\/collaborations\/?$/, function () {
+    //     require(['sfu-modules/google_docs_pia_notice'], function(module) {
+    //         module.showGoogleDocsWarning();
+    //     });
+    // });
 
     utils.onPage(/^\/profile\/settings\/?$/, function () {
         $(document).ready(function () {
