@@ -1,33 +1,30 @@
-define([
-  'jquery',
-  'react',
-  'react-dom',
-  '../jsx/sfu_copyright_compliance_notice/SFUCopyrightComplianceNoticeModalDialog'
-], function($, React, ReactDOM, SFUCopyrightComplianceModalDialog) {
+import $ from 'jquery'
+import React from 'react'
+import ReactDOM from 'react-dom'
+import SFUCopyrightComplianceModalDialog from 'jsx/sfu_copyright_compliance_notice/SFUCopyrightComplianceNoticeModalDialog'
 
-    var render = function(formId) {
-        ReactDOM.render(
-          React.createElement(
-            SFUCopyrightComplianceModalDialog,
-            {
-                modalIsOpen: true,
-                formId: formId
-            }
-          ),
-          document.getElementById('wizard_box')
-        );
-    };
+const formId = 'course_status_form'
 
-    var attachClickHandler = function(formId) {
-        var $button = $('#' + formId + ' button.btn-publish');
-        $button.on('click', function(ev) {
-            ev.preventDefault();
-            render(formId);
-        });
-        $button.attr('disabled', false);
-    };
+const render = function () {
+  ReactDOM.render(
+    React.createElement(
+      SFUCopyrightComplianceModalDialog,
+      {
+        modalIsOpen: true,
+        formId
+      }
+    ),
+    document.getElementById('wizard_box')
+  )
+};
 
-    return {
-        attachClickHandlerTo: attachClickHandler
-    };
-});
+const attachClickHandler = function () {
+  var $button = $('#course_status_form button.btn-publish')
+  $button.on('click', function (ev) {
+    ev.preventDefault()
+    render(formId)
+  })
+  $button.attr('disabled', false)
+}
+
+attachClickHandler()
