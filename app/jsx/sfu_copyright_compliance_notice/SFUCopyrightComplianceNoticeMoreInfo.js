@@ -31,9 +31,22 @@ const SFUCopyrightComplianceNoticeMoreInfo = () => (
       <li>I hold copyright in the work.</li>
     </ol>
     <p>
-        For more information see <a href="http://www.lib.sfu.ca/faqs/copyright-fair-dealing" target="_blank" rel="noreferrer noopener"> What is Fair Dealing</a>,
-        <a href="http://www.lib.sfu.ca/file-newest/11695/copyright_graphic.pdf" target="_blank" rel="noreferrer noopener">Copyright Information Graphic For Teaching Purposes</a>,
-        <a href="http://copyright.sfu.ca" target="_blank" rel="noreferrer noopener">http://copyright.sfu.ca</a> or contact the SFU Copyright Office at <a href="mailto:copy@sfu.ca">copy@sfu.ca</a>.
+        For more information see
+        <a
+          href="http://www.lib.sfu.ca/faqs/copyright-fair-dealing"
+          target="_blank"
+          rel="noreferrer noopener"
+        > What is Fair Dealing</a>,
+        <a
+          href="http://www.lib.sfu.ca/file-newest/11695/copyright_graphic.pdf"
+          target="_blank"
+          rel="noreferrer noopener"
+        >Copyright Information Graphic For Teaching Purposes</a>,
+        <a
+          href="http://copyright.sfu.ca"
+          target="_blank"
+          rel="noreferrer noopener"
+        >http://copyright.sfu.ca</a> or contact the SFU Copyright Office at <a href="mailto:copy@sfu.ca">copy@sfu.ca</a>.
       </p>
   </div>
   )
