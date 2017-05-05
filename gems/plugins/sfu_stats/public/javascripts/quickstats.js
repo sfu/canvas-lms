@@ -1,14 +1,14 @@
 /* jshint indent:4, camelcase:false, laxcomma:false */
 (function () {
-  define(['jquery', 'spin.js/jquery.spin'], () => {
-    const enrollmentCache = {};
+  define(['jquery', 'spin.js/jquery.spin'], function() {
+    var enrollmentCache = {};
     return function () {
       $('.enrollment_term_switcher select').on('change', function () {
-        let el = $(this),
+        var el = $(this),
           term = el.val(),
-          url = `/sfu/stats/enrollments/${term}.json`,
+          url = '/sfu/stats/enrollments/' + term + '.json',
           totalOrUnique = el.data('totalorunique'),
-          enrollmentType = `${toTitleCase(el.data('enrollmenttype'))}Enrollment`,
+          enrollmentType = '/sfu/stats/enrollments/' + term + '.json',
           target = el.parentsUntil('.stats_enrollment_box').prev()[0],
           targetText = $(target).text(),
           spinnerContainer = el.parent().find('.spinner_container'),
@@ -32,11 +32,11 @@
           };
 
         if (enrollmentCache.hasOwnProperty(term)) {
-          const data = enrollmentCache[term];
+          var data = enrollmentCache[term];
           fancyCounter(target, parseInt(targetText.replace(/\D/g, ''), 10), parseInt(data[totalOrUnique][enrollmentType], 10));
         } else {
           spinnerContainer.spin(spinnerOpts);
-          $.getJSON(url, (data) => {
+          $.getJSON(url, function (data)  {
             spinnerContainer.spin(false);
             enrollmentCache[term] = data;
             fancyCounter(target, parseInt(targetText.replace(/\D/g, ''), 10), parseInt(data[totalOrUnique][enrollmentType], 10));
@@ -44,24 +44,28 @@
         }
       });
 
-      function toTitleCase (str) { return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()); }
-
-      function fancyCounter (el, from, to) {
-        $({ countNum: from }).animate({ countNum: to }, {
-          duration: 300,
-          easing: 'linear',
-          step () {
-            $(el).text(numberWithCommas(Math.floor(this.countNum)));
-          },
-          complete () {
-            $(el).text(numberWithCommas(this.countNum));
-          }
+      function toTitleCase(str) {
+        return str.replace(/\w\S*/g, function(txt) {
+          return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
         });
       }
 
       function numberWithCommas (x) {
         return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
       }
+      function fancyCounter (el, from, to) {
+        $({ countNum: from }).animate({ countNum: to }, {
+          duration: 300,
+          easing: 'linear',
+          step: function () {
+            $(el).text(numberWithCommas(Math.floor(this.countNum)));
+          },
+          complete: function () {
+            $(el).text(numberWithCommas(this.countNum));
+          }
+        });
+      }
+
     }
   });
 }());

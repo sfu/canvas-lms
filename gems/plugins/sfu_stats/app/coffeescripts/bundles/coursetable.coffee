@@ -1,2 +1,2 @@
-require ['sfu_stats/coursetable'], (coursetable) ->
+require ['plugins/sfu_stats/coursetable'], (coursetable) ->
   $(document).ready coursetable

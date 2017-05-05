@@ -481,7 +481,9 @@ class Enrollment < ActiveRecord::Base
 
   def cancel_future_appointments
     if workflow_state_changed? && %w{completed deleted}.include?(workflow_state)
-      course.appointment_participants.active.current.for_context_codes(user.asset_string).update_all(:workflow_state => 'deleted')
+      unless self.course.current_enrollments.where(:user_id => self.user_id).exists? # ignore if they have another still valid enrollment
+        course.appointment_participants.active.current.for_context_codes(user.asset_string).update_all(:workflow_state => 'deleted')
+      end
     end
   end
 
@@ -990,7 +992,11 @@ class Enrollment < ActiveRecord::Base
     end
   end
 
+  # This method is intended to not duplicate work for a single user.
   def self.recompute_final_score_in_singleton(user_id, course_id, opts = {})
+    # Guard against getting more than one user_id
+    raise ArgumentError, "Cannot call with more than one user" if Array(user_id).size > 1
+
     send_later_if_production_enqueue_args(
       :recompute_final_score,
       {

@@ -1,6 +1,6 @@
 /* jshint indent:4, camelcase:false, laxcomma:false */
 (function() {
-    define(['jquery', 'sfu_stats/vendor/jquery.dataTables'], function() {
+    define(['jquery', './vendor/jquery.dataTables'], function() {
         return function() {
             var cols = {
                 id: 0,

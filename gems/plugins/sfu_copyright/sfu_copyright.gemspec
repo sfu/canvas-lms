@@ -13,4 +13,6 @@ Gem::Specification.new do |s|
   s.summary = "Contains materials related to Copyright Compliance"
 
   s.files = Dir["{app,config,db,lib}/**/*"] + ["README.md"]
+
+  s.add_dependency "rails", ">= 3.2", "< 5.1"
 end
