@@ -156,6 +156,8 @@ class ApplicationController < ActionController::Base
 
       # SFU MOD: Add SFU entries to js_env
       @js_env[:APP_NODE] = Socket.gethostname().split('.')[0]
+      # SFU MOD: Add the base Webpack URL to js_env
+      @js_env[:WEBPACK_BASE] = js_base_url
       @js_env[:RELEASE] = File.dirname(__FILE__)
       @js_env[:CANVAS_SPACES_ENABLED] = PluginSetting.find_by_name(:canvas_spaces).disabled.! rescue false
       # END SFU MOD
