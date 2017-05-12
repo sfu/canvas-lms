@@ -1,51 +1,54 @@
-define([
-  'react',
-  './SFUCopyrightComplianceNoticeMoreInfo'
-  ], function (React, SFUCopyrightComplianceNoticeMoreInfo) {
+import React from 'react'
+import SFUCopyrightComplianceNoticeMoreInfo from './SFUCopyrightComplianceNoticeMoreInfo'
 
-  var SFUCopyrightComplianceNotice = React.createClass({
-    getDefaultProps() {
-      return {
-        show_more: false
-      };
-    },
+class SFUCopyrightComplianceNotice extends React.Component {
 
-    getInitialState() {
-      return {
-        show_more: this.props.show_more
-      };
-    },
-
-    handleClick() {
-      this.setState({ show_more: !this.state.show_more });
-    },
-
-    showMoreMaybe() {
-      if (this.state.show_more) {
-        return <SFUCopyrightComplianceNoticeMoreInfo />
-      } else {
-        return (
-          <p>
-            <button onClick={this.handleClick} className="Button Button--mini">Read More&hellip;</button>
-          </p>
-        )
-      }
-    },
-
-    render() {
-      return (
-        <div>
-          <p className={this.props.className}>
-            I confirm that the use of copyright protected materials in this course
-            complies with Canada's Copyright Act and SFU Policy R30.04 - Copyright
-            Compliance and Administration.
-          </p>
-          {this.showMoreMaybe()}
-        </div>
-      )
+  constructor (props) {
+    super(props)
+    this.state = {
+      show_more: props.show_more
     }
-  });
+    this.handleClick = this.handleClick.bind(this)
+  }
 
-  return SFUCopyrightComplianceNotice;
+  handleClick () {
+    this.setState({ show_more: !this.state.show_more })
+  }
 
-});
+  showMoreMaybe () {
+    if (this.state.show_more) {
+      return <SFUCopyrightComplianceNoticeMoreInfo />
+    }
+    return (
+      <p>
+        <button onClick={this.handleClick} className="Button Button--mini">Read More&hellip;</button>
+      </p>
+    )
+  }
+
+  render () {
+    return (
+      <div>
+        <p className={this.props.className}>
+          I confirm that the use of copyright protected materials in this course
+          complies with Canada&apos;s Copyright Act and SFU Policy R30.04 - Copyright
+          Compliance and Administration.
+        </p>
+        {this.showMoreMaybe()}
+      </div>
+    )
+  }
+}
+
+SFUCopyrightComplianceNotice.propTypes = {
+  show_more: React.PropTypes.bool,
+  className: React.PropTypes.string
+}
+
+SFUCopyrightComplianceNotice.defaultProps = {
+  show_more: false,
+  className: null
+}
+
+
+export default SFUCopyrightComplianceNotice
