@@ -53,7 +53,9 @@
     </td>
     <td class='notes'>
       <div>
-        {{#t}}{{notes}}{{/t}}
+        {{#if notes}}
+          {{#t}}{{notes}}{{/t}}
+        {{/if}}
       </div>
     </td>
     <td class='links'>
