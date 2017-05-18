@@ -5,6 +5,11 @@ ENV APP_HOME /usr/src/app/
 ENV RAILS_ENV "production"
 ENV NGINX_MAX_UPLOAD_SIZE 10g
 
+# Work around github.com/zertosh/v8-compile-cache/issues/2
+# This can be removed once yarn pushes a release including the fixed version
+# of v8-compile-cache.
+ENV DISABLE_V8_COMPILE_CACHE 1
+
 USER root
 WORKDIR /root
 RUN curl -sL https://deb.nodesource.com/setup_6.x | bash -\
@@ -64,4 +69,4 @@ RUN mkdir -p log \
   && chown -R docker:docker ${APP_HOME} /home/docker
 
 USER docker
-RUN bundle exec rake canvas:compile_assets
+RUN COMPILE_ASSETS_NPM_INSTALL=0 bundle exec rake canvas:compile_assets

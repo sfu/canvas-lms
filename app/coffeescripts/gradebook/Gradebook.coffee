@@ -37,11 +37,12 @@ define [
   'jsx/gradebook/CourseGradeCalculator'
   'jsx/gradebook/EffectiveDueDates'
   'jsx/gradebook/GradingSchemeHelper'
+  'jsx/gradebook/shared/helpers/GradeFormatHelper'
   'compiled/userSettings'
   'spin.js'
   'compiled/SubmissionDetailsDialog'
   'compiled/gradebook/AssignmentGroupWeightsDialog'
-  'compiled/gradebook/GradeDisplayWarningDialog'
+  'compiled/shared/GradeDisplayWarningDialog'
   'compiled/gradebook/PostGradesFrameDialog'
   'compiled/gradebook/SubmissionCell'
   'compiled/gradebook/GradebookHeaderMenu'
@@ -79,7 +80,7 @@ define [
 ], (
   $, _, Backbone, tz, DataLoader, React, ReactDOM, LongTextEditor, KeyboardNavDialog, KeyboardNavTemplate, Slick,
   TotalColumnHeaderView, round, InputFilterView, i18nObj, I18n, GRADEBOOK_TRANSLATIONS, CourseGradeCalculator,
-  EffectiveDueDates, GradingSchemeHelper, UserSettings, Spinner, SubmissionDetailsDialog,
+  EffectiveDueDates, GradingSchemeHelper, GradeFormatHelper, UserSettings, Spinner, SubmissionDetailsDialog,
   AssignmentGroupWeightsDialog, GradeDisplayWarningDialog, PostGradesFrameDialog, SubmissionCell,
   GradebookHeaderMenu, NumberCompare, natcompare, htmlEscape, PostGradesStore, PostGradesApp, SubmissionStateMap,
   ColumnHeaderTemplate, GroupTotalCellTemplate, RowStudentNameTemplate, SectionMenuView, GradingPeriodMenuView,
@@ -652,6 +653,7 @@ define [
     updateSubmission: (submission) =>
       student = @student(submission.user_id)
       submission.submitted_at = tz.parse(submission.submitted_at)
+      submission.grade = GradeFormatHelper.formatGrade(submission.grade, { gradingType: submission.gradingType, delocalize: false })
       cell = student["assignment_#{submission.assignment_id}"] ||= {}
       _.extend(cell, submission)
 
@@ -1257,15 +1259,14 @@ define [
     displayPointTotals: =>
       @options.show_total_grade_as_points and not @weightedGrades()
 
-    switchTotalDisplay: =>
+    switchTotalDisplay: ({ dontWarnAgain = false } = {}) =>
+      if dontWarnAgain
+        UserSettings.contextSet('warned_about_totals_display', true)
+
       @options.show_total_grade_as_points = not @options.show_total_grade_as_points
       $.ajaxJSON @options.setting_update_url, "PUT", show_total_grade_as_points: @displayPointTotals()
       @grid.invalidate()
       @totalHeader.switchTotalDisplay(@options.show_total_grade_as_points)
-
-    switchTotalDisplayAndMarkUserAsWarned: =>
-      UserSettings.contextSet('warned_about_totals_display', true)
-      @switchTotalDisplay()
 
     togglePointsOrPercentTotals: =>
       if UserSettings.contextGet('warned_about_totals_display')
@@ -1273,8 +1274,7 @@ define [
       else
         dialog_options =
           showing_points: @options.show_total_grade_as_points
-          unchecked_save: @switchTotalDisplay
-          checked_save: @switchTotalDisplayAndMarkUserAsWarned
+          save: @switchTotalDisplay
         new GradeDisplayWarningDialog(dialog_options)
 
     onUserFilterInput: (term) =>
