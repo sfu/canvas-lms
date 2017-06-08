@@ -8,7 +8,7 @@
           term = el.val(),
           url = '/sfu/stats/enrollments/' + term + '.json',
           totalOrUnique = el.data('totalorunique'),
-          enrollmentType = '/sfu/stats/enrollments/' + term + '.json',
+          enrollmentType = toTitleCase(el.data('enrollmenttype')) + 'Enrollment',
           target = el.parentsUntil('.stats_enrollment_box').prev()[0],
           targetText = $(target).text(),
           spinnerContainer = el.parent().find('.spinner_container'),
