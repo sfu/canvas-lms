@@ -46,7 +46,11 @@ describe "SFU Course Form" do
         :end_at => t['end_at'],
         :workflow_state => 'active'
       })
+
+      # stub out SFU::REST#canvas_server
+      allow(SFU::REST).to receive(:canvas_server).and_return("http://#{SeleniumDriverSetup.app_host_and_port}")
     end
+
   end
 
   context "as an authorized user" do
