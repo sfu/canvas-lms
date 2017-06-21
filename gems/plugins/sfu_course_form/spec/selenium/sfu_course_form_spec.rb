@@ -60,8 +60,9 @@ describe "SFU Course Form" do
       @testcnvs = user_with_managed_pseudonym({
         name: 'Canvas Testing',
         username: 'testcnvs',
-        unique_id: 'testcnvs@sfu.ca',
-        sis_user_id: '000028225'
+        unique_id: 'testcnvs',
+        sis_user_id: '000028225',
+        account: Account.default
       })
     end
 
