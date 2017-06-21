@@ -74,6 +74,19 @@ describe "SFU Course Form" do
       get COURSE_FORM
       expect(f('#breadcrumbs li:nth-of-type(2) > span')).to include_text 'Start a New Course'
     end
+
+    it "should create one credit course" do
+      get COURSE_FORM
+      f('#action-identify-faculty').click
+      f('#action-course-calendar').click
+      f('#search').send_keys 'MATH150 D100'
+      sleep 2
+      f('#ui-id-1').click
+      f('#courses-searched input[type="checkbox"').click
+      f('#action-submit-calendar').click
+      wait_for_ajaximations
+    end
+
   end
 
 end
