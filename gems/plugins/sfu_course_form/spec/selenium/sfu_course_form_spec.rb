@@ -25,6 +25,7 @@ describe "SFU Course Form" do
   before do
     # create admin user with oauth token
     @admin = account_admin_user
+    pseudonym_model({:user => @admin})
     @admin_access_token = @admin.access_tokens.create!(:purpose => "test").full_token
     allow(SFU::REST).to receive(:canvas_oauth_token).and_return(@admin_access_token)
 
