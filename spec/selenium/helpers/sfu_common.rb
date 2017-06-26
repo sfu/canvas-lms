@@ -33,4 +33,20 @@ module SFUCommon
     @account.brand_config_md5 = @bc_config.md5
     @account.save!
   end
+
+  def create_sfu_terms
+    terms_file = File.expand_path("#{File.dirname(__FILE__)}../../../fixtures/sfu_terms.json")
+    terms = JSON.parse(File.read(terms_file))
+    terms.map! { |t| t['enrollment_term'] }
+    terms.delete_if { |t| t['name'] == 'Default Term' }
+    terms.each do |t|
+      enrollment_term_model({
+        :name => t['name'],
+        :sis_source_id => t['sis_source_id'],
+        :start_at => t['start_at'],
+        :end_at => t['end_at'],
+        :workflow_state => 'active'
+      })
+    end
+  end
 end
