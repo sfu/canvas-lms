@@ -54,7 +54,7 @@ class StatsController < ApplicationController
 
   def courses_for_term(term_id, fields='*')
     if term_id == 'current'
-      term_id = current_term || default_term
+      term_id = current_term.id || default_term.id
     end
     workflow_state_translation = {
       "available" => "published",
