@@ -15,6 +15,21 @@
 # You should have received a copy of the GNU Affero General Public License along
 # with this program. If not, see <http://www.gnu.org/licenses/>.
 
+
+=begin
+
+  * create terms
+  * create a bunch of teachers
+  * create a bunch of students
+  * create a bunch of credit courses
+  * add students and teachers to courses
+  * add courses to terms
+  * check the quickstats boxes
+  * check the table
+
+=end
+
+
 require File.expand_path(File.dirname(__FILE__) + '../../../../../../spec/selenium/common')
 require File.expand_path(File.dirname(__FILE__) + '../../../../../../spec/selenium/helpers/sfu_common')
 
@@ -33,5 +48,6 @@ describe "SFU Stats Page" do
     get STATS_PAGE
     expect(driver.title).to eq 'Canvas Stats'
   end
+
 
 end
