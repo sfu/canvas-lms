@@ -49,4 +49,22 @@ module SFUCommon
       })
     end
   end
+
+  def current_sfu_term
+    EnrollmentTerm.active.select(select_fields).where(root_account: Account.default).where(':date BETWEEN start_at AND end_at', {:date => DateTime.now}).where.not(sis_source_id: nil).first
+  end
+
+  def next_sfu_term
+    EnrollmentTerm.active.select(select_fields).where('start_at > :date', {:date => DateTime.now}).where.not(sis_source_id: nil).order(:sis_source_id).limit(1).first
+  end
+
+  def prev_sfu_term
+    EnrollmentTerm.active.select(select_fields).where('end_at < :date', {:date => DateTime.now}).where.not(sis_source_id: nil).order(sis_source_id: :desc).limit(1).first
+  end
+
+  private
+  def select_fields
+    %i(id name sis_source_id start_at end_at)
+  end
+
 end
