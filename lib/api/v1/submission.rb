@@ -89,8 +89,10 @@ module Api::V1::Submission
     hash
   end
 
-  SUBMISSION_JSON_FIELDS = %w(id user_id url score grade excused attempt submission_type submitted_at body assignment_id graded_at grade_matches_current_submission grader_id workflow_state).freeze
-  SUBMISSION_JSON_METHODS = %w(late).freeze
+  SUBMISSION_JSON_FIELDS = %w(id user_id url score grade excused attempt submission_type submitted_at body
+    assignment_id graded_at grade_matches_current_submission grader_id workflow_state late_policy_status
+    accepted_at points_deducted).freeze
+  SUBMISSION_JSON_METHODS = %w(late missing duration_late).freeze
   SUBMISSION_OTHER_FIELDS = %w(attachments discussion_entries).freeze
 
   def submission_attempt_json(attempt, assignment, user, session, context = nil)
@@ -119,6 +121,9 @@ module Api::V1::Submission
     end
 
     hash['group'] = submission_minimal_group_json(attempt) if includes.include?("group")
+    if hash.key?('grade_matches_current_submission')
+      hash['grade_matches_current_submission'] = hash['grade_matches_current_submission'] != false
+    end
 
     unless params[:exclude_response_fields] && params[:exclude_response_fields].include?('preview_url')
       preview_args = { 'preview' => '1' }

@@ -72,6 +72,19 @@ describe Attachment do
     end
   end
 
+  context "authenticated_s3_url s3_storage" do
+    before :each do
+      s3_storage!
+    end
+
+    it "should give back a signed s3 url" do
+      a = attachment_model
+      s3object = a.s3object
+      expect(a.authenticated_s3_url(expires_in: 1.day)).to match(/^https:\/\//)
+      a.destroy_permanently!
+    end
+  end
+
   def configure_crocodoc
     PluginSetting.create! :name => 'crocodoc',
                           :settings => { :api_key => "blahblahblahblahblah" }
@@ -432,6 +445,66 @@ describe Attachment do
       expect(a.content_type).to eq 'application/msword'
       a.destroy_content_and_replace
       expect(a.content_type).to eq 'unknown/unknown'
+    end
+
+    it 'should not delete s3objects if it is not production for destroy_content' do
+      ApplicationController.stubs(:test_cluster?).returns(true)
+      s3_storage!
+      a = attachment_model
+      a.stubs(:s3object).returns(mock('s3object'))
+      s3object = a.s3object
+      s3object.expects(:delete).never
+      a.destroy_content
+    end
+
+    it 'should destroy all crocodocs even from children attachments' do
+      local_storage!
+      configure_crocodoc
+
+      a = crocodocable_attachment_model(uploaded_data: default_uploaded_data)
+      a2 = attachment_model(root_attachment: a)
+      a2.submit_to_canvadocs 1, wants_annotation: true
+      a.submit_to_canvadocs 1, wants_annotation: true
+      run_jobs
+
+      expect(a.crocodoc_document).not_to be_nil
+      expect(a2.crocodoc_document).not_to be_nil
+      a.destroy_content_and_replace
+      expect(a.reload.crocodoc_document).to be_nil
+      expect(a2.reload.crocodoc_document).to be_nil
+    end
+
+    it 'should allow destroy_content_and_replace on children attachments' do
+      a = attachment_model(uploaded_data: default_uploaded_data)
+      a2 = attachment_model(root_attachment: a)
+      a2.destroy_content_and_replace
+      purgatory = Purgatory.where(attachment_id: [a.id, a2.id])
+      expect(purgatory.count).to eq 1
+      expect(purgatory.take.attachment_id).to eq a.id
+    end
+
+    shared_examples_for "purgatory" do
+      it 'should save file in purgatory and then restore and back again' do
+        a = attachment_model(uploaded_data: default_uploaded_data)
+        filename = a.filename
+        a.destroy_content_and_replace
+        purgatory = Purgatory.where(attachment_id: a).take
+        expect(purgatory.old_filename).to eq filename
+        a.resurrect_from_purgatory
+        expect(purgatory.reload.workflow_state).to eq 'restored'
+        a.destroy_content_and_replace
+        expect(purgatory.reload.workflow_state).to eq 'active'
+      end
+    end
+
+    context "s3" do
+      include_examples "purgatory"
+      before { s3_storage! }
+    end
+
+    context "s3" do
+      include_examples "purgatory"
+      before { local_storage! }
     end
   end
 
@@ -833,6 +906,22 @@ describe Attachment do
       a2.reload
       expect(a2.display_name).not_to eq 'a1.txt'
       expect(a2.display_name).not_to eq 'a2.txt'
+    end
+
+    context "sharding" do
+      specs_require_sharding
+
+      it "forms proper queries when run from a different shard" do
+        @shard1.activate do
+          @a.display_name = 'a1'
+          deleted = @a.handle_duplicates(:overwrite)
+          expect(@a.file_state).to eq 'available'
+          @a1.reload
+          expect(@a1.file_state).to eq 'deleted'
+          expect(@a1.replacement_attachment).to eql @a
+          expect(deleted).to eq [ @a1 ]
+        end
+      end
     end
   end
 
@@ -1395,7 +1484,16 @@ describe Attachment do
 
       it "should stream data to the block given" do
         callback = false
-        @attachment.s3object.class.any_instance.expects(:get).yields("test")
+        data = ["test", false]
+        Tempfile.any_instance.expects(:binmode).once
+        Tempfile.any_instance.expects(:rewind).once
+        Tempfile.any_instance.expects(:path).once
+
+        # We specify at_least(2) here because the stub will return "test"
+        # first, then on the second run will be falsey, therefore
+        # ending the loop and stopping the calls
+        File.expects(:open).at_least(2).yields(stub(read: -> {data.shift}))
+        @attachment.s3object.class.any_instance.expects(:get).with(has_key(:response_target))
         @attachment.open { |data| expect(data).to eq "test"; callback = true }
         expect(callback).to eq true
       end

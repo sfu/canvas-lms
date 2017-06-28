@@ -267,6 +267,7 @@ class Message < ActiveRecord::Base
       context = context.assignment if context.respond_to?(:assignment) && context.assignment
       context = context.rubric_association.context if context.respond_to?(:rubric_association) && context.rubric_association
       context = context.appointment_group.contexts.first if context.respond_to?(:appointment_group) && context.appointment_group
+      context = context.master_template.course if context.respond_to?(:master_template) && context.master_template
       context = context.context if context.respond_to?(:context)
       context = context.account if context.respond_to?(:account)
       context = context.root_account if context.respond_to?(:root_account)
@@ -557,7 +558,8 @@ class Message < ActiveRecord::Base
       return nil
     end
 
-    if user && user.account.feature_enabled?(:notification_service) && path_type != "yo"
+    check_acct = (user && user.account) || Account.site_admin
+    if check_acct.feature_enabled?(:notification_service) && path_type != "yo"
       enqueue_to_sqs
     else
       send(delivery_method)
