@@ -234,6 +234,7 @@ module AccountReports::ReportHelper
       csv.instance_variable_set(:@account_report, @account_report)
       csv << headers unless headers.nil?
       Shackles.activate(:slave) { yield csv }
+      @account_report.update_attribute(:current_line, csv.lineno)
     end
     file
   end
@@ -241,11 +242,15 @@ module AccountReports::ReportHelper
   class ExtendedCSV < CSV
     def <<(row)
       if @lineno % 1000 == 0
-        report = self.instance_variable_get(:@account_report).reload
-        if report.workflow_state == 'deleted'
-          report.workflow_state = 'aborted'
-          report.save!
-          raise 'aborted'
+        Shackles.activate(:master) do
+          report = self.instance_variable_get(:@account_report).reload
+          report.update_attribute(:current_line, @lineno)
+          report.update_attribute(:progress, (@lineno.to_f/report.total_lines)*100) if report.total_lines
+          if report.workflow_state == 'deleted'
+            report.workflow_state = 'aborted'
+            report.save!
+            raise 'aborted'
+          end
         end
       end
       super(row)
@@ -272,7 +277,9 @@ module AccountReports::ReportHelper
     else
       @account_report.parameters["extra_text"] = text
     end
-    @account_report.save!
+    Shackles.activate(:master) do
+      @account_report.save!
+    end
   end
 
 end
