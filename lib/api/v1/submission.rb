@@ -91,8 +91,8 @@ module Api::V1::Submission
 
   SUBMISSION_JSON_FIELDS = %w(id user_id url score grade excused attempt submission_type submitted_at body
     assignment_id graded_at grade_matches_current_submission grader_id workflow_state late_policy_status
-    accepted_at points_deducted).freeze
-  SUBMISSION_JSON_METHODS = %w(late missing duration_late).freeze
+    points_deducted).freeze
+  SUBMISSION_JSON_METHODS = %w(late missing seconds_late).freeze
   SUBMISSION_OTHER_FIELDS = %w(attachments discussion_entries).freeze
 
   def submission_attempt_json(attempt, assignment, user, session, context = nil)
@@ -162,6 +162,7 @@ module Api::V1::Submission
         atjson = attachment_json(attachment, user, {},
                                  submission_attachment: true,
                                  include: ['preview_url'],
+                                 enable_annotations: true, # we want annotations on submission's attachment preview_urls
                                  crocodoc_ids: attempt.crocodoc_whitelist)
         attachment.skip_submission_attachment_lock_checks = false
         atjson
@@ -181,6 +182,12 @@ module Api::V1::Submission
         entries = assignment.discussion_topic.discussion_entries.active.for_user(attempt.user_id)
       end
       hash['discussion_entries'] = discussion_entry_api_json(entries, assignment.discussion_topic.context, user, session)
+    end
+
+    if attempt.submission_type == 'basic_lti_launch'
+      hash['url'] = retrieve_course_external_tools_url(context.id,
+                                                       assignment_id: assignment.id,
+                                                       url: attempt.external_tool_url)
     end
 
     hash

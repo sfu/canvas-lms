@@ -263,6 +263,7 @@ class Submission < ActiveRecord::Base
   def self.needs_grading_conditions
     conditions = <<-SQL
       submissions.submission_type IS NOT NULL
+      AND (submissions.excused = 'f' OR submissions.excused IS NULL)
       AND (submissions.workflow_state = 'pending_review'
         OR (submissions.workflow_state IN ('submitted', 'graded')
           AND (submissions.score IS NULL OR NOT submissions.grade_matches_current_submission)
@@ -670,7 +671,7 @@ class Submission < ActiveRecord::Base
   def originality_data
     data = self.originality_reports.each_with_object({}) do |originality_report, hash|
       hash[Attachment.asset_string(originality_report.attachment_id)] = {
-        similarity_score: originality_report.originality_score.round(2),
+        similarity_score: originality_report.originality_score&.round(2),
         state: originality_report.state,
         report_url: originality_report.originality_report_url,
         status: originality_report.workflow_state
@@ -697,7 +698,7 @@ class Submission < ActiveRecord::Base
     if self.grants_right?(user, :view_turnitin_report)
       attachment = self.attachments.find_by_asset_string(asset_string)
       report = self.originality_reports.find_by(attachment: attachment)
-      url = report.originality_report_url if report
+      url = report&.report_launch_url
     end
     url
   end
@@ -1168,11 +1169,8 @@ class Submission < ActiveRecord::Base
   def submit_attachments_to_canvadocs
     if attachment_ids_changed? && submission_type != 'discussion_topic'
       attachments.preload(:crocodoc_document, :canvadoc).each do |a|
-        # moderated grading annotations are only supported in crocodoc right now
-        dont_submit_to_canvadocs = assignment.moderated_grading?
-
         # associate previewable-document and submission for permission checks
-        if a.canvadocable? && Canvadocs.annotations_supported? && !dont_submit_to_canvadocs
+        if a.canvadocable? && Canvadocs.annotations_supported?
           submit_to_canvadocs = true
           a.create_canvadoc! unless a.canvadoc
           a.shard.activate do
@@ -1188,14 +1186,9 @@ class Submission < ActiveRecord::Base
 
         if submit_to_canvadocs
           opts = {
-            preferred_plugins: [Canvadocs::RENDER_BOX, Canvadocs::RENDER_CROCODOC],
-            wants_annotation: true,
-            force_crocodoc: dont_submit_to_canvadocs
+            preferred_plugins: [Canvadocs::RENDER_PDFJS, Canvadocs::RENDER_BOX, Canvadocs::RENDER_CROCODOC],
+            wants_annotation: true
           }
-
-          if context.account.feature_enabled?(:new_annotations)
-            opts[:preferred_plugins].unshift Canvadocs::RENDER_PDFJS
-          end
 
           if context.root_account.settings[:canvadocs_prefer_office_online]
             # Office 365 should take priority over pdfjs
@@ -1325,15 +1318,30 @@ class Submission < ActiveRecord::Base
   end
 
   # apply_late_policy is called directly by bulk update processes, or indirectly by before_save on a Submission
-  def apply_late_policy(late_policy=nil, points_possible=nil)
-    return if score.nil? || points_deducted_changed?
+  def apply_late_policy(late_policy=nil, points_possible=nil, grading_type=nil)
+    return if points_deducted_changed?
     late_policy ||= assignment.course.late_policy
     points_possible ||= assignment.points_possible
+    grading_type ||= assignment.grading_type
+    return score_missing(late_policy, points_possible, grading_type) if missing?
+    score_late_or_none(late_policy, points_possible) if score
+  end
+
+  def score_missing(late_policy, points_possible, grading_type)
+    return unless late_policy&.missing_submission_deduction_enabled
+    self.points_deducted = nil
+    self.score = late_policy.points_for_missing(points_possible, grading_type)
+  end
+  private :score_missing
+
+  def score_late_or_none(late_policy, points_possible)
     raw_score = score_changed? ? score : originally_entered_score
     deducted = late_points_deducted(raw_score, late_policy, points_possible)
+    new_score = raw_score - deducted
     self.points_deducted = deducted
-    self.score = raw_score - deducted
+    self.score = new_score
   end
+  private :score_late_or_none
 
   def originally_entered_score
     score + (points_deducted || 0)
@@ -1341,8 +1349,8 @@ class Submission < ActiveRecord::Base
   private :originally_entered_score
 
   def late_points_deducted(raw_score, late_policy, points_possible)
-    return 0 unless late_policy && points_possible && past_due?
-    late_policy.points_deducted(score: raw_score, possible: points_possible, late_for: duration_late)
+    return 0 unless late_policy && points_possible && late?
+    late_policy.points_deducted(score: raw_score, possible: points_possible, late_for: seconds_late)
   end
   private :late_points_deducted
 
@@ -1669,7 +1677,7 @@ class Submission < ActiveRecord::Base
   scope :having_submission, -> { where("submissions.submission_type IS NOT NULL") }
   scope :without_submission, -> { where(submission_type: nil, workflow_state: "unsubmitted") }
   scope :not_placeholder, -> {
-    where("submissions.submission_type IS NOT NULL or submissions.excused or submissions.score IS NOT NULL")
+    where("submissions.submission_type IS NOT NULL or submissions.excused or submissions.score IS NOT NULL or submissions.workflow_state = 'graded'")
   }
 
   scope :include_user, -> { preload(:user) }
@@ -1970,7 +1978,7 @@ class Submission < ActiveRecord::Base
   #
   module Tardiness
     def past_due?
-      duration_late > 0
+      seconds_late > 0
     end
     alias past_due past_due?
 
@@ -1993,7 +2001,7 @@ class Submission < ActiveRecord::Base
       excused || (!!score && workflow_state == 'graded')
     end
 
-    def duration_late
+    def seconds_late
       # the submission cannot be late if it's been marked with 'none' or 'missing'
       return 0.0 if ['none', 'missing'].include?(late_policy_status)
       return 0.0 if cached_due_date.nil? || time_of_submission <= cached_due_date

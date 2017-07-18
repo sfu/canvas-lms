@@ -733,9 +733,8 @@ describe 'Submissions API', type: :request do
         "late"=>false,
         "missing"=>false,
         "late_policy_status"=>nil,
-        "duration_late"=>0.0,
-        "points_deducted"=>0.0,
-        "accepted_at"=>"1970-01-01T01:00:00Z"})
+        "seconds_late"=>0.0,
+        "points_deducted"=>0.0})
 
     # can't access other students' submissions
     @user = student2
@@ -921,9 +920,8 @@ describe 'Submissions API', type: :request do
            "late"=>false,
            "missing"=>false,
            "late_policy_status"=>nil,
-           "duration_late"=>0.0,
-           "points_deducted"=>nil,
-           "accepted_at"=>"1970-01-01T01:00:00Z"},
+           "seconds_late"=>0.0,
+           "points_deducted"=>nil},
           {"id"=>sub1.id,
            "grade"=>nil,
            "excused" => nil,
@@ -949,9 +947,8 @@ describe 'Submissions API', type: :request do
            "late"=>false,
            "missing"=>false,
            "late_policy_status"=>nil,
-           "duration_late"=>0.0,
-           "points_deducted"=>nil,
-           "accepted_at"=>"1970-01-01T02:00:00Z"},
+           "seconds_late"=>0.0,
+           "points_deducted"=>nil},
           {"id"=>sub1.id,
            "grade"=>"A-",
            "excused" => false,
@@ -999,9 +996,8 @@ describe 'Submissions API', type: :request do
            "late"=>false,
            "missing"=>false,
            "late_policy_status"=>nil,
-           "duration_late"=>0.0,
-           "points_deducted"=>0.0,
-           "accepted_at"=>"1970-01-01T03:00:00Z"}],
+           "seconds_late"=>0.0,
+           "points_deducted"=>0.0}],
         "attempt"=>3,
         "url"=>nil,
         "submission_type"=>"online_text_entry",
@@ -1036,9 +1032,8 @@ describe 'Submissions API', type: :request do
         "late"=>false,
         "missing"=>false,
         "late_policy_status"=>nil,
-        "duration_late"=>0.0,
-        "points_deducted"=>0.0,
-        "accepted_at"=>"1970-01-01T03:00:00Z"},
+        "seconds_late"=>0.0,
+        "points_deducted"=>0.0},
        {"id"=>sub2.id,
         "grade"=>"F",
         "excused" => sub2.excused,
@@ -1093,9 +1088,8 @@ describe 'Submissions API', type: :request do
            "late"=>false,
            "missing"=>false,
            "late_policy_status"=>nil,
-           "duration_late"=>0.0,
-           "points_deducted"=>0.0,
-           "accepted_at"=>"1970-01-01T04:00:00Z"}],
+           "seconds_late"=>0.0,
+           "points_deducted"=>0.0}],
         "attempt"=>1,
         "url"=>"http://www.instructure.com",
         "submission_type"=>"online_url",
@@ -1132,9 +1126,8 @@ describe 'Submissions API', type: :request do
         "late"=>false,
         "missing"=>false,
         "late_policy_status"=>nil,
-        "duration_late"=>0.0,
-        "points_deducted"=>0.0,
-        "accepted_at"=>"1970-01-01T04:00:00Z"}]
+        "seconds_late"=>0.0,
+        "points_deducted"=>0.0}]
     expect(json.sort_by { |h| h['user_id'] }).to eq res.sort_by { |h| h['user_id'] }
   end
 
@@ -1886,6 +1879,7 @@ describe 'Submissions API', type: :request do
     end
 
     it "applies late policy when grading the submission twice with the same raw score" do
+      @late_assignment.submit_homework(@student, submission_type: "online_text_entry")
       2.times do
         json = api_call(
           :put,
@@ -2262,64 +2256,9 @@ describe 'Submissions API', type: :request do
       expect(json['late_policy_status']).to eq 'missing'
     end
 
-    it "can set accepted_at on a submission" do
-      accepted_at = 3.days.ago
-      json = api_call(
-        :put,
-        "/api/v1/courses/#{@course.id}/assignments/#{@assignment.id}/submissions/#{@student.id}.json",
-        {
-          controller: 'submissions_api',
-          action: 'update',
-          format: 'json',
-          course_id: @course.id.to_s,
-          assignment_id: @assignment.id.to_s,
-          user_id: @student.id.to_s
-        }, {
-          submission: {
-            late_policy_status: 'late',
-            accepted_at: accepted_at.iso8601
-          }
-        }
-      )
-
-      submission = @assignment.submission_for_student(@student)
-      expect(submission.late_policy_status).to eq 'late'
-      expect(submission.accepted_at).to eq accepted_at.change(usec: 0)
-      expect(json['late_policy_status']).to eq 'late'
-      expect(json['accepted_at']).to eq accepted_at.change(usec: 0).iso8601
-    end
-
-    it "ignores accepted_at if late_policy_status is not late" do
-      accepted_at = 3.days.ago
-      json = api_call(
-        :put,
-        "/api/v1/courses/#{@course.id}/assignments/#{@assignment.id}/submissions/#{@student.id}.json",
-        {
-          controller: 'submissions_api',
-          action: 'update',
-          format: 'json',
-          course_id: @course.id.to_s,
-          assignment_id: @assignment.id.to_s,
-          user_id: @student.id.to_s
-        }, {
-          submission: {
-            late_policy_status: 'missing',
-            accepted_at: accepted_at.iso8601
-          }
-        }
-      )
-
-      submission = @assignment.submission_for_student(@student)
-      expect(submission.late_policy_status).to eq 'missing'
-      expect(submission.accepted_at).to be_nil
-      expect(json['late_policy_status']).to eq 'missing'
-      expect(json['accepted_at']).to be_nil
-    end
-
     it "can clear late_policy_status on a submission" do
       @assignment.submissions.find_or_create_by!(user: @student).update!(
-        late_policy_status: 'late',
-        accepted_at: 3.days.ago
+        late_policy_status: 'missing'
       )
       json = api_call(
         :put,
@@ -2340,9 +2279,7 @@ describe 'Submissions API', type: :request do
 
       submission = @assignment.submission_for_student(@student)
       expect(submission.late_policy_status).to be_nil
-      expect(submission.accepted_at).to be_nil
       expect(json['late_policy_status']).to be_nil
-      expect(json['accepted_at']).to be_nil
     end
 
     it "creates a provisional grade and comment" do
@@ -2459,9 +2396,10 @@ describe 'Submissions API', type: :request do
         }
       )
 
+      expected_url = "http://www.example.com/courses/#{@course.id}/external_tools/retrieve?assignment_id=#{@assignment.id}&url=http%3A%2F%2Fexample.test"
       expect(Submission.count).to eq 1
       expect(json['submission_type']).to eql 'basic_lti_launch'
-      expect(json['url']).to eql 'http://example.test'
+      expect(json['url']).to eq expected_url
     end
 
     it 'does not allow a submission to be overwritten if type is a non-lti type' do
@@ -3901,6 +3839,26 @@ describe 'Submissions API', type: :request do
         expect(json.first.fetch('group').fetch('id')).to eq group.id
         expect(json.first.fetch('group').fetch('name')).to eq group.name
       end
+
+      context "submission of type basic_lti_launch" do
+        let(:external_tool_url) { 'http://www.test.com/basic-launch' }
+        let(:assignment) do
+          test_course.assignments.create!(
+            title: 'group assignment',
+            grading_type: 'points',
+            points_possible: 10,
+            submission_types: 'basic_lti_launch',
+            group_category: group.group_category
+          )
+        end
+        let!(:submit_homework) { assignment.submit_homework(student1, submission_type: 'basic_lti_launch', url: external_tool_url) }
+
+        it 'includes the submission launch URL' do
+          expected_url = "http://www.example.com/courses/#{assignment.course.id}/external_tools/retrieve?assignment_id=#{assignment.id}&url=http%3A%2F%2Fwww.test.com%2Fbasic-launch"
+          submission_json = api_call_as_user(teacher, :get, path, params)
+          expect(submission_json.first['url']).to eq expected_url
+        end
+      end
     end
   end
 
@@ -3910,6 +3868,14 @@ describe 'Submissions API', type: :request do
       @student1 = student_in_course(:active_all => true).user
       @student2 = student_in_course(:active_all => true).user
       @student3 = student_in_course(:active_all => true).user
+      course_with_user('StudentViewEnrollment', :active_all => true)
+
+      section = @course.course_sections.build(:name => 'Another Section')
+      section.save
+      section.enroll_user(@student1, 'StudentEnrollment', 'active')
+      section.enroll_user(@student2, 'StudentEnrollment', 'active')
+      section.enroll_user(@student3, 'StudentEnrollment', 'active')
+
       @assignment = @course.assignments.create(points_possible: 100)
       @assignment.submit_homework @student1, :body => 'EHLO'
       @assignment.submit_homework @student2, :body => 'EHLO'

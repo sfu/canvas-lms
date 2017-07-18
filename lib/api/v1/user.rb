@@ -219,6 +219,9 @@ module Api::V1::User
   def enrollment_json(enrollment, user, session, includes = [], opts = {})
     api_json(enrollment, user, session, :only => API_ENROLLMENT_JSON_OPTS).tap do |json|
       json[:enrollment_state] = json.delete('workflow_state')
+      if enrollment.course.workflow_state == 'deleted' || enrollment.course_section.workflow_state == 'deleted'
+        json[:enrollment_state] = 'deleted'
+      end
       json[:role] = enrollment.role.name
       json[:role_id] = enrollment.role_id
       json[:sis_batch_id] = enrollment.sis_batch_id # SFU MOD - For the user enrollment API (9789f39 by ronvs)

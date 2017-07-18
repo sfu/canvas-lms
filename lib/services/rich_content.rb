@@ -52,8 +52,9 @@ module Services
       def service_settings
         settings = Canvas::DynamicSettings.from_cache("rich-content-service", expires_in: 5.minutes, use_env: false)
         {
-          RICH_CONTENT_APP_HOST: settings["app-host"],
-          RICH_CONTENT_CDN_HOST: settings["cdn-host"]
+          RICH_CONTENT_APP_HOST: settings['app-host'],
+          RICH_CONTENT_CDN_HOST: settings['cdn-host'],
+          RICH_CONTENT_SIDEBAR_SOURCE: settings['sidebar-source'] ? settings['sidebar-source'] : 'api'
         }
       rescue Imperium::TimeoutError,
         Imperium::UnableToConnectError,
@@ -66,11 +67,7 @@ module Services
       end
 
       def contextually_on(root_account, risk_level)
-          check_feature_flag(root_account, :rich_content_service) && (
-            risk_level == :basic ||
-            (risk_level == :sidebar && check_feature_flag(root_account, :rich_content_service_with_sidebar)) ||
-            check_feature_flag(root_account, :rich_content_service_high_risk)
-          )
+        risk_level == :basic || risk_level == :sidebar || check_feature_flag(root_account, :rich_content_service_high_risk)
       end
     end
   end

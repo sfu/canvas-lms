@@ -17,7 +17,7 @@
  */
 
 import serviceRCELoader from 'jsx/shared/rce/serviceRCELoader'
-import { send, destroy, focus } from 'jsx/shared/rce/RceCommandShim'
+import { RCELOADED_EVENT_NAME, send, destroy, focus } from 'jsx/shared/rce/RceCommandShim'
 import Sidebar from 'jsx/shared/rce/Sidebar'
 import featureFlag from 'jsx/shared/rce/featureFlag'
 import $ from 'jquery'
@@ -26,6 +26,7 @@ function loadServiceRCE (target, tinyMCEInitOptions, callback) {
   serviceRCELoader.loadOnTarget(target, tinyMCEInitOptions, (textarea, remoteEditor) => {
     const $textarea = freshNode($(textarea))
     $textarea.data('remoteEditor', remoteEditor)
+    target.trigger(RCELOADED_EVENT_NAME, remoteEditor)
     if (callback) {
       callback()
     }
@@ -167,7 +168,7 @@ const RichContentEditor = {
    *
    * @public
    */
-  loadNewEditor ($target, tinyMCEInitOptions = {}) {
+  loadNewEditor ($target, tinyMCEInitOptions = {}, cb) {
     if ($target.length <= 0) {
       // no actual target, just short circuit out
       return
@@ -178,10 +179,14 @@ const RichContentEditor = {
     // avoid modifying the original options object provided
     tinyMCEInitOptions = $.extend({}, tinyMCEInitOptions)
 
-    let callback
-    if (tinyMCEInitOptions.focus) {
-      // call activateRCE once loaded
-      callback = this.activateRCE.bind(this, $target)
+    let callback = () => {
+      if (tinyMCEInitOptions.focus) {
+        // call activateRCE once loaded
+        this.activateRCE($target)
+      }
+      if (cb) {
+        cb()
+      }
     }
 
     if (featureFlag()) {
@@ -252,7 +257,7 @@ const RichContentEditor = {
   },
 
   freshNode,
-  ensureID,
+  ensureID
 }
 
 export default RichContentEditor
