@@ -158,7 +158,10 @@ class Enrollment < ActiveRecord::Base
       where("EXISTS (?) AND NOT EXISTS (?)",
         Submission.where(user_id: user_id).
           where("assignment_id=assignments.id").
-          where(Submission.needs_grading_conditions),
+          where("#{Submission.needs_grading_conditions} OR
+            (workflow_state = 'deleted' AND submission_type IS NOT NULL AND
+            (score IS NULL OR NOT grade_matches_current_submission OR
+            (submission_type = 'online_quiz' AND quiz_submission_id IS NOT NULL)))"),
         Enrollment.where(Enrollment.active_student_conditions).
           where(user_id: user_id, course_id: course_id).
           where("id<>?", self)).
@@ -254,7 +257,7 @@ class Enrollment < ActiveRecord::Base
   scope :student_in_claimed_or_available, -> {
     select(:course_id).
         joins(:course).
-        where(:type => 'StudentEnrollment', :workflow_state => 'active', :courses => { :workflow_state => ['available', 'claimed'] }) }
+        where(:type => 'StudentEnrollment', :workflow_state => 'active', :courses => { :workflow_state => ['available', 'claimed', 'created'] }) }
 
   scope :all_student, -> {
     eager_load(:course).
@@ -459,7 +462,7 @@ class Enrollment < ActiveRecord::Base
     self.end_at = other.end_at
     self.course_section_id = other.course_section_id
     self.root_account_id = other.root_account_id
-    self.user.touch if workflow_state_changed?
+    self.user.touch if workflow_state_changed? && !skip_touch_user
     if skip_broadcasts
       save_without_broadcasting!
     else
@@ -1209,11 +1212,7 @@ class Enrollment < ActiveRecord::Base
   end
 
   def self.top_enrollment_by(key, rank_order = :default)
-    if CANVAS_RAILS4_2
-      raise "top_enrollment_by_user must be scoped" unless all.where_values.present?
-    else
-      raise "top_enrollment_by_user must be scoped" unless all.where_clause.present?
-    end
+    raise "top_enrollment_by_user must be scoped" unless all.where_clause.present?
 
     key = key.to_s
     order("#{key}, #{type_rank_sql(rank_order)}").distinct_on(key)
