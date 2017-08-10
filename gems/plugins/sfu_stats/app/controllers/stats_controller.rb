@@ -18,17 +18,7 @@ class StatsController < ApplicationController
 
       format.json do
         aaData = courses_for_term(params[:term_id], "id, sis_source_id, name, course_code, workflow_state, account_id")
-        aaData.map! do |course|
-          [
-            course.id,
-            course.sis_source_id,
-            course.name,
-            course.course_code,
-            course.workflow_state,
-            course.account_id
-          ]
-        end
-        render :json => { :aaData => aaData }
+        render :json => { :aaData => aaData.map { |c| [ c.id, c.sis_source_id, c.name, c.course_code, c.workflow_state, c.account_id ] } }
       end
 
     end
