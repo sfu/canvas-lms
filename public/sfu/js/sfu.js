@@ -6,6 +6,10 @@
 
  */
 
+!function(s,d,url,e,p){
+  e=d.createElement(s),p=d.getElementsByTagName(s)[0];e.async=1;e.src=url;p.parentNode.insertBefore(e,p)
+}('script', document, 'https://unpkg.com/widgetize-canvas-lms-user-content');
+
 (function ($) {
   var utils = {
     onPage (regex, fn) {
