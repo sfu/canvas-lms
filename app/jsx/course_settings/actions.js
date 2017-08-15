@@ -192,9 +192,15 @@ import 'compiled/jquery.rails_flash_notifications'
                     formData.append('file', file);
                     ajaxLib.post(response.data.upload_url, formData)
                            .then((response) => {
-                             return ajaxLib.get(successUrl).then((successResp) => {
-                               dispatch(this.prepareSetImage(successResp.data.url, successResp.data.id, courseId, ajaxLib));
-                             })
+                             // SFU MOD CANVAS-263 Temp fix for course image upload
+                             if (successUrl) {
+                               return ajaxLib.get(successUrl).then((successResp) => {
+                                 dispatch(this.prepareSetImage(successResp.data.url, successResp.data.id, courseId, ajaxLib));
+                               })
+                             } else {
+                               dispatch(this.prepareSetImage(response.data.url, response.data.id, courseId, ajaxLib));
+                             }
+                             // END SFU MOD
                            })
                            .catch((response) => {
                               dispatch(this.errorUploadingImage());
