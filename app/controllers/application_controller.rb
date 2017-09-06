@@ -667,7 +667,7 @@ class ApplicationController < ActionController::Base
         @context = api_find(Account, params[:account_id])
         params[:context_id] = @context.id
         params[:context_type] = "Account"
-        @context_enrollment = @context.account_users.where(user_id: @current_user.id).first if @context && @current_user
+        @context_enrollment = @context.account_users.active.where(user_id: @current_user.id).first if @context && @current_user
         @context_membership = @context_enrollment
         @account = @context
       elsif params[:group_id]
@@ -1011,7 +1011,7 @@ class ApplicationController < ActionController::Base
           end
           if pseudonym && pseudonym != @current_pseudonym
             return_to = session.delete(:return_to)
-            reset_session
+            reset_session_saving_keys(:oauth2)
             PseudonymSession.create!(pseudonym)
             session[:used_remember_me_token] = true if token.used_remember_me_token
           end
@@ -1021,6 +1021,11 @@ class ApplicationController < ActionController::Base
           end
         end
         return redirect_to return_to if return_to
+        if (oauth = session[:oauth2])
+          provider = Canvas::Oauth::Provider.new(oauth[:client_id], oauth[:redirect_uri], oauth[:scopes], oauth[:purpose])
+          return redirect_to Canvas::Oauth::Provider.confirmation_redirect(self, provider, pseudonym.user)
+        end
+
         # do one final redirect to get the token out of the URL
         redirect_to remove_query_params(request.original_url, 'session_token')
       end
