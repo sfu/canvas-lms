@@ -1,0 +1,380 @@
+[
+  {
+    "enrollment_term": {
+      "id": 2,
+      "name": "Default Term",
+      "sis_source_id": null,
+      "start_at": null,
+      "end_at": null
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 7,
+      "name": "Spring 2006",
+      "sis_source_id": "1061",
+      "start_at": "2006-01-01T00:00:00Z",
+      "end_at": "2006-04-30T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 8,
+      "name": "Summer 2006",
+      "sis_source_id": "1064",
+      "start_at": "2006-05-01T00:00:00Z",
+      "end_at": "2006-08-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 9,
+      "name": "Fall 2006",
+      "sis_source_id": "1067",
+      "start_at": "2006-09-01T00:00:00Z",
+      "end_at": "2006-12-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 10,
+      "name": "Spring 2007",
+      "sis_source_id": "1071",
+      "start_at": "2007-01-01T00:00:00Z",
+      "end_at": "2007-04-30T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 11,
+      "name": "Summer 2007",
+      "sis_source_id": "1074",
+      "start_at": "2007-05-01T00:00:00Z",
+      "end_at": "2007-08-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 12,
+      "name": "Fall 2007",
+      "sis_source_id": "1077",
+      "start_at": "2007-09-01T00:00:00Z",
+      "end_at": "2007-12-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 13,
+      "name": "Spring 2008",
+      "sis_source_id": "1081",
+      "start_at": "2008-01-01T00:00:00Z",
+      "end_at": "2008-04-30T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 14,
+      "name": "Summer 2008",
+      "sis_source_id": "1084",
+      "start_at": "2008-05-01T00:00:00Z",
+      "end_at": "2008-08-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 15,
+      "name": "Fall 2008",
+      "sis_source_id": "1087",
+      "start_at": "2008-09-01T00:00:00Z",
+      "end_at": "2008-12-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 16,
+      "name": "Spring 2009",
+      "sis_source_id": "1091",
+      "start_at": "2009-01-01T00:00:00Z",
+      "end_at": "2009-04-30T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 17,
+      "name": "Summer 2009",
+      "sis_source_id": "1094",
+      "start_at": "2009-05-01T00:00:00Z",
+      "end_at": "2009-08-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 18,
+      "name": "Fall 2009",
+      "sis_source_id": "1097",
+      "start_at": "2009-09-01T00:00:00Z",
+      "end_at": "2009-12-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 19,
+      "name": "Spring 2010",
+      "sis_source_id": "1101",
+      "start_at": "2010-01-01T00:00:00Z",
+      "end_at": "2010-04-30T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 20,
+      "name": "Summer 2010",
+      "sis_source_id": "1104",
+      "start_at": "2010-05-01T00:00:00Z",
+      "end_at": "2010-08-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 21,
+      "name": "Fall 2010",
+      "sis_source_id": "1107",
+      "start_at": "2010-09-01T00:00:00Z",
+      "end_at": "2010-12-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 22,
+      "name": "Spring 2011",
+      "sis_source_id": "1111",
+      "start_at": "2011-01-01T00:00:00Z",
+      "end_at": "2011-04-30T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 23,
+      "name": "Summer 2011",
+      "sis_source_id": "1114",
+      "start_at": "2011-05-01T00:00:00Z",
+      "end_at": "2011-08-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 24,
+      "name": "Fall 2011",
+      "sis_source_id": "1117",
+      "start_at": "2011-09-01T00:00:00Z",
+      "end_at": "2011-12-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 25,
+      "name": "Spring 2012",
+      "sis_source_id": "1121",
+      "start_at": "2012-01-01T00:00:00Z",
+      "end_at": "2012-04-30T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 26,
+      "name": "Summer 2012",
+      "sis_source_id": "1124",
+      "start_at": "2012-05-01T00:00:00Z",
+      "end_at": "2012-08-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 27,
+      "name": "Fall 2012",
+      "sis_source_id": "1127",
+      "start_at": "2012-09-01T00:00:00Z",
+      "end_at": "2012-12-31T00:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 37,
+      "name": "Spring 2017",
+      "sis_source_id": "1171",
+      "start_at": "2017-01-04T08:00:00Z",
+      "end_at": "2017-05-08T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 38,
+      "name": "Summer 2017",
+      "sis_source_id": "1174",
+      "start_at": "2017-05-08T07:00:00Z",
+      "end_at": "2017-09-05T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 30,
+      "name": "Fall 2014",
+      "sis_source_id": "1147",
+      "start_at": "2014-09-02T07:00:00Z",
+      "end_at": "2015-01-06T08:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 4,
+      "name": "Spring 2013",
+      "sis_source_id": "1131",
+      "start_at": "2013-01-07T08:00:00Z",
+      "end_at": "2013-05-05T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 5,
+      "name": "Summer 2013",
+      "sis_source_id": "1134",
+      "start_at": "2013-05-05T07:00:00Z",
+      "end_at": "2013-09-02T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 29,
+      "name": "Summer 2014",
+      "sis_source_id": "1144",
+      "start_at": "2014-05-05T07:00:00Z",
+      "end_at": "2014-09-01T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 31,
+      "name": "Spring 2015",
+      "sis_source_id": "1151",
+      "start_at": "2015-01-06T08:00:00Z",
+      "end_at": "2015-05-10T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 6,
+      "name": "Fall 2013",
+      "sis_source_id": "1137",
+      "start_at": "2013-09-02T07:00:00Z",
+      "end_at": "2014-01-05T08:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 28,
+      "name": "Spring 2014",
+      "sis_source_id": "1141",
+      "start_at": "2014-01-06T08:00:00Z",
+      "end_at": "2014-05-04T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 39,
+      "name": "Fall 2017",
+      "sis_source_id": "1177",
+      "start_at": "2017-09-05T07:00:00Z",
+      "end_at": "2018-01-02T08:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 40,
+      "name": "Spring 2018",
+      "sis_source_id": "1181",
+      "start_at": "2018-01-03T08:00:00Z",
+      "end_at": "2018-05-06T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 41,
+      "name": "Summer 2018",
+      "sis_source_id": "1184",
+      "start_at": "2018-05-07T07:00:00Z",
+      "end_at": "2018-09-03T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 42,
+      "name": "Fall 2018",
+      "sis_source_id": "1187",
+      "start_at": "2018-09-04T07:00:00Z",
+      "end_at": "2019-01-02T08:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 43,
+      "name": "Spring 2019",
+      "sis_source_id": "1191",
+      "start_at": "2019-01-03T08:00:00Z",
+      "end_at": "2019-05-05T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 44,
+      "name": "Summer 2019",
+      "sis_source_id": "1194",
+      "start_at": "2019-05-06T07:00:00Z",
+      "end_at": "2019-09-02T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 32,
+      "name": "Summer 2015",
+      "sis_source_id": "1154",
+      "start_at": "2015-05-11T07:00:00Z",
+      "end_at": "2015-09-08T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 33,
+      "name": "Fall 2015",
+      "sis_source_id": "1157",
+      "start_at": "2015-09-08T07:00:00Z",
+      "end_at": "2016-01-05T08:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 34,
+      "name": "Spring 2016",
+      "sis_source_id": "1161",
+      "start_at": "2016-01-05T08:00:00Z",
+      "end_at": "2016-05-09T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 35,
+      "name": "Summer 2016",
+      "sis_source_id": "1164",
+      "start_at": "2016-05-09T07:00:00Z",
+      "end_at": "2016-09-06T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 36,
+      "name": "Fall 2016",
+      "sis_source_id": "1167",
+      "start_at": "2016-09-06T07:00:00Z",
+      "end_at": "2017-01-04T08:00:00Z"
+    }
+  }
+]
