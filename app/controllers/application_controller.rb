@@ -1532,6 +1532,7 @@ class ApplicationController < ActionController::Base
                                                         current_pseudonym: @current_pseudonym,
                                                         content_tag: @module_tag || tag,
                                                         assignment: @assignment,
+                                                        launch: @lti_launch,
                                                         tool: @tool})
         adapter = Lti::LtiOutboundAdapter.new(@tool, @current_user, @context).prepare_tool_launch(@return_url, variable_expander, opts)
 
@@ -2194,6 +2195,10 @@ class ApplicationController < ActionController::Base
   end
 
   def self.region
+    nil
+  end
+
+  def self.cluster
     nil
   end
 

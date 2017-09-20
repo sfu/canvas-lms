@@ -38,7 +38,7 @@
 </p>
 <% # END SFU MOD %>
 <p>
-  <%= mt 'details.login_name', "You are authorizing this app as %{user_name}.", :user_name => link_to(@current_user.short_name, user_profile_url(@current_user), :popup => true) %>
+  <%= mt 'details.login_name', "You are authorizing this app as %{user_name}.", :user_name => link_to(@current_user.short_name, user_profile_url(@current_user), :popup => true, target:"_blank") %>
   <% if @current_user.email.present? && @current_user.email != @current_user.short_name %>
     <br/>
     <%= t 'details.email', "Your email address is %{email}.", :email => @current_user.email %>
