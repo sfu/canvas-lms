@@ -76,7 +76,7 @@ class FilePreviewsController < ApplicationController
       # google docs
       elsif service_enabled?(:google_docs_previews) && GOOGLE_PREVIEWABLE_TYPES.include?(@file.content_type)
         # SFU MOD CANVAS-205 Predoc: In-place Replacement for Google Docs Preview
-        redirect_to('//docview.sfu.ca/viewer?' + { embedded: true, url: @file.authenticated_s3_url }.to_query) and return
+        redirect_to('//docview.sfu.ca/viewer?' + { embedded: true, url: @file.authenticated_url }.to_query) and return
         # END SFU MOD
       # images
       elsif @file.content_type =~ %r{\Aimage/}
