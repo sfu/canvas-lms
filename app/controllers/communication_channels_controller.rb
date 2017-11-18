@@ -85,8 +85,8 @@ class CommunicationChannelsController < ApplicationController
 
   # @API List user communication channels
   #
-  # Returns a list of communication channels for the specified user, sorted by
-  # position.
+  # Returns a paginated list of communication channels for the specified user,
+  # sorted by position.
   #
   # @example_request
   #     curl https://<canvas>/api/v1/users/12345/communication_channels \
@@ -154,7 +154,7 @@ class CommunicationChannelsController < ApplicationController
         return render :json => { errors: { type: 'Push is only supported when using an access token'}}, status: :bad_request
       end
       if !@access_token.developer_key.try(:sns_arn)
-        return render :json => { errors: { type: 'SNS is not configured for this developer key'}}, status: 200 # SFU MOD - Temporarily suppress mobile app error (CANVAS-261)
+        return render :json => { errors: { type: 'SNS is not configured for this developer key'}}, status: :bad_request
       end
 
       endpoint = @current_user.notification_endpoints.where("lower(token) = ?", params[:communication_channel][:token].downcase).first

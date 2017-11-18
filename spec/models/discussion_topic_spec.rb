@@ -1032,6 +1032,15 @@ describe DiscussionTopic do
       expect(ct.user_can_see_posts?(@student)).to be_truthy
     end
 
+    it "should let account admins see group discussions with require_initial_post" do
+      group_discussion_assignment
+      @topic.require_initial_post = true
+      @topic.save!
+      ct = @topic.child_topics.first
+      account_admin_user(:active_all => true)
+      expect(ct.user_can_see_posts?(@admin)).to be_truthy
+    end
+
     describe "observers" do
       before :once do
         @other_student = user_factory(:active_all => true)
@@ -2055,5 +2064,42 @@ describe DiscussionTopic do
     @course.complete!
     expect(topic.grants_right?(@teacher, :reply)).to be_truthy
     expect(group_topic.grants_right?(@teacher, :reply)).to be_truthy
+  end
+
+  describe "duplicating topics" do
+    before :once do
+      course_with_teacher(:active_all => true)
+      student_in_course(:active_all => true)
+    end
+
+    it "without custom opts" do
+      group_discussion_assignment() # Discussion has title "topic"
+      @topic.podcast_has_student_posts = true
+      new_topic = @topic.duplicate({ :user => @teacher })
+      expect(new_topic.title).to eql "topic Copy"
+      expect(new_topic.assignment).not_to be_nil
+      expect(new_topic.assignment.new_record?).to be true
+      expect(new_topic.podcast_has_student_posts).to be true
+      # Child topics don't get duplicated.  The hooks create those for us
+      expect(new_topic.child_topics.length).to eq 0
+      new_topic.save!
+      # Verify that saving indeed created the appropriate child topics
+      new_topic = DiscussionTopic.find(new_topic.id)
+      expect(new_topic.child_topics.length).not_to eq 0
+    end
+
+    it "respect provided title" do
+      discussion_topic_model({ :title => "not foobar" })
+      @topic.save! # only saved topics can be duplicated
+      new_topic = @topic.duplicate({ :copy_title => "foobar" })
+      expect(new_topic.title).to eql "foobar"
+    end
+
+    it "respect provided user" do
+      discussion_topic_model()
+      @topic.save!
+      new_topic = @topic.duplicate({ :user => @student })
+      expect(new_topic.user_id).to eq @student.id
+    end
   end
 end

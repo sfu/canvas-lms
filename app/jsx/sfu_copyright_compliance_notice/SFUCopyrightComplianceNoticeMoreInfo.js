@@ -17,37 +17,35 @@ const SFUCopyrightComplianceNoticeMoreInfo = () => (
         one or more of the following:
       </p>
     <ol>
-      <li>
-        <a href="http://www.lib.sfu.ca/file-newest/11695/copyright_graphic.pdf" target="_blank" rel="noreferrer noopener">
-          Fair Dealing
-        </a>;
-        </li>
-      <li>Other exemption in the Copyright Act;</li>
-      <li>Creative Commons License;</li>
-      <li>Public Domain;</li>
-      <li>Open Access;</li>
+      <li>Fair Dealing;</li>
+      <li>Another exception in the Copyright Act (e.g., educational exceptions);</li>
+      <li>Creative Commons license;</li>
+      <li>Copyright has expired (public domain);</li>
+      <li>Open Access source;</li>
       <li>Allowed by an existing library license;</li>
-      <li>Allowed as part of purchased course materials (e.g. online resources associated with a textbook);</li>
+      <li>Allowed as part of purchased course materials (e.g., online resources associated with a textbook);</li>
+      <li>Permission granted directly by the copyright holder, or licensed the material directly;</li>
       <li>I hold copyright in the work.</li>
     </ol>
     <p>
-        For more information see
+        For more information visit {}
         <a
-          href="http://www.lib.sfu.ca/faqs/copyright-fair-dealing"
+          href="https://www.lib.sfu.ca/help/academic-integrity/copyright"
           target="_blank"
           rel="noreferrer noopener"
-        > What is Fair Dealing</a>,
+        >copyright.sfu.ca</a>, and see in particular the FAQ {}
         <a
-          href="http://www.lib.sfu.ca/file-newest/11695/copyright_graphic.pdf"
+          href="https://www.lib.sfu.ca/help/academic-integrity/copyright/fair-dealing"
           target="_blank"
           rel="noreferrer noopener"
-        >Copyright Information Graphic For Teaching Purposes</a>,
+        >What is fair dealing?</a> and the {}
         <a
-          href="http://copyright.sfu.ca"
+          href="https://www.lib.sfu.ca/system/files/26749/copyright_graphic.pdf"
           target="_blank"
           rel="noreferrer noopener"
-        >http://copyright.sfu.ca</a> or contact the SFU Copyright Office at <a href="mailto:copy@sfu.ca">copy@sfu.ca</a>.
-      </p>
+        >Using Copyright Protected Materials for Teaching Purposes at SFU</a> infographic, or contact the SFU Copyright
+        Office at <a href="mailto:copy@sfu.ca">copy@sfu.ca</a>.
+    </p>
   </div>
   )
 
