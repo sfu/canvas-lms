@@ -91,6 +91,10 @@
 #         "description": {
 #           "example": "Full marks",
 #           "type": "string"
+#         },
+#        "long_description": {
+#           "example": "Student completed the assignment flawlessly.",
+#           "type": "string"
 #         }
 #       }
 #     }
@@ -126,6 +130,10 @@
 #         "long_description": {
 #           "example": "Criterion 1 more details",
 #           "type": "string"
+#         },
+#         "criterion_use_range": {
+#           "example": true,
+#           "type": "boolean"
 #         },
 #         "ratings": {
 #           "type": "array",
@@ -606,10 +614,20 @@ class AssignmentsApiController < ApplicationController
 
     new_assignment = old_assignment.duplicate({ :user => @current_user })
 
-    new_assignment.save!
     new_assignment.insert_at(old_assignment.position + 1)
+    new_assignment.save!
+    positions_in_group = Assignment.active.where(assignment_group_id: old_assignment.assignment_group_id)
+                                   .pluck("id", "position")
+    positions_hash = {}
+    positions_in_group.each do |id_pos_pair|
+      positions_hash[id_pos_pair[0]] = id_pos_pair[1]
+    end
     if new_assignment
-      render :json => assignment_json(new_assignment, @current_user, session)
+      # Include the updated positions in the response so the frontend can
+      # update them appropriately
+      result_json = assignment_json(new_assignment, @current_user, session)
+      result_json['new_positions'] = positions_hash
+      render :json => result_json
     else
       render json: { error: 'cannot save new assignment' }, status: :bad_request
     end
