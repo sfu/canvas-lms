@@ -31,13 +31,6 @@ describe "SFU Privacy Notice" do
   end
 
   context "on course collaborations page" do
-
-    def select_collaboration_type(type)
-      dropdown = f('#collaboration_collaboration_type')
-      options = dropdown.find_elements(tag_name: 'option')
-      options.each { |option| option.click if option.text == type}
-    end
-
     before :each do
       course_with_teacher_logged_in
       setup_google_drive
