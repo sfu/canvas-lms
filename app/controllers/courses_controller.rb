@@ -287,6 +287,21 @@ require 'securerandom'
 #           "description": "The course's IANA time zone name.",
 #           "example": "America/Denver",
 #           "type": "string"
+#         },
+#         "blueprint": {
+#           "description": "optional: whether the course is set as a Blueprint Course (blueprint fields require the Blueprint Courses feature)",
+#           "example": true,
+#           "type": "boolean"
+#         },
+#         "blueprint_restrictions": {
+#           "description": "optional: Set of restrictions applied to all locked course objects",
+#           "example": {"content": true, "points": true, "due_dates": false, "availability_dates": false},
+#           "type": "object"
+#         },
+#         "blueprint_restrictions_by_object_type": {
+#           "description": "optional: Sets of restrictions differentiated by object type applied to locked course objects",
+#           "example": {"assignment": {"content": true, "points": true}, "wiki_page": {"content": true}},
+#           "type": "object"
 #         }
 #       }
 #     }
@@ -878,11 +893,15 @@ class CoursesController < ApplicationController
 
       users = Api.paginate(users, self, api_v1_course_users_url)
       includes = Array(params[:include])
-      user_json_preloads(
-        users,
-        includes.include?('email'),
-        group_memberships: includes.include?('group_ids')
-      )
+
+      # user_json_preloads loads both active/accepted and deleted
+      # group_memberships when passed "group_memberships: true." In a
+      # known case in the wild, each student had thousands of deleted
+      # group memberships. Since we only care about active group
+      # memberships for this course, load the data in a more targeted way.
+      user_json_preloads(users, includes.include?('email'))
+      include_group_ids = includes.delete('group_ids').present?
+
       unless includes.include?('test_student') || Array(params[:enrollment_type]).include?("student_view")
         users.reject! do |u|
           u.preferences[:fake_student]
@@ -906,9 +925,15 @@ class CoursesController < ApplicationController
 
       render :json => users.map { |u|
         enrollments = enrollments_by_user[u.id] || [] if includes.include?('enrollments')
-        user_unconfirmed = enrollments ? enrollments.all?{|e| %w{invited creation_pending rejected}.include?(e.workflow_state)} : !confirmed_user_ids.include?(u.id)
+        user_unconfirmed = if enrollments
+          enrollments.all?{|e| %w{invited creation_pending rejected}.include?(e.workflow_state)}
+        else
+          !confirmed_user_ids.include?(u.id)
+        end
         excludes = user_unconfirmed ? %w{pseudonym personal_info} : []
-        user_json(u, @current_user, session, includes, @context, enrollments, excludes)
+        user_json(u, @current_user, session, includes, @context, enrollments, excludes).tap do |json|
+          json[:group_ids] = active_group_memberships(users)[u.id]&.map(&:group_id) || [] if include_group_ids
+        end
       }
     end
   end
@@ -1173,8 +1198,7 @@ class CoursesController < ApplicationController
 
       if @context.root_account.feature_enabled?(:master_courses)
         master_template = @context.master_course_templates.for_full_course.first
-        restrictions_by_object_type = master_template&.default_restrictions_by_type || {}
-        cleaned_restrictions = restrictions_by_object_type.map{|k, v| [k.sub(/^.+::/, '').underscore, v] }.to_h
+        restrictions_by_object_type = master_template&.default_restrictions_by_type_for_api || {}
         message =!MasterCourses::MasterTemplate.is_master_course?(@context) && why_cant_i_enable_master_course(@context)
         message ||= ''
         js_env({
@@ -1182,7 +1206,7 @@ class CoursesController < ApplicationController
           DISABLED_BLUEPRINT_MESSAGE: message,
           BLUEPRINT_RESTRICTIONS: master_template&.default_restrictions || { :content => true },
           USE_BLUEPRINT_RESTRICTIONS_BY_OBJECT_TYPE: master_template&.use_default_restrictions_by_type || false,
-          BLUEPRINT_RESTRICTIONS_BY_OBJECT_TYPE: cleaned_restrictions
+          BLUEPRINT_RESTRICTIONS_BY_OBJECT_TYPE: restrictions_by_object_type
         })
       end
 
@@ -2234,7 +2258,7 @@ class CoursesController < ApplicationController
 
       term_id = params[:course].delete(:term_id)
       enrollment_term_id = params[:course].delete(:enrollment_term_id) || term_id
-      if enrollment_term_id && @course.root_account.grants_right?(@current_user, session, :manage_courses)
+      if enrollment_term_id && @course.account.grants_right?(@current_user, session, :manage_courses)
         enrollment_term = api_find(@course.root_account.enrollment_terms, enrollment_term_id)
         @course.enrollment_term = enrollment_term if enrollment_term && enrollment_term != @course.enrollment_term
       end
@@ -2913,6 +2937,10 @@ class CoursesController < ApplicationController
   end
 
   private
+
+  def active_group_memberships(users)
+    @active_group_memberships ||= GroupMembership.active_for_context_and_users(@context, users).group_by(&:user_id)
+  end
 
   def effective_due_dates_params
     params.permit(assignment_ids: [])

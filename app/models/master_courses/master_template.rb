@@ -45,6 +45,8 @@ class MasterCourses::MasterTemplate < ActiveRecord::Base
   after_save :invalidate_course_cache
   after_update :sync_default_restrictions
 
+  after_destroy :destroy_subscriptions_later
+
   def set_defaults
     unless self.default_restrictions.present?
       self.default_restrictions = {:content => true}
@@ -81,6 +83,14 @@ class MasterCourses::MasterTemplate < ActiveRecord::Base
         end
       end
     end
+  end
+
+  def destroy_subscriptions_later
+    self.send_later_if_production(:destroy_subscriptions)
+  end
+
+  def destroy_subscriptions
+    self.child_subscriptions.active.each(&:destroy)
   end
 
   def touch_all_content_for_tags(only_content_type=nil)
@@ -255,6 +265,10 @@ class MasterCourses::MasterTemplate < ActiveRecord::Base
     else
       self.default_restrictions
     end
+  end
+
+  def default_restrictions_by_type_for_api
+    default_restrictions_by_type.map{|k, v| [k.constantize.table_name.singularize, v] }.to_h
   end
 
   def self.create_associations_from_sis(root_account, associations, messages, migrating_user=nil)
