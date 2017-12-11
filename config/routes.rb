@@ -295,8 +295,7 @@ CanvasRails::Application.routes.draw do
 
     get 'external_tools/sessionless_launch' => 'external_tools#sessionless_launch'
     resources :external_tools do
-      get :resource_selection
-      post :resource_selection
+      match :resource_selection, via: [:get, :post]
       get :homework_submission
       get :finished
       collection do
@@ -328,7 +327,8 @@ CanvasRails::Application.routes.draw do
     post 'quizzes/unpublish' => 'quizzes/quizzes#unpublish'
     post 'quizzes/:id/toggle_post_to_sis' => "quizzes/quizzes#toggle_post_to_sis"
 
-    resources :quizzes, controller: 'quizzes/quizzes' do
+    post 'quizzes/new' => 'quizzes/quizzes#new' # use POST instead of GET (not idempotent)
+    resources :quizzes, controller: 'quizzes/quizzes', except: :new do
       get :managed_quiz_data
       get :submission_versions
       get :history
@@ -536,7 +536,7 @@ CanvasRails::Application.routes.draw do
 
     resources :external_tools do
       get :finished
-      get :resource_selection
+      match :resource_selection, via: [:get, :post]
       collection do
         get :retrieve
       end
@@ -610,7 +610,7 @@ CanvasRails::Application.routes.draw do
     get 'external_tools/sessionless_launch' => 'external_tools#sessionless_launch'
     resources :external_tools do
       get :finished
-      get :resource_selection
+      match :resource_selection, via: [:get, :post]
       collection do
         get :retrieve
       end
@@ -751,7 +751,7 @@ CanvasRails::Application.routes.draw do
   get 'search/bookmarks' => 'users#bookmark_search', as: :bookmark_search
   get 'search/rubrics' => 'search#rubrics'
   get 'search/all_courses' => 'search#all_courses'
-  resources :users, except: :destroy do
+  resources :users, except: [:destroy, :index] do
     match 'masquerade', via: [:get, :post]
     concerns :files, :file_images
 
@@ -1558,6 +1558,7 @@ CanvasRails::Application.routes.draw do
       get "courses/:course_id/modules", action: :index, as: 'course_context_modules'
       get "courses/:course_id/modules/:id", action: :show, as: 'course_context_module'
       put "courses/:course_id/modules", action: :batch_update
+      post "courses/:course_id/modules/:module_id/duplicate", action: :duplicate
       post "courses/:course_id/modules", action: :create, as: 'course_context_module_create'
       put "courses/:course_id/modules/:id", action: :update, as: 'course_context_module_update'
       delete "courses/:course_id/modules/:id", action: :destroy
@@ -2041,6 +2042,10 @@ CanvasRails::Application.routes.draw do
 
     scope(controller: 'lti/users_api') do
       get 'users/:id', action: :show
+    end
+
+    scope(controller: 'lti/assignments_api') do
+      get 'assignments/:assignment_id', action: :show
     end
 
     %w(course account).each do |context|

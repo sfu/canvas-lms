@@ -76,7 +76,9 @@ class Course < ActiveRecord::Base
   has_many :gradable_student_enrollments, -> { where(enrollments: { workflow_state: ['active', 'inactive'], type: ['StudentEnrollment', 'StudentViewEnrollment'] }).preload(:user) }, class_name: 'Enrollment'
   has_many :gradable_students, through: :gradable_student_enrollments, source: :user
   has_many :all_student_enrollments, -> { where("enrollments.workflow_state<>'deleted' AND enrollments.type IN ('StudentEnrollment', 'StudentViewEnrollment')").preload(:user) }, class_name: 'Enrollment'
+  has_many :all_student_enrollments_including_deleted, -> { where("enrollments.type IN ('StudentEnrollment', 'StudentViewEnrollment')").preload(:user) }, class_name: 'Enrollment'
   has_many :all_students, :through => :all_student_enrollments, :source => :user
+  has_many :all_students_including_deleted, :through => :all_student_enrollments_including_deleted, source: :user
   has_many :all_accepted_student_enrollments, -> { where("enrollments.workflow_state NOT IN ('rejected', 'deleted') AND enrollments.type IN ('StudentEnrollment', 'StudentViewEnrollment')").preload(:user) }, class_name: 'Enrollment'
   has_many :all_accepted_students, :through => :all_accepted_student_enrollments, :source => :user
   has_many :all_real_enrollments, -> { where("enrollments.workflow_state<>'deleted' AND enrollments.type<>'StudentViewEnrollment'").preload(:user) }, class_name: 'Enrollment'
@@ -223,7 +225,9 @@ class Course < ActiveRecord::Base
   sanitize_field :syllabus_body, CanvasSanitize::SANITIZE
 
   include StickySisFields
-  are_sis_sticky :name, :course_code, :start_at, :conclude_at, :restrict_enrollments_to_course_dates, :enrollment_term_id, :workflow_state
+  are_sis_sticky :name, :course_code, :start_at, :conclude_at,
+                 :restrict_enrollments_to_course_dates, :enrollment_term_id,
+                 :workflow_state, :account_id
 
   include FeatureFlags
 
@@ -321,8 +325,15 @@ class Course < ActiveRecord::Base
     end
 
     tags = DifferentiableAssignment.scope_filter(tags, user, self, is_teacher: user_is_teacher)
+    return tags if user.blank? || user_is_teacher
 
-    tags
+    path_visible_pages = self.wiki_pages.left_outer_joins(assignment: :submissions).
+      except(:preload).
+      where("assignments.id is null or submissions.user_id = ?", user.id).
+      select(:id)
+
+    tags.where("content_tags.content_type <> 'WikiPage' or
+      content_tags.content_id in (?)", path_visible_pages)
   end
 
   def sequential_module_item_ids
@@ -2171,27 +2182,28 @@ class Course < ActiveRecord::Base
   ADMIN_TYPES = %w{TeacherEnrollment TaEnrollment DesignerEnrollment}
   def section_visibilities_for(user, opts={})
     RequestCache.cache('section_visibilities_for', user, self, opts) do
-      Rails.cache.fetch(['section_visibilities_for', user, self, opts].cache_key) do
-        workflow_not = opts[:excluded_workflows] || 'deleted'
+      shard.activate do
+        Rails.cache.fetch(['section_visibilities_for', user, self, opts].cache_key) do
+          workflow_not = opts[:excluded_workflows] || 'deleted'
 
-        enrollment_rows = all_enrollments
-          .where(user: user)
-          .where.not(workflow_state: workflow_not)
-          .pluck(
-            :course_section_id,
-            :limit_privileges_to_course_section,
-            :type,
-            :associated_user_id
-          )
+          enrollment_rows = all_enrollments.
+            where(user: user).
+            where.not(workflow_state: workflow_not).
+            pluck(
+              :course_section_id,
+              :limit_privileges_to_course_section,
+              :type,
+              :associated_user_id)
 
-        enrollment_rows.map do |section_id, limit_privileges, type, associated_user_id|
-          {
-            :course_section_id => section_id,
-            :limit_privileges_to_course_section => limit_privileges,
-            :type => type,
-            :associated_user_id => associated_user_id,
-            :admin => ADMIN_TYPES.include?(type)
-          }
+          enrollment_rows.map do |section_id, limit_privileges, type, associated_user_id|
+            {
+              :course_section_id => section_id,
+              :limit_privileges_to_course_section => limit_privileges,
+              :type => type,
+              :associated_user_id => associated_user_id,
+              :admin => ADMIN_TYPES.include?(type)
+            }
+          end
         end
       end
     end
@@ -2205,7 +2217,9 @@ class Course < ActiveRecord::Base
   def students_visible_to(user, include: nil)
     include = Array(include)
 
-    if include.include?(:priors)
+    if include.include?(:priors_and_deleted)
+      scope = self.all_students_including_deleted
+    elsif include.include?(:priors)
       scope = self.all_students
     elsif include.include?(:inactive) || include.include?(:completed)
       scope = self.all_accepted_students
@@ -2421,62 +2435,62 @@ class Course < ActiveRecord::Base
       :css_class => 'grades',
       :href => :course_grades_path,
     }, {
-        :id => TAB_PEOPLE,
-        :label => t('#tabs.people', "People"),
-        :css_class => 'people',
-        :href => :course_users_path
-      }, {
-        :id => TAB_PAGES,
-        :label => t('#tabs.pages', "Pages"),
-        :css_class => 'pages',
-        :href => :course_wiki_path
-      }, {
-        :id => TAB_FILES,
-        :label => t('#tabs.files', "Files"),
-        :css_class => 'files',
-        :href => :course_files_path,
-        :icon => 'icon-folder'
-      }, {
-        :id => TAB_SYLLABUS,
-        :label => t('#tabs.syllabus', "Syllabus"),
-        :css_class => 'syllabus',
-        :href => :syllabus_course_assignments_path
-      }, {
-        :id => TAB_OUTCOMES,
-        :label => t('#tabs.outcomes', "Outcomes"),
-        :css_class => 'outcomes',
-        :href => :course_outcomes_path
-      }, {
-        :id => TAB_QUIZZES,
-        :label => t('#tabs.quizzes', "Quizzes"),
-        :css_class => 'quizzes',
-        :href => :course_quizzes_path
-      }, {
-        :id => TAB_MODULES,
-        :label => t('#tabs.modules', "Modules"),
-        :css_class => 'modules',
-        :href => :course_context_modules_path
-      }, {
-        :id => TAB_CONFERENCES,
-        :label => t('#tabs.conferences', "Conferences"),
-        :css_class => 'conferences',
-        :href => :course_conferences_path
-      }, {
-        :id => TAB_COLLABORATIONS,
-        :label => t('#tabs.collaborations', "Collaborations"),
-        :css_class => 'collaborations',
-        :href => :course_collaborations_path
-      }, {
-        :id => TAB_COLLABORATIONS_NEW,
-        :label => t('#tabs.collaborations', "Collaborations"),
-        :css_class => 'collaborations',
-        :href => :course_lti_collaborations_path
-      }, {
-        :id => TAB_SETTINGS,
-        :label => t('#tabs.settings', "Settings"),
-        :css_class => 'settings',
-        :href => :course_settings_path,
-      }]
+      :id => TAB_PEOPLE,
+      :label => t('#tabs.people', "People"),
+      :css_class => 'people',
+      :href => :course_users_path
+    }, {
+      :id => TAB_PAGES,
+      :label => t('#tabs.pages', "Pages"),
+      :css_class => 'pages',
+      :href => :course_wiki_path
+    }, {
+      :id => TAB_FILES,
+      :label => t('#tabs.files', "Files"),
+      :css_class => 'files',
+      :href => :course_files_path,
+      :icon => 'icon-folder'
+    }, {
+      :id => TAB_SYLLABUS,
+      :label => t('#tabs.syllabus', "Syllabus"),
+      :css_class => 'syllabus',
+      :href => :syllabus_course_assignments_path
+    }, {
+      :id => TAB_OUTCOMES,
+      :label => t('#tabs.outcomes', "Outcomes"),
+      :css_class => 'outcomes',
+      :href => :course_outcomes_path
+    }, {
+      :id => TAB_QUIZZES,
+      :label => t('#tabs.quizzes', "Quizzes"),
+      :css_class => 'quizzes',
+      :href => :course_quizzes_path
+    }, {
+      :id => TAB_MODULES,
+      :label => t('#tabs.modules', "Modules"),
+      :css_class => 'modules',
+      :href => :course_context_modules_path
+    }, {
+      :id => TAB_CONFERENCES,
+      :label => t('#tabs.conferences', "Conferences"),
+      :css_class => 'conferences',
+      :href => :course_conferences_path
+    }, {
+      :id => TAB_COLLABORATIONS,
+      :label => t('#tabs.collaborations', "Collaborations"),
+      :css_class => 'collaborations',
+      :href => :course_collaborations_path
+    }, {
+      :id => TAB_COLLABORATIONS_NEW,
+      :label => t('#tabs.collaborations', "Collaborations"),
+      :css_class => 'collaborations',
+      :href => :course_lti_collaborations_path
+    }, {
+      :id => TAB_SETTINGS,
+      :label => t('#tabs.settings', "Settings"),
+      :css_class => 'settings',
+      :href => :course_settings_path,
+    }]
   end
 
   def tab_hidden?(id)
@@ -3068,6 +3082,12 @@ class Course < ActiveRecord::Base
   def find_or_create_progressions_for_user(user)
     @progressions ||= {}
     @progressions[user.id] ||= ContextModuleProgressions::Finder.find_or_create_for_context_and_user(self, user)
+  end
+
+  def show_total_grade_as_points?
+    !!settings[:show_total_grade_as_points] &&
+      group_weighting_scheme != "percent" &&
+      !relevant_grading_period_group&.weighted?
   end
 
   private
