@@ -278,7 +278,7 @@ class GradeCalculator
   def enrollments
     @enrollments ||= Enrollment.shard(@course.shard).active.
       where(user_id: @user_ids, course_id: @course.id).
-      select(:id, :user_id)
+      select(:id, :user_id, :workflow_state)
   end
 
   def joined_enrollment_ids
@@ -593,9 +593,9 @@ class GradeCalculator
         {
           assignment: a,
           submission: s,
-          score: s && s.score,
+          score: s&.score,
           total: a.points_possible || 0,
-          excused: s && s.excused?,
+          excused: s&.excused?,
         }
       end
 
