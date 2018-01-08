@@ -62,6 +62,12 @@ module SFUCommon
     EnrollmentTerm.active.select(select_fields).where('end_at < :date', {:date => DateTime.now}).where.not(sis_source_id: nil).order(sis_source_id: :desc).limit(1).first
   end
 
+  def select_collaboration_type(type)
+    dropdown = f('#collaboration_collaboration_type')
+    options = dropdown.find_elements(tag_name: 'option')
+    options.each { |option| option.click if option.text == type}
+  end
+
   private
   def select_fields
     %i(id name sis_source_id start_at end_at)

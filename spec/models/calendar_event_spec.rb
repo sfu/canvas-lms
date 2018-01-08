@@ -184,6 +184,11 @@ describe CalendarEvent do
         expect(res.dtstamp.strftime('%Y-%m-%dT%H:%M:%S')).to eq Time.zone.parse("Sep 3 2008 12:05pm").in_time_zone('UTC').strftime('%Y-%m-%dT%H:%M:00')
       end
 
+      it 'should not fail with no date for all_day event' do
+        res = calendar_event_model(all_day: true).to_ics
+        expect(res).not_to be_nil
+      end
+
       it "should return string dates for all_day events" do
         calendar_event_model(:start_at => "Sep 3 2008 12:00am")
         expect(@event.all_day).to eql(true)
@@ -278,11 +283,11 @@ describe CalendarEvent do
     end
 
     it "should return events explicitly tied to the contexts" do
-      expect(CalendarEvent.for_user_and_context_codes(@student, [@course.asset_string])).
-        to contain_exactly @e1
+      expect(CalendarEvent.for_user_and_context_codes(@student, [@course.asset_string]).sort_by(&:id)).
+        to eql [@e1]
 
-      expect(CalendarEvent.for_user_and_context_codes(@student, [@course.asset_string, @student.asset_string])).
-        to contain_exactly @e1, @e2
+      expect(CalendarEvent.for_user_and_context_codes(@student, [@course.asset_string, @student.asset_string]).sort_by(&:id)).
+        to eql [@e1, @e2]
     end
 
     it "should return events implicitly tied to the contexts (via effective_context_string)" do
@@ -308,28 +313,26 @@ describe CalendarEvent do
       se.context = section
       se.save!
 
-      # none of the appointments even though they technically are on the user
-      events = CalendarEvent.for_user_and_context_codes(@student, [@student.asset_string])
-      expect(events).to contain_exactly @e2
+      expect(CalendarEvent.for_user_and_context_codes(@student, [@student.asset_string]).sort_by(&:id)).
+        to eql [@e2] # none of the appointments even though they technically are on the user
 
-      # none of the appointments even though they technically are on the section
-      events = CalendarEvent.for_user_and_context_codes(@student, [section.asset_string])
-      expect(events).to be_empty
+      expect(CalendarEvent.for_user_and_context_codes(@student, [section.asset_string]).sort_by(&:id)).
+        to eql [] # none of the appointments even though they technically are on the section
 
-      events = CalendarEvent.for_user_and_context_codes(@student, [@course.asset_string, @student.asset_string])
-      expect(events).to contain_exactly @e1, @e2, a1, a2, pe, se
+      expect(CalendarEvent.for_user_and_context_codes(@student, [@course.asset_string, @student.asset_string]).sort_by(&:id)).
+        to eql [@e1, @e2, a1, a2, pe, se]
 
-      events = CalendarEvent.for_user_and_context_codes(@student, [@course.asset_string])
-      expect(events).to contain_exactly @e1, a1, a2, pe, se
+      expect(CalendarEvent.for_user_and_context_codes(@student, [@course.asset_string]).sort_by(&:id)).
+        to eql [@e1, a1, a2, pe, se]
 
-      events = CalendarEvent.for_user_and_context_codes(@student, [@course.asset_string]).events_without_child_events
-      expect(events).to contain_exactly @e1, a1, a2, se
+      expect(CalendarEvent.for_user_and_context_codes(@student, [@course.asset_string]).events_without_child_events.sort_by(&:id)).
+        to eql [@e1, a1, a2, se]
 
-      events = CalendarEvent.for_user_and_context_codes(@student, [g1.asset_string, g2.asset_string, g3.asset_string])
-      expect(events).to contain_exactly ae1, ae2, ae3
+      expect(CalendarEvent.for_user_and_context_codes(@student, [g1.asset_string, g2.asset_string, g3.asset_string]).sort_by(&:id)).
+        to eql [ae1, ae2, ae3]
 
-      events = CalendarEvent.for_user_and_context_codes(@teacher, [g1.asset_string, g2.asset_string, g3.asset_string]).events_with_child_events
-      expect(events).to contain_exactly ae1, ae2
+      expect(CalendarEvent.for_user_and_context_codes(@teacher, [g1.asset_string, g2.asset_string, g3.asset_string]).events_with_child_events.sort_by(&:id)).
+        to eql [ae1, ae2]
     end
   end
 

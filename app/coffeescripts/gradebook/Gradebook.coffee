@@ -279,14 +279,16 @@ define [
       $(".post-grades-button-placeholder").show()
       return if @startedInitializing
       @startedInitializing = true
-
-      @spinner = new Spinner() unless @spinner
-      $(@spinner.spin().el).css(
-        opacity: 0.5
-        top: '55px'
-        left: '50%'
-      ).addClass('use-css-transitions-for-show-hide').appendTo('#main')
-      $('#gradebook-grid-wrapper').hide()
+      if @gridReady.state() != 'resolved'
+        @spinner = new Spinner() unless @spinner
+        $(@spinner.spin().el).css(
+          opacity: 0.5
+          top: '55px'
+          left: '50%'
+        ).addClass('use-css-transitions-for-show-hide').appendTo('#main')
+        $('#gradebook-grid-wrapper').hide()
+      else
+        $('#gradebook_grid').trigger('resize.fillWindowWithMe')
 
     gotCustomColumns: (columns) =>
       @customColumns = columns
@@ -582,9 +584,9 @@ define [
 
     renderTotalHeader: () =>
       @totalHeader = new TotalColumnHeaderView
-        showingPoints: @displayPointTotals()
+        showingPoints: @options.show_total_grade_as_points
         toggleShowingPoints: @togglePointsOrPercentTotals.bind(this)
-        weightedGroups: @weightedGroups
+        weightedGrades: @weightedGrades
         totalColumnInFront: @totalColumnInFront
         moveTotalColumn: @moveTotalColumn.bind(this)
       @totalHeader.render()
@@ -685,6 +687,8 @@ define [
       columns = @grid.getColumns()
       for submission in submissions
         student = @student(submission.user_id)
+        continue unless student # if the student isn't loaded, we don't need to update it
+
         idToMatch = "assignment_#{submission.assignment_id}"
         cell = index for column, index in columns when column.id is idToMatch
         thisCellIsActive = activeCell? and
@@ -763,7 +767,7 @@ define [
       if columnDef.type == 'total_grade'
         templateOpts.warning = @totalGradeWarning
         templateOpts.lastColumn = true
-        templateOpts.showPointsNotPercent = @displayPointTotals()
+        templateOpts.showPointsNotPercent = @options.show_total_grade_as_points
         templateOpts.hideTooltip = @weightedGrades() and not @totalGradeWarning
       GroupTotalCellTemplate templateOpts
 
@@ -967,7 +971,11 @@ define [
       $(@grid.getActiveCellNode()).removeClass('editable')
       assignment = @assignments[data.assignmentId]
       student = @student(data.userId)
-      opts = @options
+      opts = Object.assign({}, { anonymous: false }, @options)
+
+      if @$grid.find('.grid-canvas').hasClass('hide-students')
+        student.name = I18n.t 'Student'
+        opts.anonymous = true
 
       SubmissionDetailsDialog.open assignment, student, opts
 
@@ -1271,17 +1279,14 @@ define [
       @options.group_weighting_scheme == "percent"
 
     weightedGrades: =>
-      @options.group_weighting_scheme == "percent" || @gradingPeriodSet?.weighted || false
-
-    displayPointTotals: =>
-      @options.show_total_grade_as_points and not @weightedGrades()
+      @options.group_weighting_scheme == "percent" || !!@gradingPeriodSet?.weighted
 
     switchTotalDisplay: ({ dontWarnAgain = false } = {}) =>
       if dontWarnAgain
         UserSettings.contextSet('warned_about_totals_display', true)
 
       @options.show_total_grade_as_points = not @options.show_total_grade_as_points
-      $.ajaxJSON @options.setting_update_url, "PUT", show_total_grade_as_points: @displayPointTotals()
+      $.ajaxJSON @options.setting_update_url, "PUT", show_total_grade_as_points: @options.show_total_grade_as_points
       @grid.invalidate()
       @totalHeader.switchTotalDisplay(@options.show_total_grade_as_points)
 
