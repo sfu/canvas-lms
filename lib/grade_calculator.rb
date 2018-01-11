@@ -23,7 +23,8 @@ class GradeCalculator
     opts = opts.reverse_merge(
       ignore_muted: true,
       update_all_grading_period_scores: true,
-      update_course_score: true
+      update_course_score: true,
+      only_update_course_gp_metadata: false
     )
 
     Rails.logger.info("GRADES: calc args: user_ids=#{user_ids.inspect}")
@@ -48,11 +49,15 @@ class GradeCalculator
     @dropped_updates = {}
     @current_groups = {}
     @final_groups = {}
+    # The developers of the future, I leave you this gift:
+    #   If you add a new options here, make sure you also update the
+    #   opts in the compute_branch method
     @ignore_muted = opts[:ignore_muted]
     @effective_due_dates = opts[:effective_due_dates]
     @enrollments = opts[:enrollments]
     @periods = opts[:periods]
     @submissions = opts[:submissions]
+    @only_update_course_gp_metadata = opts[:only_update_course_gp_metadata]
   end
 
   # recomputes the scores and saves them to each user's Enrollment
@@ -100,6 +105,9 @@ class GradeCalculator
     compute_scores
     save_scores
     invalidate_caches
+    # The next line looks weird, but it is intended behaviour.  Its
+    # saying "if we're on the branch not calculating muted scores, run
+    # the branch that does."
     calculate_muted_scores if @ignore_muted
     calculate_course_score if @update_course_score
   end
@@ -243,7 +251,8 @@ class GradeCalculator
       periods: grading_periods_for_course,
       effective_due_dates: effective_due_dates,
       enrollments: enrollments,
-      submissions: submissions
+      submissions: submissions,
+      only_update_course_gp_metadata: @only_update_course_gp_metadata
     )
     GradeCalculator.new(@user_ids, @course, opts).compute_and_save_scores
   end
@@ -278,7 +287,7 @@ class GradeCalculator
   def enrollments
     @enrollments ||= Enrollment.shard(@course.shard).active.
       where(user_id: @user_ids, course_id: @course.id).
-      select(:id, :user_id)
+      select(:id, :user_id, :workflow_state)
   end
 
   def joined_enrollment_ids
@@ -357,6 +366,7 @@ class GradeCalculator
     Score.transaction do
       @course.shard.activate do
         save_course_and_grading_period_scores
+        save_course_and_grading_period_metadata
         score_rows = group_score_rows
         if @grading_period.nil? && score_rows.any?
           dropped_rows = group_dropped_rows
@@ -367,6 +377,7 @@ class GradeCalculator
   end
 
   def save_course_and_grading_period_scores
+    return if @only_update_course_gp_metadata
     # Construct upsert statement to update existing Scores or create them if needed,
     # for course and grading period Scores.
     Score.connection.execute("
@@ -428,7 +439,9 @@ class GradeCalculator
             enrollments.id IN (#{joined_enrollment_ids}) AND
             scores.id IS NULL;
     ")
+  end
 
+  def save_course_and_grading_period_metadata
     ScoreMetadata.connection.execute("
       UPDATE #{ScoreMetadata.quoted_table_name} metadata
         SET
@@ -579,10 +592,14 @@ class GradeCalculator
         {
           assignment: a,
           submission: s,
-          score: s && s.score,
+          score: s&.score,
           total: a.points_possible || 0,
-          excused: s && s.excused?,
+          excused: s&.excused?,
         }
+      end
+
+      if enrollments_by_user[user_id].all? { |e| e.workflow_state == 'completed' }
+        group_submissions.reject! { |s| s[:submission].nil? }
       end
 
       group_submissions.reject! { |s| s[:score].nil? } if ignore_ungraded
