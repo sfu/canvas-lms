@@ -442,6 +442,12 @@ class GradeCalculator
   end
 
   def save_course_and_grading_period_metadata
+    # We only save score metadata for posted grades. This means, if we're
+    # calculating unposted grades (which means @ignore_muted is false),
+    # we don't want to update the score metadata. TODO: start storing the
+    # score metadata for unposted grades.
+    return unless @ignore_muted
+
     ScoreMetadata.connection.execute("
       UPDATE #{ScoreMetadata.quoted_table_name} metadata
         SET
@@ -519,6 +525,11 @@ class GradeCalculator
             sc.id IS NULL;
     ")
 
+    # We only save score metadata for posted grades. This means, if we're
+    # calculating unposted grades (which means @ignore_muted is false),
+    # we don't want to update the score metadata. TODO: start storing the
+    # score metadata for unposted grades.
+    if @ignore_muted
     ScoreMetadata.connection.execute("
       UPDATE #{ScoreMetadata.quoted_table_name} md
         SET
@@ -613,7 +624,7 @@ class GradeCalculator
       Rails.logger.info "GRADES: calculating... submissions=#{logged_submissions.inspect}"
 
       kept = drop_assignments(group_submissions, group.rules_hash)
-      dropped_submissions = (group_submissions - kept).map { |s| s[:submission].id }
+      dropped_submissions = (group_submissions - kept).map { |s| s[:submission]&.id }.compact
 
       score, possible = kept.reduce([0, 0]) { |(s_sum,p_sum),s|
         [s_sum + s[:score], p_sum + s[:total]]
@@ -643,10 +654,11 @@ class GradeCalculator
     Rails.logger.info "GRADES: dropping assignments! #{rules.inspect}"
 
     cant_drop = []
-    if never_drop_ids.present?
-      cant_drop, submissions = submissions.partition { |s|
-        never_drop_ids.include? s[:assignment].id
-      }
+    if never_drop_ids.present? || @ignore_muted
+      cant_drop, submissions = submissions.partition do |submission|
+        assignment = submission[:assignment]
+        (@ignore_muted && assignment.muted?) || never_drop_ids.include?(assignment.id)
+      end
     end
 
     # fudge the drop rules if there aren't enough submissions
