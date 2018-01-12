@@ -530,35 +530,36 @@ class GradeCalculator
     # we don't want to update the score metadata. TODO: start storing the
     # score metadata for unposted grades.
     if @ignore_muted
-    ScoreMetadata.connection.execute("
-      UPDATE #{ScoreMetadata.quoted_table_name} md
-        SET
-          calculation_details = CAST(val.calculation_details as json),
-          updated_at = #{updated_at}
-        FROM (VALUES #{dropped_values}) val
-          (enrollment_id, assignment_group_id, calculation_details)
-        INNER JOIN #{Score.quoted_table_name} scores ON
-          scores.enrollment_id = val.enrollment_id AND
-          scores.assignment_group_id = val.assignment_group_id
-        WHERE
-          scores.id = md.score_id;
-      INSERT INTO #{ScoreMetadata.quoted_table_name}
-        (score_id, calculation_details, created_at, updated_at)
-        SELECT
-          scores.id AS score_id,
-          CAST(val.calculation_details as json) AS calculation_details,
-          #{updated_at} AS created_at,
-          #{updated_at} AS updated_at
-        FROM (VALUES #{dropped_values}) val
-          (enrollment_id, assignment_group_id, calculation_details)
-        LEFT OUTER JOIN #{Score.quoted_table_name} scores ON
-          scores.enrollment_id = val.enrollment_id AND
-          scores.assignment_group_id = val.assignment_group_id
-        LEFT OUTER JOIN #{ScoreMetadata.quoted_table_name} metadata ON
-          metadata.score_id = scores.id
-        WHERE
-          metadata.id IS NULL;
-    ")
+      ScoreMetadata.connection.execute("
+        UPDATE #{ScoreMetadata.quoted_table_name} md
+          SET
+            calculation_details = CAST(val.calculation_details as json),
+            updated_at = #{updated_at}
+          FROM (VALUES #{dropped_values}) val
+            (enrollment_id, assignment_group_id, calculation_details)
+          INNER JOIN #{Score.quoted_table_name} scores ON
+            scores.enrollment_id = val.enrollment_id AND
+            scores.assignment_group_id = val.assignment_group_id
+          WHERE
+            scores.id = md.score_id;
+        INSERT INTO #{ScoreMetadata.quoted_table_name}
+          (score_id, calculation_details, created_at, updated_at)
+          SELECT
+            scores.id AS score_id,
+            CAST(val.calculation_details as json) AS calculation_details,
+            #{updated_at} AS created_at,
+            #{updated_at} AS updated_at
+          FROM (VALUES #{dropped_values}) val
+            (enrollment_id, assignment_group_id, calculation_details)
+          LEFT OUTER JOIN #{Score.quoted_table_name} scores ON
+            scores.enrollment_id = val.enrollment_id AND
+            scores.assignment_group_id = val.assignment_group_id
+          LEFT OUTER JOIN #{ScoreMetadata.quoted_table_name} metadata ON
+            metadata.score_id = scores.id
+          WHERE
+            metadata.id IS NULL;
+      ")
+    end
   end
 
   # returns information about assignments groups in the form:
