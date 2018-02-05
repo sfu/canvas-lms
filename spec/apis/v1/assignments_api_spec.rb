@@ -1795,7 +1795,7 @@ describe AssignmentsApiController, type: :request do
         api_call_to_update_adhoc_override(student_ids: [@student.id])
 
         ao = @assignment.assignment_overrides.where(set_type: 'ADHOC').first
-        expect(AssignmentOverrideStudent.count).to eq 1
+        expect(AssignmentOverrideStudent.active.count).to eq 1
       end
 
       it 'allows the update of an adhoc override with different student' do
@@ -3509,6 +3509,7 @@ describe AssignmentsApiController, type: :request do
         expect(json['discussion_topic']).to eq({
           'author' => {},
           'id' => @topic.id,
+          'is_section_specific' => @topic.is_section_specific,
           'title' => 'assignment1',
           'message' => nil,
           'posted_at' => @topic.posted_at.as_json,
@@ -3540,7 +3541,7 @@ describe AssignmentsApiController, type: :request do
           'html_url' =>
             "http://www.example.com/courses/#{@course.id}/discussion_topics/#{@topic.id}",
           'attachments' => [],
-          'permissions' => {'delete' => true, 'attach' => true, 'update' => true, 'reply' => true},
+          'permissions' => {'attach' => true, 'update' => true, 'reply' => true, 'delete' => true},
           'discussion_type' => 'side_comment',
           'group_category_id' => nil,
           'can_group' => true,
@@ -4205,7 +4206,6 @@ describe AssignmentsApiController, type: :request do
 
     it "should preload student_ids when including adhoc overrides" do
       expect_any_instantiation_of(@override).to receive(:assignment_override_students).never
-
       json = api_call_as_user(@teacher, :get,
         "/api/v1/courses/#{@course.id}/assignments?include[]=overrides",
         { :controller => 'assignments_api',
@@ -4219,7 +4219,6 @@ describe AssignmentsApiController, type: :request do
       # yeah i know this is a separate api; sue me
 
       expect_any_instantiation_of(@override).to receive(:assignment_override_students).never
-
       json = api_call_as_user(@teacher, :get,
         "/api/v1/courses/#{@course.id}/assignment_groups?include[]=assignments&include[]=overrides",
         { :controller => 'assignment_groups',

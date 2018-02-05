@@ -34,6 +34,10 @@ class CourseSection < ActiveRecord::Base
   has_many :course_account_associations
   has_many :calendar_events, :as => :context, :inverse_of => :context
   has_many :assignment_overrides, :as => :set, :dependent => :destroy
+  has_many :discussion_topic_section_visibilities, -> {
+    where("discussion_topic_section_visibilities.workflow_state<>'deleted'")
+  }, dependent: :destroy
+  has_many :discussion_topics, :through => :discussion_topic_section_visibilities
 
   before_validation :infer_defaults, :verify_unique_sis_source_id
   validates_presence_of :course_id, :root_account_id, :workflow_state
@@ -233,9 +237,7 @@ class CourseSection < ActiveRecord::Base
     end
     self.save!
     self.all_enrollments.update_all all_attrs
-    Assignment.joins(:submissions)
-      .where(context: [old_course, self.course])
-      .where(submissions: { user_id: user_ids }).touch_all
+    Assignment.where(context: [old_course, self.course]).touch_all
     EnrollmentState.send_later_if_production(:invalidate_states_for_course_or_section, self)
     User.send_later_if_production(:update_account_associations, user_ids) if old_course.account_id != course.account_id && !User.skip_updating_account_associations?
     if old_course.id != self.course_id && old_course.id != self.nonxlist_course_id
@@ -297,6 +299,7 @@ class CourseSection < ActiveRecord::Base
     self.workflow_state = 'deleted'
     self.enrollments.not_fake.each(&:destroy)
     self.assignment_overrides.each(&:destroy)
+    self.discussion_topic_section_visibilities&.each(&:destroy)
     save!
   end
 

@@ -49,6 +49,26 @@
 #           "description": "The user's final score for the class. Only included if user has permissions to view this score.",
 #           "example": "",
 #           "type": "string"
+#         },
+#         "unposted_current_grade": {
+#           "description": "The user's current grade in the class including muted/unposted assignments. Only included if user has permissions to view this grade, typically teachers, TAs, and admins.",
+#           "example": "",
+#           "type": "string"
+#         },
+#         "unposted_final_grade": {
+#           "description": "The user's final grade for the class including muted/unposted assignments. Only included if user has permissions to view this grade, typically teachers, TAs, and admins..",
+#           "example": "",
+#           "type": "string"
+#         },
+#         "unposted_current_score": {
+#           "description": "The user's current score in the class including muted/unposted assignments. Only included if user has permissions to view this score, typically teachers, TAs, and admins..",
+#           "example": "",
+#           "type": "string"
+#         },
+#         "unposted_final_score": {
+#           "description": "The user's final score for the class including muted/unposted assignments. Only included if user has permissions to view this score, typically teachers, TAs, and admins..",
+#           "example": "",
+#           "type": "string"
 #         }
 #       }
 #     }
@@ -389,7 +409,7 @@ class EnrollmentsApiController < ApplicationController
       enrollments,
       self, send("api_v1_#{endpoint_scope}_enrollments_url"))
 
-    ActiveRecord::Associations::Preloader.new.preload(enrollments, [:user, :course, :course_section])
+    ActiveRecord::Associations::Preloader.new.preload(enrollments, [:user, :course, :course_section, :root_account, :sis_pseudonym])
 
     include_group_ids = Array(params[:include]).include?("group_ids")
     includes = [:user] + Array(params[:include])
@@ -639,6 +659,57 @@ class EnrollmentsApiController < ApplicationController
       render :json => @enrollment.errors, :status => :bad_request
     end
   end
+
+  # @API Accept Course Invitation
+  # accepts a pending course invitation for the current user
+  #
+  # @example_request
+  #   curl https://<canvas>/api/v1/courses/<course_id>/enrollments/:id/accept \
+  #     -X POST \
+  #     -H 'Authorization: Bearer <token>'
+  #
+  # @example_response
+  # {
+  #   "success": true
+  # }
+  def accept
+    @enrollment = @context.enrollments.find(params[:id])
+    return render_unauthorized_action unless @current_user && @enrollment.user == @current_user
+    return render(json: {success: true}) if @enrollment.active?
+    return render(json: {error: 'membership not activated'}, status: :bad_request) if @enrollment.inactive?
+    if @enrollment.rejected?
+      @enrollment.workflow_state = 'invited'
+      @enrollment.save_without_broadcasting
+    end
+    return render(json: {error: 'self enroll'}, status: :bad_request) if @enrollment.self_enrolled?
+    return render(json: {error: 'no current invitation'}, status: :bad_request) unless @enrollment.invited?
+    @enrollment.accept!
+    render json: {success: true}
+  end
+
+  # @API Reject Course Invitation
+  # rejects a pending course invitation for the current user
+  #
+  # @example_request
+  #   curl https://<canvas>/api/v1/courses/<course_id>/enrollments/:id/reject \
+  #     -X POST \
+  #     -H 'Authorization: Bearer <token>'
+  #
+  # @example_response
+  # {
+  #   "success": true
+  # }
+  def reject
+    @enrollment = @context.enrollments.find(params[:id])
+    return render_unauthorized_action unless @current_user && @enrollment.user == @current_user
+    return render(json: {success: true}) if @enrollment.rejected?
+    return render(json: {error: 'membership not activated'}, status: :bad_request) if @enrollment.inactive?
+    return render(json: {error: 'self enroll'}, status: :bad_request) if @enrollment.self_enrolled?
+    return render(json: {error: 'no current invitation'}, status: :bad_request) unless @enrollment.invited?
+    @enrollment.reject!
+    render json: {success: true}
+  end
+
 
   # @API Re-activate an enrollment
   # Activates an inactive enrollment
