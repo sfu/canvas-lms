@@ -457,7 +457,7 @@ class Enrollment < ActiveRecord::Base
   end
 
   def update_cached_due_dates
-    DueDateCacher.recompute_course(course) if @update_cached_due_dates
+    DueDateCacher.recompute_users_for_course(user_id, course) if @update_cached_due_dates
   end
 
   def update_from(other, skip_broadcasts=false)
@@ -789,6 +789,10 @@ class Enrollment < ActiveRecord::Base
 
   def inactive?
     state_based_on_date == :inactive
+  end
+
+  def hard_inactive?
+    workflow_state == 'inactive'
   end
 
   def invited?
@@ -1337,10 +1341,8 @@ class Enrollment < ActiveRecord::Base
   end
 
   def update_assignment_overrides_if_needed
-    assignment_scope = Assignment
-                        .where(context_id: self.course_id, context_type: 'Course')
-    override_scope = AssignmentOverrideStudent
-                      .where(user_id: self.user_id)
+    assignment_scope = Assignment.where(context_id: self.course_id, context_type: 'Course')
+    override_scope = AssignmentOverrideStudent.where(user_id: self.user_id)
 
     if being_deleted? && !enrollments_exist_for_user_in_course?
       return unless (assignment_ids = assignment_scope.pluck(:id)).any?
