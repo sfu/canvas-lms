@@ -37,7 +37,7 @@ describe "announcements" do
       @course.root_account.enable_feature!(:section_specific_announcements)
       @course.course_sections.create!(name: "Section 1")
       @course.course_sections.create!(name: "Section 2")
-      AnnouncementNewEdit.visit(@course)
+      AnnouncementNewEdit.visit_new(@course)
       AnnouncementNewEdit.select_a_section("Section")
       AnnouncementNewEdit.add_message("Announcement Body")
       AnnouncementNewEdit.add_title("Announcement Title")
@@ -50,11 +50,23 @@ describe "announcements" do
       @course.root_account.enable_feature!(:section_specific_announcements)
       @course.course_sections.create!(name: "Section 1")
       @course.course_sections.create!(name: "Section 2")
-      AnnouncementNewEdit.visit(@course)
+      AnnouncementNewEdit.visit_new(@course)
       AnnouncementNewEdit.select_a_section("")
       AnnouncementNewEdit.add_message("Announcement Body")
       AnnouncementNewEdit.add_title("Announcement Title")
       expect(AnnouncementNewEdit.section_error).to include("A section is required")
+    end
+
+    it "should not show the allow comments checkbox if globally disabled" do
+      @course.lock_all_announcements = true
+      @course.save!
+      AnnouncementNewEdit.visit_new(@course)
+      expect { f("#allow_user_comments") }.to raise_error(Selenium::WebDriver::Error::NoSuchElementError)
+    end
+
+    it "should show the comments checkbox if not globally disabled" do
+      AnnouncementNewEdit.visit_new(@course)
+      expect { f("#allow_user_comments") }.not_to raise_error
     end
 
     context "section specific announcements" do
