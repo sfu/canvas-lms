@@ -473,6 +473,7 @@ class FilesController < ApplicationController
       return
     end
 
+
     verifier_checker = Attachments::Verification.new(@attachment)
     if (params[:verifier] && verifier_checker.valid_verifier_for_permission?(params[:verifier], :read, session)) ||
         @attachment.attachment_associations.where(:context_type => 'Submission').
@@ -524,7 +525,7 @@ class FilesController < ApplicationController
         if attachment.content_type && attachment.content_type.match(/\Avideo\/|audio\//)
           attachment.context_module_action(@current_user, :read)
         end
-        format.html { render :show }
+        format.html { render :show, status: @attachment.locked_for?(@current_user) ? :forbidden : :ok }
       end
       format.json do
         json = {
