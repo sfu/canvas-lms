@@ -152,14 +152,13 @@ class ApplicationController < ActionController::Base
           enable_profiles: (@domain_root_account && @domain_root_account.settings[:enable_profiles] != false)
         },
       }
-      js_env[:current_user] = @current_user ? Rails.cache.fetch(['user_display_json', @current_user].cache_key, :expires_in => 1.hour) { user_display_json(@current_user, :profile) } : {}
+      @js_env[:current_user] = @current_user ? Rails.cache.fetch(['user_display_json', @current_user].cache_key, :expires_in => 1.hour) { user_display_json(@current_user, :profile) } : {}
       @js_env[:page_view_update_url] = page_view_path(@page_view.id, page_view_token: @page_view.token) if @page_view
       @js_env[:IS_LARGE_ROSTER] = true if !@js_env[:IS_LARGE_ROSTER] && @context.respond_to?(:large_roster?) && @context.large_roster?
       @js_env[:context_asset_string] = @context.try(:asset_string) if !@js_env[:context_asset_string]
       @js_env[:ping_url] = polymorphic_url([:api_v1, @context, :ping]) if @context.is_a?(Course)
       @js_env[:TIMEZONE] = Time.zone.tzinfo.identifier if !@js_env[:TIMEZONE]
       @js_env[:CONTEXT_TIMEZONE] = @context.time_zone.tzinfo.identifier if !@js_env[:CONTEXT_TIMEZONE] && @context.respond_to?(:time_zone) && @context.time_zone.present?
-      @js_env[:GRAPHQL_ENABLED] = @domain_root_account.try(:feature_enabled?, :graphql)
       unless @js_env[:LOCALE]
         @js_env[:LOCALE] = I18n.locale.to_s
         @js_env[:BIGEASY_LOCALE] = I18n.bigeasy_locale
@@ -377,6 +376,7 @@ class ApplicationController < ActionController::Base
   def logged_in_user
     @real_current_user || @current_user
   end
+  helper_method :logged_in_user
 
   def not_fake_student_user
     @current_user && @current_user.fake_student? ? logged_in_user : @current_user
@@ -1583,7 +1583,11 @@ class ApplicationController < ActionController::Base
         adapter = Lti::LtiOutboundAdapter.new(@tool, @current_user, @context).prepare_tool_launch(@return_url, variable_expander, opts)
 
         if tag.try(:context_module)
-          add_crumb tag.context_module.name, context_url(@context, :context_context_modules_url)
+          # if you change this, see also url_show.html.erb
+          cu = context_url(@context, :context_context_modules_url)
+          cu = "#{cu}/#{tag.context_module.id}"
+          add_crumb tag.context_module.name, cu
+          add_crumb @tag.title
         end
 
         if @assignment
@@ -1915,7 +1919,8 @@ class ApplicationController < ActionController::Base
   end
 
   def logout_current_user
-    @current_user.try(:stamp_logout_time!)
+    logged_in_user.try(:stamp_logout_time!)
+    InstFS.logout(logged_in_user)
     destroy_session
   end
 
@@ -2359,7 +2364,7 @@ class ApplicationController < ActionController::Base
         can_read_course_list: can_read_course_list,
         can_read_roster: can_read_roster,
         can_create_courses: @account.grants_right?(@current_user, session, :manage_courses),
-        can_create_users: @account.root_account? && @account.grants_right?(@current_user, session, :manage_user_logins),
+        can_create_users: @account.root_account.grants_right?(@current_user, session, :manage_user_logins),
         analytics: @account.service_enabled?(:analytics),
         can_masquerade: @account.grants_right?(@current_user, session, :become_user),
         can_message_users: @account.grants_right?(@current_user, session, :send_messages),
