@@ -113,7 +113,6 @@ class FilesController < ApplicationController
   # an Account in show_relative
   protect_from_forgery :except => [:api_capture, :show_relative], with: :exception
 
-  # END SFU MOD
   before_action :require_user, only: :create_pending
   before_action :require_context, except: [
     :assessment_question_show, :image_thumbnail, :show_thumbnail,
