@@ -151,6 +151,7 @@ class UsersController < ApplicationController
   include SectionTabHelper
   include I18nUtilities
   include CustomColorHelper
+  include DashboardHelper
 
   before_action :require_user, :only => [:grades, :merge, :kaltura_session,
     :ignore_item, :ignore_stream_item, :close_notification, :mark_avatar_image,
@@ -507,16 +508,6 @@ class UsersController < ApplicationController
     end
   end
 
-  helper_method :show_planner?
-  def show_planner?
-    return false unless @current_user && @current_user.preferences
-    if @current_user.preferences[:dashboard_view]
-      @current_user.preferences[:dashboard_view] == 'planner'
-    else
-      false
-    end
-  end
-
   def user_dashboard
     if planner_enabled?
       js_bundle :react_todo_sidebar
@@ -540,7 +531,7 @@ class UsersController < ApplicationController
     js_env({
       :DASHBOARD_SIDEBAR_URL => dashboard_sidebar_url,
       :PREFERENCES => {
-        :recent_activity_dashboard => @current_user.preferences[:dashboard_view] == 'activity' || @current_user.preferences[:recent_activity_dashboard],
+        :recent_activity_dashboard => show_recent_activity?,
         :hide_dashcard_color_overlays => @current_user.preferences[:hide_dashcard_color_overlays],
         :custom_colors => @current_user.custom_colors,
         :show_planner => show_planner?
@@ -898,6 +889,22 @@ class UsersController < ApplicationController
     render :json => todos
   end
 
+  # @API List counts for todo items
+  # Counts of different todo items such as the number of assignments needing grading as well as the number of assignments needing submitting.
+  #
+  # @argument include[] [String, "ungraded_quizzes"]
+  #   "ungraded_quizzes":: Optionally include ungraded quizzes (such as practice quizzes and surveys) in the list.
+  #                        These will be returned under a +quiz+ key instead of an +assignment+ key in response elements.
+  #
+  # There is a limit to the number of todo items this endpoint will count.
+  # It will only look at the first 100 todo items for the user. If the user has more than 100 todo items this count may not be reliable.
+  # The largest reliable number for both counts is 100.
+  #
+  # @example_response
+  #   {
+  #     needs_grading_count: 32,
+  #     assignments_needing_submitting: 10
+  #   }
   def todo_item_count
     return render_unauthorized_action unless @current_user
     limit = ToDoListPresenter::ASSIGNMENT_LIMIT

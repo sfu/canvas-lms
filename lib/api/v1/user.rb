@@ -218,7 +218,8 @@ module Api::V1::User
                               :created_at,
                               :start_at,
                               :end_at,
-                              :type]
+                              :type
+                            ]
 
   def enrollment_json(enrollment, user, session, includes = [], opts = {})
     api_json(enrollment, user, session, :only => API_ENROLLMENT_JSON_OPTS).tap do |json|
@@ -230,6 +231,7 @@ module Api::V1::User
       json[:role_id] = enrollment.role_id
       json[:sis_batch_id] = enrollment.sis_batch_id # SFU MOD - For the user enrollment API (9789f39 by ronvs)
       json[:last_activity_at] = enrollment.last_activity_at
+      json[:last_attended_at] = enrollment.last_attended_at
       json[:total_activity_time] = enrollment.total_activity_time
       if enrollment.root_account.grants_right?(user, session, :manage_sis)
         json[:sis_import_id] = enrollment.sis_batch_id

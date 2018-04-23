@@ -47,26 +47,36 @@ const dueDateList = new DueDateList(assignment.get('assignment_overrides'), sect
 const [contextType] = splitAssetString(ENV.context_asset_string)
 
 function renderSectionsAutocomplete (view) {
-  const container = document.querySelector('#sections_autocomplete_root')
-  if (container) {
-    const isGroupDiscussion = view.groupCategorySelector.groupDiscussionChecked()
-    const isGradedDiscussion = view.gradedChecked()
-
-    ReactDOM.render(
-      <SectionsAutocomplete
-        selectedSections={ENV.SELECTED_SECTION_LIST}
-        disabled={isGradedDiscussion || isGroupDiscussion}
-        disableDiscussionOptions={() => {
-          view.disableGradedCheckBox()
-          view.groupCategorySelector.disableGroupDiscussionCheckbox()
-        }}
-        enableDiscussionOptions={() => {
-          view.enableGradedCheckBox()
+  if (sectionSpecificEnabled()) {
+    const container = document.querySelector('#sections_autocomplete_root')
+    if (container) {
+      const gcs = view.groupCategorySelector
+      const isGradedDiscussion = view.gradedChecked()
+      const isGroupDiscussion = (gcs !== undefined) ? gcs.groupDiscussionChecked() : false
+      const enableDiscussionOptions = () => {
+        view.enableGradedCheckBox()
+        if (gcs !== undefined) {
           view.groupCategorySelector.enableGroupDiscussionCheckbox()
-        }}
-        sections={ENV.SECTION_LIST}/>
-      , container
-    )
+        }
+      }
+      const disableDiscussionOptions = () => {
+        view.disableGradedCheckBox()
+        if (gcs !== undefined) {
+          view.groupCategorySelector.disableGroupDiscussionCheckbox()
+        }
+      }
+
+      ReactDOM.render(
+        <SectionsAutocomplete
+          selectedSections={ENV.SELECTED_SECTION_LIST}
+          disabled={isGradedDiscussion || isGroupDiscussion}
+          disableDiscussionOptions={disableDiscussionOptions}
+          enableDiscussionOptions={enableDiscussionOptions}
+          sections={ENV.SECTION_LIST}
+        />
+        , container
+      )
+    }
   }
 }
 
@@ -111,9 +121,7 @@ $(() => {
   // This needs to be run in the next tick, so that the backbone views are all
   // properly created/rendered thus can be used to checked if this is a graded
   // or group discussions.
-  if (sectionSpecificEnabled()) {
-    setTimeout(() => renderSectionsAutocomplete(view))
-  }
+  setTimeout(() => renderSectionsAutocomplete(view))
 })
 
 export default view

@@ -101,6 +101,7 @@ module SIS
               @tmp_dirs << tmp_dir
               CanvasUnzip::extract_archive(file, tmp_dir)
               Dir[File.join(tmp_dir, "**/**")].each do |fn|
+                next if File.directory?(fn) || !!(fn =~ IGNORE_FILES)
                 file_name = fn[tmp_dir.size+1 .. -1]
                 att = create_batch_attachment(File.join(tmp_dir, file_name))
                 process_file(tmp_dir, file_name, att)
@@ -288,7 +289,7 @@ module SIS
             file = csv[:attachment].open
             csv[:fullpath] = file.path
           end
-          importerObject.process(csv)
+          @counts[importer.to_s.pluralize.to_sym] += importerObject.process(csv)
           run_next_importer(IMPORTERS[IMPORTERS.index(importer) + 1]) if complete_importer(importer)
         rescue => e
           return @batch if @batch.workflow_state == 'aborted'

@@ -177,10 +177,7 @@ describe DiscussionTopicsController do
       group_id = group_topic.child_topics.first.group.id
       get 'index', params: { group_id: group_id }, :format => :json
       expect(response).to be_success
-      response_body = response.body
-      # Remove the prepending while loop so the parser doesn't choke
-      response_body.sub!('while(1);', '')
-      parsed_json = JSON.parse response_body
+      parsed_json = json_parse(response.body)
       expect(parsed_json.length).to eq 1
       parsed_topic = parsed_json.first
       # barf
@@ -236,6 +233,20 @@ describe DiscussionTopicsController do
       user_session(@student)
       get 'show', params: {:course_id => @course.id, :id => @topic.id}
       assert_unauthorized
+    end
+
+    it "should return unauthorized if a user does not have visibilities" do
+      @course.root_account.enable_feature!(:section_specific_announcements)
+      user_session(@teacher)
+      section1 = @course.course_sections.create!(name: "Section 1")
+      section2 = @course.course_sections.create!(name: "Section 2")
+      @course.enroll_teacher(@teacher, section: section1, allow_multiple_enrollments: true).accept!
+      Enrollment.limit_privileges_to_course_section!(@course, @teacher, true)
+      ann = @course.announcements.create!(message: "testing", is_section_specific: true, course_sections: [section2])
+      ann.save!
+      get :show, params: {course_id: @course.id, id: ann.id}
+      get :edit, params: {course_id: @course.id, id: ann.id}
+      expect(response.status).to equal(401)
     end
 
     it "js_env TOTAL_USER_COUNT and IS_ANNOUNCEMENT are set correctly for section specific announcements" do
@@ -748,6 +759,49 @@ describe DiscussionTopicsController do
       expect(assigns[:js_env]).to have_key(:active_grading_periods)
     end
 
+    it "js_env SECTION_LIST is set correctly for section specific announcements on a limited privileges user" do
+      @course.root_account.enable_feature!(:section_specific_announcements)
+      user_session(@teacher)
+      section1 = @course.course_sections.create!(name: "Section 1")
+      section2 = @course.course_sections.create!(name: "Section 2")
+      @course.enroll_teacher(@teacher, section: section1, allow_multiple_enrollments: true).accept!
+      Enrollment.limit_privileges_to_course_section!(@course, @teacher, true)
+      ann = @course.announcements.create!(message: "testing", is_section_specific: true, course_sections: [section1])
+      ann.save!
+      get :edit, params: {course_id: @course.id, id: ann.id}
+
+      # 2 because there is a default course created in the course_with_teacher factory
+      expect(assigns[:js_env]["SECTION_LIST"].length).to eq(2)
+    end
+
+    it "js_env SECTION_LIST is set correctly for section specific announcements on a not limited privileges user" do
+      @course.root_account.enable_feature!(:section_specific_announcements)
+      user_session(@teacher)
+      section1 = @course.course_sections.create!(name: "Section 1")
+      section2 = @course.course_sections.create!(name: "Section 2")
+      @course.enroll_teacher(@teacher, section: section1, allow_multiple_enrollments: true).accept!
+      Enrollment.limit_privileges_to_course_section!(@course, @teacher, false)
+      ann = @course.announcements.create!(message: "testing", is_section_specific: true, course_sections: [section1])
+      ann.save!
+      get :edit, params: {course_id: @course.id, id: ann.id}
+
+      # 3 because there is a default course created in the course_with_teacher factory
+      expect(assigns[:js_env]["SECTION_LIST"].length).to eq(3)
+    end
+
+    it "returns unauthorized for a user that does not have visibilites to view thiss" do
+      @course.root_account.enable_feature!(:section_specific_announcements)
+      user_session(@teacher)
+      section1 = @course.course_sections.create!(name: "Section 1")
+      section2 = @course.course_sections.create!(name: "Section 2")
+      @course.enroll_teacher(@teacher, section: section1, allow_multiple_enrollments: true).accept!
+      Enrollment.limit_privileges_to_course_section!(@course, @teacher, true)
+      ann = @course.announcements.create!(message: "testing", is_section_specific: true, course_sections: [section2])
+      ann.save!
+      get :edit, params: {course_id: @course.id, id: ann.id}
+      assert_unauthorized
+    end
+
     it "js_env SELECTED_SECTION_LIST is set correctly for section specific announcements" do
       @course.root_account.enable_feature!(:section_specific_announcements)
       user_session(@teacher)
@@ -1016,8 +1070,11 @@ describe DiscussionTopicsController do
         user_session(@teacher)
         @section1 = @course.course_sections.create!(name: "Section 1")
         @section2 = @course.course_sections.create!(name: "Section 2")
-        @course.enroll_teacher(@teacher, section: @section1, allow_multiple_enrollments: true).accept(true)
-        @course.enroll_teacher(@teacher, section: @section2, allow_multiple_enrollments: true).accept(true)
+        @section3 = @course.course_sections.create!(name: "Section 1")
+        @section4 = @course.course_sections.create!(name: "Section 2")
+        @course.enroll_teacher(@teacher, section: @section1, allow_multiple_enrollments: true).accept!
+        @course.enroll_teacher(@teacher, section: @section2, allow_multiple_enrollments: true).accept!
+        Enrollment.limit_privileges_to_course_section!(@course, @teacher, true)
       end
 
       it 'creates an announcement with sections' do
@@ -1088,6 +1145,15 @@ describe DiscussionTopicsController do
         expect(DiscussionTopic.count).to eq 0
         post('create', params: obj_params, format: :json)
         expect(response).to have_http_status 422
+        expect(DiscussionTopic.count).to eq 0
+        expect(DiscussionTopicSectionVisibility.count).to eq 0
+      end
+
+      it 'does not allow creation of disuccions to sections that are not visible to the user' do
+        # This teacher does not have permissino for section 3 and 4
+        sections = [@section1.id, @section2.id, @section3.id, @section4.id].join(",")
+        post 'create', params: topic_params(@course, {specific_sections: sections}), :format => :json
+        expect(response).to have_http_status 400
         expect(DiscussionTopic.count).to eq 0
         expect(DiscussionTopicSectionVisibility.count).to eq 0
       end
@@ -1236,6 +1302,25 @@ describe DiscussionTopicsController do
       expect(response).to have_http_status 422
       expect(DiscussionTopic.count).to eq 2
       expect(DiscussionTopicSectionVisibility.count).to eq 0
+    end
+
+    it "does not allow updating a section specific announcement you do not have visibilities for" do
+      @course.root_account.enable_feature!(:section_specific_announcements)
+      user_session(@teacher)
+      section1 = @course.course_sections.create!(name: "Section 1")
+      section2 = @course.course_sections.create!(name: "Section 2")
+      @course.enroll_teacher(@teacher, section: section1, allow_multiple_enrollments: true).accept!
+      Enrollment.limit_privileges_to_course_section!(@course, @teacher, true)
+      ann = @course.announcements.create!(message: "testing", is_section_specific: true, course_sections: [section2])
+      ann.save!
+
+      put('update', params: {
+        course_id: @course.id,
+        topic_id: ann.id,
+        specific_sections: section1.id,
+        title: 'Updated Topic',
+      })
+      expect(response).to have_http_status 400
     end
 
     it "should not clear lock_at if locked is not changed" do
