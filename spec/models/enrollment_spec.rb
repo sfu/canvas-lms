@@ -199,17 +199,18 @@ describe Enrollment do
     end
   end
 
-  describe '#restore' do
+  describe 'restoring' do
     before(:once) do
+      @course.assignments.create!
       @enrollment.save!
       @enrollment.scores.create!
       @enrollment.destroy
     end
 
     it 'restores associated scores that are deleted' do
-      expect { @enrollment.restore }.to change {
-        Score.find_by(enrollment_id: @enrollment, grading_period_id: nil).workflow_state
-      }.from('deleted').to('active')
+      @enrollment.restore
+      score_workflow = Score.find_by(enrollment_id: @enrollment, course_score: true).workflow_state
+      expect(score_workflow).to eq('active')
     end
 
     it 'does not restore scores associated with other enrollments' do
@@ -217,7 +218,31 @@ describe Enrollment do
       new_score = new_enrollment.scores.new
       new_score.workflow_state = :deleted
       new_score.save!
-      expect { @enrollment.restore }.not_to change { new_score.reload.workflow_state }
+      @enrollment.restore
+      new_score.reload
+      expect(new_score.workflow_state).not_to eq('active')
+    end
+
+    it 'restores associated scores that are deleted if restored by workflow state' do
+      @enrollment.update!(workflow_state: :active)
+      score_workflow = Score.find_by(enrollment_id: @enrollment, course_score: true).workflow_state
+      expect(score_workflow).to eq('active')
+    end
+
+    it 'does not restore scores associated with other enrollments if restored by workflow_state' do
+      new_enrollment = StudentEnrollment.create!(user: User.create!, course: @course)
+      new_score = new_enrollment.scores.new
+      new_score.workflow_state = :deleted
+      new_score.save!
+      @enrollment.update!(workflow_state: :active)
+      new_score.reload
+      expect(new_score.workflow_state).not_to eq('active')
+    end
+
+    it 'restores associated scores that are deleted if restored to inactive by workflow state' do
+      @enrollment.update!(workflow_state: :inactive)
+      score_workflow = Score.find_by(enrollment_id: @enrollment, course_score: true).workflow_state
+      expect(score_workflow).to eq('active')
     end
   end
 
@@ -480,30 +505,34 @@ describe Enrollment do
           end
         end
 
+        # if a user is being restored to active, the DueDateCacher
+        # run will kick off a grade calculation, which sill update
+        # the score objects. To test we're not copying scores, we'll
+        # restore to completed for these tests.
         context 'on restoration' do
           it 'copies scores over from existing student enrollments to restored student enrollments' do
             new_student_enrollment.destroy
-            new_student_enrollment.update!(workflow_state: :active)
+            new_student_enrollment.update!(workflow_state: :completed)
             expect(new_student_enrollment.computed_current_score).to eq(@enrollment.computed_current_score)
           end
 
           it 'copies scores over from existing fake student enrollments to restored fake student enrollments' do
             @enrollment.update!(type: 'StudentViewEnrollment')
             new_fake_student_enrollment.destroy
-            new_fake_student_enrollment.update!(workflow_state: :active)
+            new_fake_student_enrollment.update!(workflow_state: :completed)
             expect(new_fake_student_enrollment.computed_current_score).to eq(@enrollment.computed_current_score)
           end
 
           it 'does not copy scores if the restored enrollment type does not match existing enrollment types' do
             new_fake_student_enrollment.destroy
-            new_fake_student_enrollment.update!(workflow_state: :active)
+            new_fake_student_enrollment.update!(workflow_state: :completed)
             expect(new_fake_student_enrollment.computed_current_score).to be_nil
           end
 
           it 'does not copy scores if the existing enrollment is soft-deleted' do
             @enrollment.destroy
             new_student_enrollment.destroy
-            new_student_enrollment.update!(workflow_state: :active)
+            new_student_enrollment.update!(workflow_state: :completed)
             expect(new_student_enrollment.computed_current_score).to be_nil
           end
         end
@@ -868,7 +897,7 @@ describe Enrollment do
       course_with_teacher(:active_all => true)
       student = user_with_pseudonym
       observer = user_with_pseudonym
-      observer.observed_users << student
+      observer.linked_students << student
 
       @course.enroll_student(student, :no_notify => true)
       expect(student.messages).to be_empty
@@ -888,7 +917,7 @@ describe Enrollment do
       course_with_teacher
       student = user_with_pseudonym
       observer = user_with_pseudonym
-      observer.observed_users << student
+      observer.linked_students << student
 
       @course.enroll_student(student)
       expect(observer.messages).to be_empty
@@ -952,7 +981,7 @@ describe Enrollment do
     student = user_with_pseudonym
     observer = user_with_pseudonym
     old_time = observer.updated_at
-    observer.observed_users << student
+    observer.linked_students << student
     @course.enrollments.create(user: student, skip_touch_user: true, type: 'StudentEnrollment')
     expect(observer.reload.updated_at).to eq old_time
   end
@@ -2427,7 +2456,7 @@ describe Enrollment do
     before :once do
       @student = user_factory(active_all: true)
       @parent = user_with_pseudonym(:active_all => true)
-      @student.observers << @parent
+      @student.linked_observers << @parent
     end
 
     it 'should get new observer enrollments when an observed user gets a new enrollment' do
@@ -2580,7 +2609,7 @@ describe Enrollment do
 
     it "triggers a batch when enrollment is created" do
       added_user = user_factory
-      expect(DueDateCacher).to receive(:recompute_users_for_course).with(added_user.id, @course)
+      expect(DueDateCacher).to receive(:recompute_users_for_course).with(added_user.id, @course, nil, { update_grades: false })
       @course.enroll_student(added_user)
     end
 
@@ -2590,7 +2619,7 @@ describe Enrollment do
     end
 
     it "triggers a batch when enrollment is deleted" do
-      expect(DueDateCacher).to receive(:recompute_users_for_course).with(@enrollment.user_id, @course)
+      expect(DueDateCacher).to receive(:recompute_users_for_course).with(@enrollment.user_id, @course, nil, { update_grades: false })
       @enrollment.destroy
     end
 
@@ -2604,6 +2633,14 @@ describe Enrollment do
       Enrollment.suspend_callbacks(:set_update_cached_due_dates) do
         @course.enroll_student(user_factory)
       end
+    end
+
+    it 'triggers once for enrollment.destroy' do
+      override = assignment_override_model(assignment: @assignments.first)
+      override.assignment_override_students.create(user: @student)
+      expect(DueDateCacher).to receive(:recompute_users_for_course).once
+      expect(DueDateCacher).to receive(:recompute).never
+      @enrollment.destroy
     end
   end
 

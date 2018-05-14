@@ -762,8 +762,14 @@ class FilesController < ApplicationController
     @attachment.workflow_state = nil
     @attachment.uploaded_data = params[:file] || params[:attachment] && params[:attachment][:uploaded_data]
     if @attachment.save
+      # SFU MOD Fix avatar uploads on local storage
+      # This will be replaced by an upcoming commit on master
+      # refer to https://sfuits.slack.com/archives/C0H376ZQX/p1525459901000147 for more details
+      includes = Array(params[:success_include])
+      includes << 'avatar' if @attachment.folder == @attachment.user&.profile_pics_folder
       # for consistency with the s3 upload client flow, we redirect to the success url here to finish up
-      redirect_to api_v1_files_create_success_url(@attachment, :uuid => @attachment.uuid, :on_duplicate => params[:on_duplicate], :quota_exemption => params[:quota_exemption])
+      redirect_to api_v1_files_create_success_url(@attachment, :uuid => @attachment.uuid, :on_duplicate => params[:on_duplicate], :quota_exemption => params[:quota_exemption], :include => includes)
+      # END SFU MOD
     else
       head :bad_request
     end

@@ -144,6 +144,7 @@
         display the appropriate message.
     */
   utils.onPage(/^\/courses\/\d+\/collaborations\/?$/, () => {
+    INST.collaboration_types = INST.collaboration_types || ENV.collaboration_types
     loadModule('sfu_google_docs_pia_notice.js');
   });
 
