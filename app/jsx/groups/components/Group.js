@@ -112,7 +112,12 @@ import natcompare from 'compiled/util/natcompare'
           <ul ref="memberList" className="student-group-list clearfix" aria-label={I18n.t('group members')} tabIndex="0" role="list">
             {this.props.group.users.map(u => {
             var isLeader = u.id == leaderId;
-            var name = u.name || u.display_name;
+
+            { /*  SFU MOD: show display name if user does not have read_sis permissions */ }
+            { /*  Fixes sfu/canvas-lms:#267 */ }
+            var name = ENV.permissions.read_sis ? u.name : u.short_name || u.name;
+            { /* END SFU MOD */ }
+            
             var leaderBadge = isLeader ? <i className="icon-user" aria-hidden="true"></i> : null;
             return <li tabIndex="0" role="listitem" key={u.id}><span className="screenreader-only">{isLeader ? I18n.t('group leader %{user_name}', {user_name: name}) : name}</span><span aria-hidden="true">{name} {leaderBadge}</span></li>;
             })}

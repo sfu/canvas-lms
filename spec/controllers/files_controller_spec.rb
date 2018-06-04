@@ -42,7 +42,7 @@ describe FilesController do
   end
 
   def io
-    fixture_file_upload('scribd_docs/doc.doc', 'application/msword', true)
+    fixture_file_upload('docs/doc.doc', 'application/msword', true)
   end
 
   def course_file
@@ -1140,6 +1140,33 @@ describe FilesController do
       @attachment.save!
       post "api_create", params: params[:upload_params].merge(:file => @content)
       assert_status(400)
+    end
+
+    it "should forward params[:success_include] to the api_create_success redirect as params[:include] if present" do
+      local_storage!
+      params = @attachment.ajax_upload_params(@teacher.pseudonym, "", "")
+      post "api_create", params: params[:upload_params].merge(:file => @content, :success_include => 'foo')
+      expect(response).to be_redirect
+      expect(response.location).to include('include%5B%5D=foo') # include[]=foo, url encoded
+    end
+
+    it "should add 'include=avatar' to the api_create_success redirect for profile pictures" do
+      profile_pic = factory_with_protected_attributes(
+        Attachment,
+        user: @teacher,
+        context: @teacher,
+        folder: @teacher.profile_pics_folder,
+        file_state: 'deleted',
+        workflow_state: 'unattached',
+        filename: 'profile.png',
+        content_type: 'image/png',
+      )
+
+      local_storage!
+      params = profile_pic.ajax_upload_params(@teacher.pseudonym, "", "")
+      post "api_create", params: params[:upload_params].merge(:file => @content)
+      expect(response).to be_redirect
+      expect(response.location).to include('include%5B%5D=avatar') # include[]=avatar, url encoded
     end
   end
 
