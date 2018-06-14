@@ -274,6 +274,13 @@ class GroupsController < ApplicationController
 
     respond_to do |format|
       format.html do
+        
+        # SFU MOD: add ENV.permissions to groups index page - for sfu/canvas-lms-#267
+        js_env permissions: {
+          read_sis: @context.grants_any_right?(@current_user, session, :read_sis, :manage_sis)
+        }
+        # END SFU MOD
+
         @categories  = @context.group_categories.order("role <> 'student_organized'", GroupCategory.best_unicode_collation_key('name')).preload(:root_account)
         @user_groups = @current_user.group_memberships_for(@context) if @current_user
 
