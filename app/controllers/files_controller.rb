@@ -195,8 +195,7 @@ class FilesController < ApplicationController
     begin
       access_verifier = validate_access_verifier
     rescue Users::AccessVerifier::InvalidVerifier
-      render_unauthorized_action
-      return false
+      access_verifier = {}
     end
 
     if access_verifier[:user]
@@ -452,8 +451,11 @@ class FilesController < ApplicationController
   # @returns File
   def api_show
     get_context
-    @attachment = @context ? @context.attachments.find(params[:id]) : Attachment.find(params[:id])
-    raise ActiveRecord::RecordNotFound if @attachment.deleted?
+    @attachment = @context ? @context.attachments.not_deleted.find_by(id: params[:id]) : Attachment.not_deleted.find_by(id: params[:id])
+    unless @attachment
+      render json: { errors: [{message: "The specified resource does not exist."}] }, status: 404
+      return
+    end
     params[:include] = Array(params[:include])
     if authorized_action(@attachment,@current_user,:read)
       render :json => attachment_json(@attachment, @current_user, {}, { include: params[:include], omit_verifier_in_app: !value_to_boolean(params[:use_verifiers]) })

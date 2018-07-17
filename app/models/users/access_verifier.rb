@@ -19,16 +19,9 @@ require 'openssl'
 
 module Users
   module AccessVerifier
-    class InvalidVerifier < RuntimeError
-    end
+    TTL_MINUTES = 5
 
-    def self.validate_legacy(fields)
-      return {} if fields[:sf_verifier].blank?
-      ts = fields[:ts]&.to_i
-      raise InvalidVerifier unless ts > 5.minutes.ago.to_i && ts < 1.minute.from_now.to_i
-      user = User.where(id: fields[:user_id]).first
-      raise InvalidVerifier unless user && fields[:sf_verifier] == OpenSSL::HMAC.hexdigest(OpenSSL::Digest::MD5.new, user.uuid, ts.to_s)
-      return { user: user }
+    class InvalidVerifier < RuntimeError
     end
 
     def self.generate(claims)
@@ -46,17 +39,12 @@ module Users
       jwt_claims[:root_account_id] = root_account.global_id.to_s if root_account
       jwt_claims[:oauth_host] = oauth_host if oauth_host
 
-      expires = 5.minutes.from_now
+      expires = TTL_MINUTES.minutes.from_now
       key = nil # use default key
       { sf_verifier: Canvas::Security.create_jwt(jwt_claims, expires, key, :HS512) }
     end
 
     def self.validate(fields)
-      if fields[:user_id].present? && fields[:ts].present?
-        # validate legacy verifiers
-        return validate_legacy(fields)
-      end
-
       return {} if fields[:sf_verifier].blank?
       claims = Canvas::Security.decode_jwt(fields[:sf_verifier])
 
