@@ -30,13 +30,18 @@ module Canvas::LiveEvents
   def self.amended_context(canvas_context)
     ctx = LiveEvents.get_context || {}
     return ctx unless canvas_context
-    ctx.merge({
+    ctx = ctx.merge({
       context_type: canvas_context.class.to_s,
-      context_id: canvas_context.global_id,
-      root_account_id: canvas_context.root_account.try(:global_id),
-      root_account_uuid: canvas_context.root_account.try(:uuid),
-      root_account_lti_guid: canvas_context.root_account.try(:lti_guid),
+      context_id: canvas_context.global_id
     })
+    if canvas_context.respond_to?(:root_account)
+      ctx.merge!({
+        root_account_id: canvas_context.root_account.try(:global_id),
+        root_account_uuid: canvas_context.root_account.try(:uuid),
+        root_account_lti_guid: canvas_context.root_account.try(:lti_guid),
+      })
+    end
+    ctx
   end
 
   def self.get_course_data(course)
@@ -395,6 +400,8 @@ module Canvas::LiveEvents
       grader_id = submission.global_grader_id
     end
 
+    sis_pseudonym = SisPseudonym.for(submission.user, submission.assignment.root_account, type: :trusted, require_sis: false)
+
     post_event_stringified('grade_change', {
       submission_id: submission.global_id,
       assignment_id: submission.global_assignment_id,
@@ -406,6 +413,7 @@ module Canvas::LiveEvents
       old_points_possible: old_assignment.points_possible,
       grader_id: grader_id,
       student_id: submission.global_user_id,
+      student_sis_id: sis_pseudonym&.sis_user_id,
       user_id: submission.global_user_id,
       grading_complete: submission.graded?,
       muted: submission.muted_assignment?
@@ -434,6 +442,28 @@ module Canvas::LiveEvents
   def self.quiz_export_complete(content_export)
     payload = content_export.settings[:quizzes2]
     post_event_stringified('quiz_export_complete', payload, amended_context(content_export.context))
+  end
+
+  def self.content_migration_completed(content_migration)
+    post_event_stringified(
+      'content_migration_completed',
+      content_migration_data(content_migration),
+      amended_context(content_migration.context)
+    )
+  end
+
+  def self.content_migration_data(content_migration)
+    context = content_migration.context
+    import_quizzes_next =
+      content_migration.migration_settings&.[](:import_quizzes_next) == true
+    {
+      content_migration_id: content_migration.global_id,
+      context_id: context.global_id,
+      context_type: context.class.to_s,
+      lti_context_id: context.lti_context_id,
+      context_uuid: context.uuid,
+      import_quizzes_next: import_quizzes_next
+    }
   end
 
   def self.course_section_created(section)

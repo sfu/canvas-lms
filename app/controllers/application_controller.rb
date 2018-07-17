@@ -161,6 +161,7 @@ class ApplicationController < ActionController::Base
       @js_env[:TIMEZONE] = Time.zone.tzinfo.identifier if !@js_env[:TIMEZONE]
       @js_env[:CONTEXT_TIMEZONE] = @context.time_zone.tzinfo.identifier if !@js_env[:CONTEXT_TIMEZONE] && @context.respond_to?(:time_zone) && @context.time_zone.present?
       unless @js_env[:LOCALE]
+        I18n.set_locale_with_localizer
         @js_env[:LOCALE] = I18n.locale.to_s
         @js_env[:BIGEASY_LOCALE] = I18n.bigeasy_locale
         @js_env[:FULLCALENDAR_LOCALE] = I18n.fullcalendar_locale
@@ -833,7 +834,7 @@ class ApplicationController < ActionController::Base
           groups = @context.current_groups.shard(opts[:cross_shard] ? @context.in_region_associated_shards : Shard.current).to_a
         end
       end
-      groups.reject!{|g| g.context_type == "Course" && g.context.concluded?}
+      groups = @context.filter_visible_groups_for_user(groups)
 
       if opts[:favorites_first]
         favorite_course_ids = @context.favorite_context_ids("Course")
@@ -1708,13 +1709,11 @@ class ApplicationController < ActionController::Base
     res = "#{request.protocol}#{host}"
 
     shard.activate do
-      ts, sig = @current_user && @current_user.access_verifier
-
       # add parameters so that the other domain can create a session that
       # will authorize file access but not full app access.  We need this in
       # case there are relative URLs in the file that point to other pieces
       # of content.
-      opts = { :user_id => @current_user.try(:id), :ts => ts, :sf_verifier => sig }
+      opts = generate_access_verifier
       opts[:verifier] = verifier if verifier.present?
 
       if download
@@ -1941,7 +1940,7 @@ class ApplicationController < ActionController::Base
 
   def logout_current_user
     logged_in_user.try(:stamp_logout_time!)
-    InstFS.logout(logged_in_user)
+    InstFS.logout(logged_in_user) rescue nil
     destroy_session
   end
 

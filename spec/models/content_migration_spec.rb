@@ -102,6 +102,7 @@ describe ContentMigration do
 
       cm.queue_migration
       run_jobs
+      expect(cm.reload).to be_imported
       expect(context.reload.attachments.count).to eq filecount
     end
 
@@ -602,6 +603,32 @@ describe ContentMigration do
       Setting.set('content_migrations_expire_after_days', '0')
       ContentMigration.where(id: @cm.id).update_all(created_at: 405.days.ago)
       expect(ContentMigration.expired.pluck(:id)).to be_empty
+    end
+  end
+
+  context 'Quizzes.Next CC import' do
+    before do
+      allow(@cm.root_account).
+        to receive(:feature_enabled?).
+        with(:import_to_quizzes_next).
+        and_return(true)
+      allow(@cm.migration_settings).
+        to receive(:[]).
+        with(:import_quizzes_next).
+        and_return(true)
+    end
+
+    let(:importer) { instance_double('QuizzesNext::Importers::CourseContentImporter') }
+
+    it 'calls QuizzesNext::Importers' do
+      expect(@cm.migration_settings).
+        to receive(:[]).
+        with(:migration_ids_to_import)
+      expect(Importers).not_to receive(:content_importer_for)
+      expect(QuizzesNext::Importers::CourseContentImporter).
+        to receive(:new).and_return(importer)
+      expect(importer).to receive(:import_content)
+      @cm.import!({})
     end
   end
 end

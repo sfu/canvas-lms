@@ -18,8 +18,8 @@
 
 import React, { Component } from "react";
 import formatMessage from "../../format-message";
-import Select from "@instructure/ui-core/lib/components/Select";
-import TextInput from "@instructure/ui-core/lib/components/TextInput";
+import Select from "@instructure/ui-forms/lib/components/Select";
+import TextInput from "@instructure/ui-forms/lib/components/TextInput";
 import Alert from "@instructure/ui-core/lib/components/Alert";
 
 const usageRightsValues = {
@@ -54,9 +54,6 @@ export default class UsageRightsForm extends Component {
       usageRight: Object.keys(usageRightsValues)[0],
       copyrightHolder: ""
     };
-    this.handleUsageRight = this.handleUsageRight.bind(this);
-    this.handleCCLicense = this.handleCCLicense.bind(this);
-    this.handleCopyrightHolder = this.handleCopyrightHolder.bind(this);
   }
 
   isCreativeCommons() {
@@ -67,17 +64,17 @@ export default class UsageRightsForm extends Component {
     return this.state.usageRight === Object.keys(usageRightsValues)[0];
   }
 
-  handleUsageRight(ev) {
-    this.setState({ usageRight: ev.target.value });
-  }
+  handleUsageRight = (ev, selected) => {
+    this.setState({ usageRight: selected.value });
+  };
 
-  handleCCLicense(ev) {
-    this.setState({ ccLicense: ev.target.value });
-  }
+  handleCCLicense = (ev, selected) => {
+    this.setState({ ccLicense: selected.value });
+  };
 
-  handleCopyrightHolder(ev) {
+  handleCopyrightHolder = ev => {
     this.setState({ copyrightHolder: ev.target.value });
-  }
+  };
 
   value() {
     if (this.isNotSelected()) {
