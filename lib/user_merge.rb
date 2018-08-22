@@ -53,7 +53,15 @@ class UserMerge
 
     move_enrollments(target_user, user_merge_data)
 
-    Shard.with_each_shard(from_user.associated_shards + from_user.associated_shards(:weak) + from_user.associated_shards(:shadow)) do
+    # SFU MOD
+    # unique the shard list when merging user data
+    # in a non-sharded open-source environment, the concanetated list of shards will be an array of three identical shards
+    # when running in the with_each_shard loop, the first pass will work, the second will fail with a PG duplicate key error
+    # and the third will never be reached
+    # fixes gh-1166
+    shards = from_user.associated_shards + from_user.associated_shards(:weak) + from_user.associated_shards(:shadow)
+    Shard.with_each_shard(shards.uniq) do
+    # END SFU MOD
       max_position = Pseudonym.where(user_id: target_user).order(:position).last.try(:position) || 0
       pseudonyms_to_move = Pseudonym.where(user_id: from_user)
       user_merge_data.add_more_data(pseudonyms_to_move)
