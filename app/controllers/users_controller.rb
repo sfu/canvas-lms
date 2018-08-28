@@ -157,7 +157,7 @@ class UsersController < ApplicationController
     :ignore_item, :ignore_stream_item, :close_notification, :mark_avatar_image,
     :user_dashboard, :toggle_hide_dashcard_color_overlays,
     :masquerade, :external_tool, :dashboard_sidebar, :settings, :activity_stream,
-    :activity_stream_summary, :pandata_token]
+    :activity_stream_summary, :pandata_events_token]
   before_action :require_registered_user, :only => [:delete_user_service,
     :create_user_service]
   before_action :reject_student_view_student, :only => [:delete_user_service,
@@ -511,7 +511,6 @@ class UsersController < ApplicationController
   def user_dashboard
     # Use the legacy to do list for non-students until it is ready for other roles
     if planner_enabled? && !@current_user.non_student_enrollment?
-      js_bundle :react_todo_sidebar
       css_bundle :react_todo_sidebar
     end
     session.delete(:parent_registration) if session[:parent_registration]
@@ -1020,7 +1019,7 @@ class UsersController < ApplicationController
           assignments: {context_id: shard_course_ids}).
           merge(Assignment.published)
         subs = subs.merge(Assignment.not_locked) if only_submittable
-        submissions = subs.order(:cached_due_date)
+        submissions = subs.order(:cached_due_date, :id)
       end
     end
     assignments = Api.paginate(submissions, self, api_v1_user_missing_submissions_url).map(&:assignment)
@@ -2596,6 +2595,9 @@ class UsersController < ApplicationController
       pseudonym_params.delete(:password_confirmation)
     end
     password_provided = @pseudonym.new_record? && pseudonym_params.key?(:password)
+    if password_provided && @user.workflow_state == 'pre_registered'
+      @user.workflow_state = 'registered'
+    end
     if params[:pseudonym][:authentication_provider_id]
       @pseudonym.authentication_provider = @context.
           authentication_providers.active.
@@ -2656,7 +2658,7 @@ class UsersController < ApplicationController
         # add session_token to the query
         qs = URI.decode_www_form(uri.query || '')
         qs.delete_if { |(k, _v)| k == 'session_token' }
-        qs << ['session_token', SessionToken.new(@pseudonym.id, current_user_id: @user.id)]
+        qs << ['session_token', SessionToken.new(@pseudonym.id)]
         uri.query = URI.encode_www_form(qs)
 
         data['destination'] = uri.to_s

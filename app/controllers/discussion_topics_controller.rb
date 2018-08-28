@@ -350,7 +350,7 @@ class DiscussionTopicsController < ApplicationController
       scope = scope.active.where('delayed_post_at IS NULL OR delayed_post_at<?', Time.now.utc)
     end
 
-    if !@context.account.feature_enabled?(:section_specific_discussions) || request.format.json?
+    if @context.is_a?(Group) || request.format.json?
       @topics = Api.paginate(scope, self, topic_pagination_url)
       if params[:exclude_context_module_locked_topics]
         @topics = DiscussionTopic.reject_context_module_locked_topics(@topics, @current_user)
@@ -371,7 +371,7 @@ class DiscussionTopicsController < ApplicationController
         add_crumb(t('#crumbs.discussions', 'Discussions'),
                   named_context_url(@context, :context_discussion_topics_url))
 
-        if !@context.account.feature_enabled?(:section_specific_discussions)
+        if @context.is_a?(Group)
           locked_topics, open_topics = @topics.partition do |topic|
             locked = topic.locked? || topic.locked_for?(@current_user)
             locked.is_a?(Hash) ? locked[:can_view] : locked
@@ -539,8 +539,7 @@ class DiscussionTopicsController < ApplicationController
       end
     end
 
-    js_hash[:SECTION_SPECIFIC_DISCUSSIONS_ENABLED] = @context.account.feature_enabled?(:section_specific_discussions)
-
+    js_hash[:SECTION_SPECIFIC_DISCUSSIONS_ENABLED] = !@context.is_a?(Group)
     js_hash[:MAX_NAME_LENGTH_REQUIRED_FOR_ACCOUNT] = AssignmentUtil.name_length_required_for_account?(@context)
     js_hash[:MAX_NAME_LENGTH] = AssignmentUtil.assignment_max_name_length(@context)
     js_hash[:DUE_DATE_REQUIRED_FOR_ACCOUNT] = AssignmentUtil.due_date_required_for_account?(@context)
@@ -719,8 +718,9 @@ class DiscussionTopicsController < ApplicationController
                 :COURSE_ID => @sequence_asset.context.id,
               }
             end
+            @assignment_presenter = AssignmentPresenter.new(@topic.assignment)
             if @topic.for_assignment? && @presenter.allows_speed_grader? &&
-              @topic.assignment.can_view_speed_grader?(@current_user)
+              @assignment_presenter.can_view_speed_grader_link?(@current_user)
               env_hash[:SPEEDGRADER_URL_TEMPLATE] = named_context_url(@topic.assignment.context,
                                                                       :speed_grader_context_gradebook_url,
                                                                       :assignment_id => @topic.assignment.id,
