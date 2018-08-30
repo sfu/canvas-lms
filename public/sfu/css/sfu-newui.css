@@ -48,6 +48,8 @@ body.modal #footer {
 }
 
 .SFUPrivacyNotice.alert {
-    padding: 0.25em 1em;
+    padding: .5em 1em !important;
     color: #695129;
+    background-color: #FBEDE7;
+
 }
