@@ -95,7 +95,7 @@ Rails.configuration.after_initialize do
     DatabaseServer.send_in_each_region(
       IncomingMailProcessor::IncomingMessageProcessor,
       :queue_processors,
-      { run_current_region_asynchronously: true,
+      { run_current_region_asynchronously: false, # SFU MOD - WORKAROUND FOR INCOMING MAIL FAILURES -- https://sfuits.slack.com/archives/C0H376ZQX/p1536961602000100
         singleton: 'IncomingMailProcessor::IncomingMessageProcessor.queue_processors' }
     )
   end
@@ -139,7 +139,7 @@ Rails.configuration.after_initialize do
     DatabaseServer.send_in_each_region(
       BounceNotificationProcessor,
       :process,
-      { run_current_region_asynchronously: true,
+      { run_current_region_asynchronously: false, # SFU MOD - WORKAROUND FOR INCOMING MAIL FAILURES -- https://sfuits.slack.com/archives/C0H376ZQX/p1536961602000100
         singleton: 'BounceNotificationProcessor.process' }
     )
   end
@@ -148,7 +148,7 @@ Rails.configuration.after_initialize do
     DatabaseServer.send_in_each_region(
       NotificationFailureProcessor,
       :process,
-      { run_current_region_asynchronously: true,
+      { run_current_region_asynchronously: false, # SFU MOD - WORKAROUND FOR INCOMING MAIL FAILURES -- https://sfuits.slack.com/archives/C0H376ZQX/p1536961602000100
         singleton: 'NotificationFailureProcessor.process' }
     )
   end
