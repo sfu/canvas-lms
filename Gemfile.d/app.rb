@@ -52,6 +52,7 @@ gem "aws-sdk-sns", '1.1.0', require: false
 gem "aws-sdk-sqs", '1.3.0', require: false
 gem "aws-sdk-core", "3.22.0", require: false
 gem "aws-sigv4", "1.0.2", require: false
+gem "aws-sdk-kms", "1.7.0", require: false
 
 gem 'barby', '0.6.5', require: false
   gem 'rqrcode', '0.10.1', require: false
@@ -126,7 +127,7 @@ gem 'canvas_statsd', '2.0.4'
   gem 'statsd-ruby', '1.4.0', require: false
   gem 'aroi', '0.0.6', require: false
 gem 'gepub', '0.7.0beta4'
-gem 'imperium', '0.4.0', require: false
+gem 'imperium', '0.5.0', require: false
 gem 'academic_benchmarks', '0.0.10', require: false
 
 gem 'graphql', '1.8.3'

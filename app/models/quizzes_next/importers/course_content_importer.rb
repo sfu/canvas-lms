@@ -36,20 +36,51 @@ module QuizzesNext::Importers
 
     def migration_lti!
       lti_assignment_quiz_set = []
-      @migration.imported_migration_items_by_class(Assignment).each do |assignment|
-        next unless assignment.quiz?
-        quiz = assignment.quiz
+      @migration.imported_migration_items_by_class(Quizzes::Quiz).each do |quiz|
+        assignment = quiz_assignment(quiz)
+        next unless assignment
         lti_assignment_quiz_set << [assignment.global_id, quiz.global_id]
         assignment.workflow_state = 'importing'
         assignment.importing_started_at = Time.zone.now
-        assignment.quiz_lti! && assignment.save!
+        if assignment.quiz_lti!
+          assignment.quiz = nil
+          assignment.save!
+        end
 
         # Quizzes will be created in Quizzes.Next app
         # assignment.quiz_lti! breaks relation to quiz. Destroying Quizzes:Quiz wouldn't
-        # mark assginment to be deleted.
+        # mark assignment to be deleted.
         quiz.destroy
       end
       setup_assets_imported(lti_assignment_quiz_set)
+    end
+
+    def quiz_assignment(quiz)
+      assignment_quiz_assignment(quiz) || practice_quiz_assignment(quiz)
+    end
+
+    def assignment_quiz_assignment(quiz)
+      return unless quiz.assignment?
+      quiz.build_assignment unless quiz.assignment
+      quiz.assignment
+    end
+
+    def practice_quiz_assignment(quiz)
+      return unless quiz.quiz_type == 'practice_quiz'
+      assignment = quiz.assignment
+      unless assignment
+        assignment = quiz.context.assignments.build(
+          title: quiz.title,
+          due_at: quiz.due_at
+        )
+        assignment.assignment_group_id = quiz.assignment_group_id
+        assignment.only_visible_to_overrides = quiz.only_visible_to_overrides
+        assignment.saved_by = :quiz
+      end
+      assignment.points_possible = 0
+      assignment.omit_from_final_grade = true
+      assignment.save!
+      assignment
     end
 
     def setup_assets_imported(lti_assignment_quiz_set)

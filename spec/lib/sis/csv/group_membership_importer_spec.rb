@@ -78,6 +78,16 @@ describe SIS::CSV::GroupMembershipImporter do
     expect(importer.errors.last.last).to eq "User U001 doesn't have an enrollment in the course of group G002."
   end
 
+  it "should find active gm first" do
+    g = group_model(context: @account, sis_source_id: "G002")
+    g.group_memberships.create!(user: @user1, workflow_state: 'accepted')
+    g.group_memberships.create!(user: @user1, workflow_state: 'deleted')
+    importer = process_csv_data_cleanly(
+      "group_id,user_id,status",
+      "G002,U001,accepted")
+    expect(importer.errors).to eq []
+  end
+
   it 'should create rollback data' do
     @account.enable_feature!(:refactor_of_sis_imports)
     batch1 = @account.sis_batches.create! { |sb| sb.data = {} }
@@ -96,5 +106,29 @@ describe SIS::CSV::GroupMembershipImporter do
     expect(batch2.roll_back_data.first.updated_workflow_state).to eq 'deleted'
     batch2.restore_states_for_batch
     expect(@account.all_groups.where(sis_source_id: 'G001').take.group_memberships.take.workflow_state).to eq 'accepted'
+  end
+
+  it 'should handle unique constraint errors rolling back data' do
+    batch1 = @account.sis_batches.create! { |sb| sb.data = {} }
+    process_csv_data_cleanly(
+      "group_id,user_id,status",
+      "G001,U001,accepted",
+      "G001,U002,accepted",
+      batch: batch1
+    )
+    batch2 = @account.sis_batches.create! { |sb| sb.data = {} }
+    process_csv_data_cleanly(
+      "group_id,user_id,status",
+      "G001,U001,deleted",
+      "G001,U002,deleted",
+      batch: batch2
+    )
+    group = @account.all_groups.where(sis_source_id: 'G001').take
+    deleted_gm = GroupMembership.where(group_id: group, user_id: @user1).take
+    new_gm = group.group_memberships.create!(:workflow_state => 'accepted', :user => @user1)
+    batch2.restore_states_for_batch
+    expect(batch2.sis_batch_errors.last.message).to include("Couldn't rollback SIS batch data for row")
+    expect(batch2.roll_back_data.where(context_type: "GroupMembership", context_id: deleted_gm.id).take.workflow_state).to eq 'failed'
+    expect(group.group_memberships.where(user_id: @user2).take.workflow_state).to eq 'accepted' # should restore the one still
   end
 end

@@ -32,6 +32,7 @@ class User < ActiveRecord::Base
   include Context
   include ModelCache
   include UserLearningObjectScopes
+  include PermissionsHelper
 
   attr_accessor :previous_id, :menu_data, :gradebook_importer_submissions, :prior_enrollment
 
@@ -1044,7 +1045,7 @@ class User < ActiveRecord::Base
     can :read and can :read_grades and can :read_profile and can :read_as_admin and can :manage and
       can :manage_content and can :manage_files and can :manage_calendar and can :send_messages and
       can :update_avatar and can :manage_feature_flags and can :api_show_user and
-      can :read_email_addresses and can :view_user_logins
+      can :read_email_addresses and can :view_user_logins and can :generate_observer_pairing_code
 
     given { |user| user == self && user.user_can_edit_name? }
     can :rename
@@ -1060,6 +1061,9 @@ class User < ActiveRecord::Base
 
     given { |user| self.check_courses_right?(user, :manage_user_notes) }
     can :create_user_notes and can :read_user_notes
+
+    given { |user| self.check_courses_right?(user, :generate_observer_pairing_code) }
+    can :generate_observer_pairing_code
 
     given {|user| self.check_accounts_right?(user, :manage_user_notes) }
     can :create_user_notes and can :read_user_notes and can :delete_user_notes
@@ -2053,17 +2057,23 @@ class User < ActiveRecord::Base
   end
 
   def manageable_appointment_context_codes
-    @manageable_appointment_context_codes ||= Rails.cache.fetch([self, 'cached_manageable_appointment_codes', ApplicationController.region ].cache_key, expires_in: 1.day) do
+    cache_key = [self, 'cached_manageable_appointment_codes', ApplicationController.region ].cache_key
+    @manageable_appointment_context_codes ||= Rails.cache.fetch(cache_key, expires_in: 1.day) do
       ret = {:full => [], :limited => [], :secondary => []}
-      cached_current_enrollments(preload_courses: true).each do |e|
-        next unless e.course.grants_right?(self, :manage_calendar)
-        if e.course.visibility_limited_to_course_sections?(self)
+      limited_sections = {}
+      manageable_enrollments_by_permission(:manage_calendar).each do |e|
+        next if ret[:full].include?("course_#{e.course_id}")
+        if e.limit_privileges_to_course_section
           ret[:limited] << "course_#{e.course_id}"
-          ret[:secondary] << "course_section_#{e.course_section_id}"
+          limited_sections[e.course_id] ||= []
+          limited_sections[e.course_id] << "course_section_#{e.course_section_id}"
         else
+          ret[:limited].delete("course_#{e.course_id}")
+          limited_sections.delete(e.course_id)
           ret[:full] << "course_#{e.course_id}"
         end
       end
+      ret[:secondary] = limited_sections.values.flatten
       ret
     end
   end
@@ -2248,7 +2258,7 @@ class User < ActiveRecord::Base
 
     return @roles if @roles
     root_account.shard.activate do
-      @roles = Rails.cache.fetch(['user_roles_for_root_account3', self, root_account].cache_key) do
+      @roles = Rails.cache.fetch(['user_roles_for_root_account4', self, root_account].cache_key) do
         user_roles(root_account)
       end
     end
@@ -2819,6 +2829,7 @@ class User < ActiveRecord::Base
       roles << 'admin'
       root_ids = [root_account.id,  Account.site_admin.id]
       roles << 'root_admin' if account_users.any?{|au| root_ids.include?(au.account_id) }
+      roles << 'consortium_admin' if account_users.any?{|au| au.shard != root_account.shard}
     end
     roles
   end
@@ -2842,6 +2853,6 @@ class User < ActiveRecord::Base
   end
 
   def generate_observer_pairing_code
-    observer_pairing_codes.create(expires_at: 1.day.from_now, code: SecureRandom.hex(3))
+    observer_pairing_codes.create(expires_at: 7.days.from_now, code: SecureRandom.base64().gsub(/\W/, '')[0..5])
   end
 end
