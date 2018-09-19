@@ -305,7 +305,7 @@ class User < ActiveRecord::Base
 
   scope :for_course_with_last_login, lambda { |course, root_account_id, enrollment_type|
     # add a field to each user that is the aggregated max from current_login_at and last_login_at from their pseudonyms
-    scope = select("users.*, MAX(current_login_at) as last_login, MAX(current_login_at) IS NULL as login_info_exists").
+    scope = select("users.*, MAX(current_login_at) as last_login").
       # left outer join ensures we get the user even if they don't have a pseudonym
       joins(sanitize_sql([<<-SQL, root_account_id])).where(:enrollments => { :course_id => course })
         LEFT OUTER JOIN #{Pseudonym.quoted_table_name} ON pseudonyms.user_id = users.id AND pseudonyms.account_id = ?
@@ -900,7 +900,7 @@ class User < ActiveRecord::Base
   def delete_enrollments(enrollment_scope=self.enrollments)
     courses_to_update = enrollment_scope.active.distinct.pluck(:course_id)
     Enrollment.suspend_callbacks(:set_update_cached_due_dates) do
-      enrollment_scope.each{ |e| e.destroy }
+      enrollment_scope.preload(:course, :enrollment_state).each{ |e| e.destroy }
     end
     user_ids = enrollment_scope.pluck(:user_id).uniq
     courses_to_update.each do |course|
@@ -1025,6 +1025,8 @@ class User < ActiveRecord::Base
     # check if the user we are given is an admin in one of this user's accounts
     return false unless user
     return true if Account.site_admin.grants_right?(user, sought_right)
+    return self.account.grants_right?(user, sought_right) if self.fake_student? # doesn't have account association
+
     common_shards = associated_shards & user.associated_shards
     search_method = ->(shard) do
       associated_accounts.shard(shard).any?{|a| a.grants_right?(user, sought_right) }
@@ -1816,12 +1818,11 @@ class User < ActiveRecord::Base
             order('submissions.created_at DESC').
             limit(opts[:limit]).to_a
 
-          subs_with_comment_scope = Submission.active.where(user_id: self).for_context_codes(context_codes).
+          submissions += Submission.active.where(user_id: self).for_context_codes(context_codes).
             joins(:assignment).
             where(assignments: {muted: false, workflow_state: 'published'}).
-            where('last_comment_at > ?', opts[:start_at])
-          # have to order by last_updated_at_from_db in another query because of distinct_on in the first one
-          submissions += Submission.from(subs_with_comment_scope).limit(opts[:limit]).order("last_comment_at").select("*").to_a
+            where('last_comment_at > ?', opts[:start_at]).
+            limit(opts[:limit]).order("last_comment_at").to_a
 
           submissions = submissions.sort_by{|t| t.last_comment_at || t.created_at}.reverse
           submissions = submissions.uniq
@@ -1969,7 +1970,7 @@ class User < ActiveRecord::Base
     assignments = Assignment.published.
       for_context_codes(context_codes).
       due_between_with_overrides(now, opts[:end_at]).
-      include_submitted_count
+      include_submitted_count.to_a
 
     if assignments.any?
       if AssignmentOverrideApplicator.should_preload_override_students?(assignments, self, "upcoming_events")
@@ -2678,7 +2679,7 @@ class User < ActiveRecord::Base
   end
 
   def associated_shards(strength = :strong)
-    [Shard.default]
+    strength == :strong ? [Shard.default] : []
   end
 
   def in_region_associated_shards
@@ -2853,6 +2854,11 @@ class User < ActiveRecord::Base
   end
 
   def generate_observer_pairing_code
-    observer_pairing_codes.create(expires_at: 7.days.from_now, code: SecureRandom.base64().gsub(/\W/, '')[0..5])
+    code = nil
+    loop do
+      code = SecureRandom.base64().gsub(/\W/, '')[0..5]
+      break if ObserverPairingCode.active.where(code: code).count == 0
+    end
+    observer_pairing_codes.create(expires_at: 7.days.from_now, code: code)
   end
 end
