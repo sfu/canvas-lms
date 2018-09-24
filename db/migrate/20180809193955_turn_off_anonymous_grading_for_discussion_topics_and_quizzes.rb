@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2016 - present Instructure, Inc.
+# Copyright (C) 2018 - present Instructure, Inc.
 #
 # This file is part of Canvas.
 #
@@ -14,17 +14,13 @@
 #
 # You should have received a copy of the GNU Affero General Public License along
 # with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 
-class CleanseTheSyckness < ActiveRecord::Migration[4.2]
+class TurnOffAnonymousGradingForDiscussionTopicsAndQuizzes < ActiveRecord::Migration[5.1]
   tag :postdeploy
+  disable_ddl_transaction!
 
   def up
-    if User.exists? # don't raise for a fresh install
-      raise "WARNING:\n
-        This migration needs to be run under Rails 4.2.\n"
-    end
-  end
-
-  def down
+    DataFixup::TurnOffAnonymousGradingForDiscussionTopicsAndQuizzes.run
   end
 end
