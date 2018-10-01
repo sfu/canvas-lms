@@ -23,6 +23,7 @@ module InstFS
     end
 
     def login_pixel(user, session, oauth_host)
+      return if session[:oauth2] # don't stomp an existing oauth flow in progress
       if !session[:shown_instfs_pixel] && user && enabled?
         session[:shown_instfs_pixel] = true
         pixel_url = login_pixel_url(token: session_jwt(user, oauth_host))
@@ -113,7 +114,6 @@ module InstFS
     def direct_upload(file_name:, file_object:)
       # example of a call to direct_upload:
       # > res = InstFS.direct_upload(
-      # >   host: "canvas.docker",
       # >   file_name: "a.png",
       # >   file_object: File.open("public/images/a.png")
       # > )
@@ -124,7 +124,7 @@ module InstFS
       data = {}
       data[file_name] = file_object
 
-      response = CanvasHttp.post(url, form_data: data, multipart:true)
+      response = CanvasHttp.post(url, form_data: data, multipart: true, streaming: true)
       if response.class == Net::HTTPCreated
         json_response = JSON.parse(response.body)
         return json_response["instfs_uuid"] if json_response.key?("instfs_uuid")

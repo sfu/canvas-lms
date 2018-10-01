@@ -67,8 +67,8 @@ import SFUCopyrightComplianceNotice from '../sfu_copyright_compliance_notice/SFU
         this.setState({
           itemShown: item
         }, function () {
-          var $messageBox = $(this.refs.messageBox.getDOMNode());
-          var $messageIcon = $(this.refs.messageIcon.getDOMNode());
+          var $messageBox = $(this.messageBox);
+          var $messageIcon = $(this.messageIcon);
 
           // I would use .toggle, but it has too much potential to get all out
           // of whack having to be called twice to force the animation.
@@ -85,10 +85,10 @@ import SFUCopyrightComplianceNotice from '../sfu_copyright_compliance_notice/SFU
 
           // Set the focus to the call to action 'button' if it's there
           // otherwise the text.
-          if (this.refs.callToAction) {
-            this.refs.callToAction.getDOMNode().focus();
+          if (this.callToAction) {
+            this.callToAction.focus();
           } else {
-            this.refs.messageBox.getDOMNode().focus();
+            this.messageBox.focus();
           }
 
         });
@@ -107,7 +107,7 @@ import SFUCopyrightComplianceNotice from '../sfu_copyright_compliance_notice/SFU
 
       renderButton: function () {
         if (this.state.itemShown.key === 'home_page') {
-          return (<a ref="callToAction" onClick={this.chooseHomePage} className="Button Button--primary" aria-label={"Start task: "+this.state.itemShown.title} aria-describedby="ic-wizard-box__message-text">
+          return (<a ref={e => (this.callToAction = e)} onClick={this.chooseHomePage} className="Button Button--primary" aria-label={"Start task: "+this.state.itemShown.title} aria-describedby="ic-wizard-box__message-text">
             {this.state.itemShown.title}
           </a>
           );
@@ -120,7 +120,7 @@ import SFUCopyrightComplianceNotice from '../sfu_copyright_compliance_notice/SFU
                 <input name='_method' type='hidden' value='put' />
                 <input name='authenticity_token' type='hidden' value={$.cookie('_csrf_token')} />
                 <input type='hidden' name='course[event]' value='offer'/>
-                <button ref='callToAction' type='submit' className='Button Button--success'>{this.state.itemShown.title}</button>
+                <button ref={e => (this.callToAction = e)} type='submit' className='Button Button--success'>{this.state.itemShown.title}</button>
               </form>
             );
           } else {
@@ -131,7 +131,7 @@ import SFUCopyrightComplianceNotice from '../sfu_copyright_compliance_notice/SFU
         }
         if (this.state.itemShown.hasOwnProperty('title')) {
           return (
-            <a ref="callToAction" href={this.getHref()} className="Button Button--primary" aria-label={"Start task: "+this.state.itemShown.title} aria-describedby="ic-wizard-box__message-text">
+            <a ref={e => (this.callToAction = e)} href={this.getHref()} className="Button Button--primary" aria-label={"Start task: "+this.state.itemShown.title} aria-describedby="ic-wizard-box__message-text">
               {this.state.itemShown.title}
             </a>
           );
@@ -164,10 +164,10 @@ import SFUCopyrightComplianceNotice from '../sfu_copyright_compliance_notice/SFU
             </h1>
             <div className='ic-wizard-box__message'>
               <div className='ic-wizard-box__message-layout'>
-                <div ref='messageIcon' className='ic-wizard-box__message-icon ic-wizard-box__message-icon--is-fired'>
+                <div ref={e => (this.messageIcon = e)} className='ic-wizard-box__message-icon ic-wizard-box__message-icon--is-fired'>
                   <i className={this.state.itemShown.iconClass}></i>
                 </div>
-                <div ref='messageBox' tabIndex='-1' className='ic-wizard-box__message-inner ic-wizard-box__message-inner--is-fired'>
+                <div ref={e => (this.messageBox = e)} tabIndex='-1' className='ic-wizard-box__message-inner ic-wizard-box__message-inner--is-fired'>
                   <p className='ic-wizard-box__message-text' id='ic-wizard-box__message-text'>
                     {this.state.itemShown.text}
                   </p>
