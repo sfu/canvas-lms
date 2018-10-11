@@ -75,6 +75,7 @@ class FavoritesController < ApplicationController
       courses.reject!{|c| mc_ids.include?(c.id)}
     end
 
+    all_precalculated_permissions = @current_user.precalculate_permissions_for_courses(courses, [:read_sis, :manage_sis])
     render :json => courses.map { |course|
       enrollments = nil
       unless Array(params[:exclude]).include?('enrollments')
@@ -85,7 +86,8 @@ class FavoritesController < ApplicationController
         end
       end
 
-      course_json(course, @current_user, session, includes, enrollments)
+      course_json(course, @current_user, session, includes, enrollments,
+        precalculated_permissions: all_precalculated_permissions&.dig(course.global_id))
     }
   end
 
@@ -188,9 +190,8 @@ class FavoritesController < ApplicationController
   def remove_favorite_course
     # allow removing a Favorite whose context object no longer exists
     # but also allow referencing by sis id, if possible
-    courses = api_find_all(Course, [params[:id]])
-    course_id = Shard.relative_id_for(courses.any? ? courses.first.id : params[:id], Shard.current, @current_user.shard)
-    fave = @current_user.favorites.where(:context_type => 'Course', :context_id => course_id).first
+    course = api_find(Course, params[:id])
+    fave = @current_user.favorites.where(:context_type => 'Course', :context_id => course.id).first
     if fave
       result = favorite_json(fave, @current_user, session)
       fave.destroy
@@ -217,9 +218,8 @@ class FavoritesController < ApplicationController
   #       -H 'Authorization: Bearer <ACCESS_TOKEN>'
   #
   def remove_favorite_groups
-    group = api_find_all(Group, [params[:id]])
-    group_id= Shard.relative_id_for(group.any? ? group.first.id : params[:id], Shard.current, @current_user.shard)
-    fave = @current_user.favorites.where(:context_type => 'Group', :context_id => group_id).first
+    group = api_find(Group, params[:id])
+    fave = @current_user.favorites.where(:context_type => 'Group', :context_id => group.id).first
     if fave
       result = favorite_json(fave, @current_user, session)
       fave.destroy
