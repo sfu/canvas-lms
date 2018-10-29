@@ -42,15 +42,10 @@ class CourseForMenuPresenter
       courseCode: course.course_code,
       assetString: course.asset_string,
       href: course_path(course, invitation: course.read_attribute(:invitation)),
-      informStudentsOfOverdueSubmissions: course.feature_enabled?(:new_gradebook),
       term: term || nil,
       subtitle: subtitle,
       id: course.id,
       image: course.feature_enabled?(:course_card_images) ? course.image : nil,
-      imagesEnabled: course.feature_enabled?(:course_card_images),
-      rights: {
-        can_manage: course.grants_right?(@user, :read_as_admin)
-      },
       position: (@context && @context.feature_enabled?(:dashcard_reordering)) ? @user.dashboard_positions[course.asset_string] : nil,
       links: available_section_tabs.map do |tab|
         presenter = SectionTabPresenter.new(tab, course)

@@ -109,7 +109,7 @@ module Context
   end
 
   def active_record_types
-    @active_record_types ||= Rails.cache.fetch(['active_record_types', self].cache_key) do
+    @active_record_types ||= Rails.cache.fetch(['active_record_types2', self].cache_key) do
       res = {}
       ActiveRecord::Base.uncached do
         res[:files] = self.respond_to?(:attachments) && self.attachments.active.exists?

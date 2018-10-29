@@ -301,8 +301,9 @@ class Course < ActiveRecord::Base
       EnrollmentState.send_later_if_production(:invalidate_states_for_course_or_section, self) if self.enrollments.exists?
       # if the course date settings have been changed, we'll end up reprocessing all the access values anyway, so no need to queue below for other setting changes
     end
-    if @changed_settings
-      changed_keys = (@changed_settings & [:restrict_student_future_view, :restrict_student_past_view])
+    if saved_change_to_account_id? || @changed_settings
+      state_settings = [:restrict_student_future_view, :restrict_student_past_view]
+      changed_keys = saved_change_to_account_id? ? state_settings : (@changed_settings & state_settings)
       if changed_keys.any?
         EnrollmentState.send_later_if_production(:invalidate_access_for_course, self, changed_keys)
       end
@@ -988,8 +989,12 @@ class Course < ActiveRecord::Base
           if enrollment_info.any?
             data = SisBatchRollBackData.build_dependent_data(sis_batch: sis_batch, contexts: enrollment_info, updated_state: 'completed')
             Enrollment.where(:id => enrollment_info.map(&:id)).update_all(:workflow_state => 'completed', :completed_at => Time.now.utc)
-            EnrollmentState.where(:enrollment_id => enrollment_info.map(&:id)).
-              update_all(["state = ?, state_is_current = ?, access_is_current = ?, lock_version = lock_version + 1", 'completed', true, false])
+
+            EnrollmentState.transaction do
+              locked_ids = EnrollmentState.where(:enrollment_id => enrollment_info.map(&:id)).lock(:no_key_update).order(:enrollment_id).pluck(:enrollment_id)
+              EnrollmentState.where(:enrollment_id => locked_ids).
+                update_all(["state = ?, state_is_current = ?, access_is_current = ?, lock_version = lock_version + 1", 'completed', true, false])
+            end
             EnrollmentState.send_later_if_production(:process_states_for_ids, enrollment_info.map(&:id)) # recalculate access
           end
 
@@ -1004,8 +1009,11 @@ class Course < ActiveRecord::Base
             if enrollment_info.any?
               data = SisBatchRollBackData.build_dependent_data(sis_batch: sis_batch, contexts: enrollment_info, updated_state: 'deleted')
               Enrollment.where(:id => enrollment_info.map(&:id)).update_all(:workflow_state => 'deleted')
-              EnrollmentState.where(:enrollment_id => enrollment_info.map(&:id)).
-                update_all(["state = ?, state_is_current = ?, lock_version = lock_version + 1", 'deleted', true])
+              EnrollmentState.transaction do
+                locked_ids = EnrollmentState.where(:enrollment_id => enrollment_info.map(&:id)).lock(:no_key_update).order(:enrollment_id).pluck(:enrollment_id)
+                EnrollmentState.where(:enrollment_id => locked_ids).
+                  update_all(["state = ?, state_is_current = ?, lock_version = lock_version + 1", 'deleted', true])
+              end
             end
             User.send_later_if_production(:update_account_associations, user_ids)
           end
@@ -2213,6 +2221,7 @@ class Course < ActiveRecord::Base
               new_folder_id = merge_mapped_id(file.folder)
             end
             new_file.folder_id = new_folder_id
+            new_file.need_notify = false
             new_file.save_without_broadcasting!
             cm.add_imported_item(new_file)
             cm.add_imported_item(new_file.folder, key: new_file.folder.id)
@@ -2238,7 +2247,7 @@ class Course < ActiveRecord::Base
       :allow_student_discussion_topics, :allow_student_discussion_editing, :lock_all_announcements,
       :organize_epub_by_content_type, :show_announcements_on_home_page,
       :home_page_announcement_limit, :enable_offline_web_export,
-      :restrict_student_future_view, :restrict_student_past_view
+      :restrict_student_future_view, :restrict_student_past_view, :restrict_enrollments_to_course_dates
     ]
   end
 
@@ -3216,8 +3225,7 @@ class Course < ActiveRecord::Base
   end
 
   def moderators
-    active_instructors = users.merge(Enrollment.active_or_pending.of_instructor_type)
-    active_instructors.select { |user| grants_right?(user, :select_final_grade) }
+    participating_instructors.distinct.select { |user| grants_right?(user, :select_final_grade) }
   end
 
   def moderated_grading_max_grader_count
