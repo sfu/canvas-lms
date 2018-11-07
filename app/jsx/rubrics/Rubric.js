@@ -24,6 +24,7 @@ import I18n from 'i18n!edit_rubric'
 
 import Criterion from './Criterion'
 
+import { getSavedComments } from './helpers'
 import { rubricShape, rubricAssessmentShape, rubricAssociationShape } from './types'
 import { roundIfWhole } from './Points'
 
@@ -52,7 +53,6 @@ const Rubric = (props) => {
   const priorData = _.get(rubricAssessment, 'data', [])
   const byCriteria = _.keyBy(priorData, (ra) => ra.criterion_id)
   const criteriaById = _.keyBy(rubric.criteria, (c) => c.id)
-  const allComments = _.get(rubricAssociation, 'summary_data.saved_comments', {})
   const hidePoints = _.get(rubricAssociation, 'hide_points', false)
   const freeForm = rubric.free_form_criterion_comments
 
@@ -93,7 +93,7 @@ const Rubric = (props) => {
         freeForm={freeForm}
         isSummary={isSummary}
         onAssessmentChange={assessing ? onCriteriaChange(criterion.id) : undefined}
-        savedComments={allComments[criterion.id]}
+        savedComments={getSavedComments(rubricAssociation, criterion.id)}
         hidePoints={hidePoints}
         hasPointsColumn={showPointsColumn()}
       />
@@ -106,13 +106,12 @@ const Rubric = (props) => {
   const hideScoreTotal = _.get(rubricAssociation, 'hide_score_total') === true
   const noScore = _.get(rubricAssociation, 'score') === null
   const showTotalPoints = !hidePoints && !hideScoreTotal
-  const criteriaClass = (isSummary || !showPointsColumn()) ? 'rubric-larger-criteria' : undefined
   const maxRatings = _.max(rubric.criteria.map((c) => c.ratings.length))
   const minSize = () => {
     if (isSummary || flexWidth) return {}
     else {
-      const ratingCorrection = freeForm ? 0 : 7.5 * maxRatings
-      return { 'minWidth': `${30 + (ratingCorrection)}rem` }
+      const ratingCorrection = freeForm ? 15 : 7.5 * maxRatings
+      return { 'minWidth': `${15 + ratingCorrection}rem` }
     }
   }
 
@@ -121,13 +120,13 @@ const Rubric = (props) => {
       <Table caption={rubric.title}>
         <thead>
           <tr>
-            <th scope="col" className={criteriaClass}>
+            <th scope="col" className="rubric-criteria">
               {I18n.t('Criteria')}
             </th>
             <th scope="col" className="ratings">{I18n.t('Ratings')}</th>
             {
               showPointsColumn() && (
-                <th scope="col">{I18n.t('Pts')}</th>
+                <th className="rubric-points" scope="col">{I18n.t('Pts')}</th>
               )
             }
           </tr>

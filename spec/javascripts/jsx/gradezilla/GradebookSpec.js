@@ -203,6 +203,7 @@ test('renders the StatusesModal', function () {
   const renderStatusesModalStub = sandbox.stub(gradebook, 'renderStatusesModal');
   gradebook.gridReady.reject();
   gradebook.initialize();
+  loaderPromises.gotContextModules.resolve([])
   loaderPromises.gotCustomColumns.resolve([]);
   loaderPromises.gotAssignmentGroups.resolve([]);
   loaderPromises.gotStudentIds.resolve({ user_ids: [] });
@@ -3545,7 +3546,8 @@ test('StatusesModal is mounted on renderStatusesModal', function () {
   const statusModal = this.gradebook.renderStatusesModal();
   statusModal.open();
   clock.tick(500); // wait for Modal to transition open
-  const header = document.querySelector('h3');
+
+  const header = document.querySelector('[aria-label="Statuses"][role="dialog"] h2');
   equal(header.innerText, 'Statuses');
 
   const statusesModalMountPoint = document.querySelector("[data-component='StatusesModal']");

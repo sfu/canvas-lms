@@ -2,7 +2,8 @@ require [
   'jquery'
   'underscore'
   'Backbone'
-  'react'
+  'react',
+  'react-dom'
   'sfu_course_form/compiled/models/User'
   'sfu_course_form/compiled/models/Term'
   'sfu_course_form/compiled/models/Course'
@@ -16,7 +17,7 @@ require [
   'sfu_course_form/compiled/views/sandboxes/SandboxListView',
   'jsx/sfu_copyright_compliance_notice/SFUCopyrightComplianceNotice',
   'jqueryui/autocomplete'
-], ($, _, Backbone, React, User, Term, Course, AmaintTermList, TermList, TermListView, CourseList, CourseListView, SelectableCourseListView, SandboxList, SandboxListView, SFUCopyrightComplianceNotice) ->
+], ($, _, Backbone, React, ReactDOM, User, Term, Course, AmaintTermList, TermList, TermListView, CourseList, CourseListView, SelectableCourseListView, SandboxList, SandboxListView, SFUCopyrightComplianceNotice) ->
 
   user = {}
   currentUser = {}
@@ -258,7 +259,7 @@ require [
   $(document).ready ->
 
 
-    React.render(
+    ReactDOM.render(
       React.createElement(
         SFUCopyrightComplianceNotice,
         { className: 'sfu-ic-wizard-box__message-text__copyright_compliance' }
