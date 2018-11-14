@@ -1,4 +1,5 @@
 import React from 'react'
+import PropTypes from 'prop-types'
 
 const SFUGoogleDocsStudentPrivacyNotice = ({ alertStyle }) => {
   const alertClassName = `SFUPrivacyNotice ${alertStyle}`
@@ -16,7 +17,7 @@ const SFUGoogleDocsStudentPrivacyNotice = ({ alertStyle }) => {
 }
 
 SFUGoogleDocsStudentPrivacyNotice.propTypes = {
-  alertStyle: React.PropTypes.string.isRequired
+  alertStyle: PropTypes.string.isRequired
 }
 
 const SFUPrivacyNotice = ({ usage, alertStyle }) => {
@@ -70,8 +71,8 @@ const SFUPrivacyNotice = ({ usage, alertStyle }) => {
 }
 
 SFUPrivacyNotice.propTypes = {
-  alertStyle: React.PropTypes.string.isRequired,
-  usage: React.PropTypes.string.isRequired
+  alertStyle: PropTypes.string.isRequired,
+  usage: PropTypes.string.isRequired
 }
 
 export default SFUPrivacyNotice
