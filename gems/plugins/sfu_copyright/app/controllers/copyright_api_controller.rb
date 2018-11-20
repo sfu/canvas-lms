@@ -25,8 +25,8 @@ class CopyrightApiController < ApplicationController
     end
 
     # Randomly select a course and instructor
-    course = courses.order('RANDOM()').first
-    teacher = course.teachers.order('RANDOM()').first
+    course = courses.order(Arel.sql('RANDOM()')).first
+    teacher = course.teachers.order(Arel.sql('RANDOM()')).first
 
     # Determine the SFU Computing ID and email address of the instructor
     # NOTE: The course could (very rarely) be teacher-less

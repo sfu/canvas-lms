@@ -1,10 +1,11 @@
 import React from 'react'
+import PropTypes from 'prop-types'
 import ReactModal from 'react-modal'
 import SFUCopyrightComplianceNotice from './SFUCopyrightComplianceNotice'
 
 class SFUCopyrightComplianceModalDialog extends React.Component {
 
-  constructor (props) {
+  constructor(props) {
     super(props)
     this.state = {
       modalIsOpen: this.props.modalIsOpen
@@ -14,18 +15,18 @@ class SFUCopyrightComplianceModalDialog extends React.Component {
     this.publishCourse = this.publishCourse.bind(this)
   }
 
-  componentWillReceiveProps (nextProps) {
+  componentWillReceiveProps(nextProps) {
     this.setState({
       modalIsOpen: nextProps.modalIsOpen
     });
   }
 
-  openModal (e) {
+  openModal(e) {
     e.preventDefault();
-    this.setState({modalIsOpen: true});
+    this.setState({ modalIsOpen: true });
   }
 
-  closeModal (e) {
+  closeModal(e) {
     if (e) {
       e.preventDefault();
     }
@@ -34,7 +35,7 @@ class SFUCopyrightComplianceModalDialog extends React.Component {
     });
   }
 
-  publishCourse (e) {
+  publishCourse(e) {
     if (e) {
       e.preventDefault();
     }
@@ -45,7 +46,7 @@ class SFUCopyrightComplianceModalDialog extends React.Component {
     });
   }
 
-  render () {
+  render() {
     return (
       <ReactModal
         contentLabel="Copyright Compliance Notice"
@@ -85,8 +86,8 @@ class SFUCopyrightComplianceModalDialog extends React.Component {
 }
 
 SFUCopyrightComplianceModalDialog.propTypes = {
-  modalIsOpen: React.PropTypes.bool.isRequired,
-  formId: React.PropTypes.string.isRequired
+  modalIsOpen: PropTypes.bool.isRequired,
+  formId: PropTypes.string.isRequired
 }
 
 export default SFUCopyrightComplianceModalDialog

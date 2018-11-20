@@ -1,9 +1,10 @@
 import React from 'react'
+import PropTypes from 'prop-types'
 import SFUCopyrightComplianceNoticeMoreInfo from './SFUCopyrightComplianceNoticeMoreInfo'
 
 class SFUCopyrightComplianceNotice extends React.Component {
 
-  constructor (props) {
+  constructor(props) {
     super(props)
     this.state = {
       show_more: props.show_more
@@ -11,11 +12,11 @@ class SFUCopyrightComplianceNotice extends React.Component {
     this.handleClick = this.handleClick.bind(this)
   }
 
-  handleClick () {
+  handleClick() {
     this.setState({ show_more: !this.state.show_more })
   }
 
-  showMoreMaybe () {
+  showMoreMaybe() {
     if (this.state.show_more) {
       return <SFUCopyrightComplianceNoticeMoreInfo />
     }
@@ -26,7 +27,7 @@ class SFUCopyrightComplianceNotice extends React.Component {
     )
   }
 
-  render () {
+  render() {
     return (
       <div>
         <p className={this.props.className}>
@@ -41,8 +42,8 @@ class SFUCopyrightComplianceNotice extends React.Component {
 }
 
 SFUCopyrightComplianceNotice.propTypes = {
-  show_more: React.PropTypes.bool,
-  className: React.PropTypes.string
+  show_more: PropTypes.bool,
+  className: PropTypes.string
 }
 
 SFUCopyrightComplianceNotice.defaultProps = {
