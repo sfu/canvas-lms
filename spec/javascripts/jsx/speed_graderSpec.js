@@ -27,7 +27,9 @@ import fakeENV from 'helpers/fakeENV';
 import natcompare from 'compiled/util/natcompare';
 import numberHelper from 'jsx/shared/helpers/numberHelper';
 import userSettings from 'compiled/userSettings';
-import {unescape} from 'str/htmlEscape';
+import htmlEscape from 'str/htmlEscape';
+
+const {unescape} = htmlEscape;
 
 import 'jquery.ajaxJSON';
 
@@ -55,30 +57,6 @@ function setupFixtures (domStrings = '') {
 function teardownFixtures() {
   // fast remove
   while (fixtures.firstChild) fixtures.removeChild(fixtures.firstChild);
-}
-
-function waitForElement(query, timeout = 1000) {
-  const queryFn = typeof query === 'function' ?
-    query :
-    () => document.querySelector(query)
-
-  return new Promise((resolve, reject) => {
-    let timeoutId
-
-    const intervalId = setInterval(() => {
-      const $el = queryFn()
-      if ($el) {
-        clearInterval(intervalId)
-        clearTimeout(timeoutId)
-        resolve($el)
-      }
-    }, 10)
-
-    timeoutId = setTimeout(() => {
-      clearInterval(intervalId)
-      reject(new Error('Timeout waiting for element'))
-    }, timeout)
-  })
 }
 
 QUnit.module('SpeedGrader#showDiscussion', {
@@ -680,6 +658,7 @@ QUnit.module('SpeedGrader#handleGradeSubmit', {
     sandbox.spy($.fn, 'append');
     this.originalWindowJSONData = window.jsonData;
     setupFixtures(`
+      <div id="iframe_holder"></div>
       <div id="multiple_submissions"></div>
       <a class="update_submission_grade_url" href="my_url.com" title="POST"></a>
     `);
@@ -1114,6 +1093,8 @@ QUnit.module('handleSubmissionSelectionChange', (hooks) => {
     submissions = `/submissions/{{submissionId}}`;
     params = `?download={{attachmentId}}`;
     setupFixtures(`
+      <div id="iframe_holder"></div>
+      <div id="react_pill_container"></div>
       <div id='grade_container'>
         <input type='text' id='grading-box-extended' />
       </div>
@@ -2425,6 +2406,7 @@ QUnit.module('SpeedGrader', function(suiteHooks) {
 
         setupFixtures(`
           <div id="combo_box_container"></div>
+          <div id="react_pill_container"></div>
           <div class="comment" id="comment_fixture" style="display: none;">
             <button class="submit_comment_button"/></button>
           </div>
@@ -2656,6 +2638,10 @@ QUnit.module('SpeedGrader', function(suiteHooks) {
           RUBRIC_ASSESSMENT: {}
         })
 
+        setupFixtures(`
+          <div id="react_pill_container"></div>
+        `);
+
         SpeedGrader.setup()
         window.jsonData = windowJsonData
         SpeedGrader.EG.jsonReady()
@@ -2693,6 +2679,9 @@ QUnit.module('SpeedGrader', function(suiteHooks) {
             <span class="screenreader-only">Delete comment</span>
           </a>
           <div class="comment_attachments"></div>
+          <a href="#" class="play_comment_link media-comment" style="display:none;" aria-label="Play media comment">
+            click to view
+          </a>
         </div>
       `;
 
@@ -2719,7 +2708,7 @@ QUnit.module('SpeedGrader', function(suiteHooks) {
           hideStudentNames: true
         };
 
-        setupFixtures();
+        setupFixtures(`<div id="right_side"></div>`);
         SpeedGrader.setup()
         window.jsonData = windowJsonData
         SpeedGrader.EG.jsonReady()
@@ -2782,6 +2771,42 @@ QUnit.module('SpeedGrader', function(suiteHooks) {
         const renderedSecond = SpeedGrader.EG.renderComment(secondStudentComment, commentRenderingOptions);
         strictEqual(renderedSecond.find('.author_name').text(), 'Student 2');
       });
+
+      QUnit.module('comment with a media object attached', mediaCommentHooks => {
+        let studentComment
+
+        mediaCommentHooks.beforeEach(() => {
+          studentComment = SpeedGrader.EG.currentStudent.submission.submission_comments[1]
+          studentComment.media_comment_id = 1
+          studentComment.media_comment_type = 'video'
+
+          sandbox.stub($.fn, 'mediaComment')
+        })
+
+        mediaCommentHooks.afterEach(() => {
+          $.fn.mediaComment.restore()
+
+          delete studentComment.media_comment_id
+          delete studentComment.media_comment_type
+        })
+
+        test('shows the play_comment_link element when rendered', () => {
+          const renderedComment = SpeedGrader.EG.renderComment(studentComment, commentRenderingOptions)
+          renderedComment.appendTo('#right_side')
+
+          ok(renderedComment.find('.play_comment_link').is(':visible'))
+        })
+
+        test('passes the clicked element to the comment dialog when clicked', () => {
+          const renderedComment = SpeedGrader.EG.renderComment(studentComment, commentRenderingOptions)
+          renderedComment.appendTo('#right_side')
+          renderedComment.find('.play_comment_link').click()
+
+          const playCommentLink = $(renderedComment).find('.play_comment_link').get(0)
+          const [,,,openingElement] = $.fn.mediaComment.firstCall.args
+          strictEqual(openingElement, playCommentLink)
+        })
+      })
     })
 
     QUnit.module('#jsonReady', contextHooks => {
@@ -3102,6 +3127,7 @@ QUnit.module('SpeedGrader', function(suiteHooks) {
         submissions = `/anonymous_submissions/{{anonymousId}}`;
         params = `?download={{attachmentId}}`;
         setupFixtures(`
+          <div id="react_pill_container"></div>
           <div id="full_width_container"></div>
           <div id="submission_file_hidden">
             <a

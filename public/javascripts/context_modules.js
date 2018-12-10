@@ -22,7 +22,7 @@ import PublishCloud from 'jsx/shared/PublishCloud'
 import ModuleDuplicationSpinner from 'jsx/modules/components/ModuleDuplicationSpinner'
 import React from 'react'
 import ReactDOM from 'react-dom'
-import * as MoveItem from 'jsx/move_item'
+import {reorderElements, renderTray} from 'jsx/move_item'
 import PublishableModuleItem from 'compiled/models/PublishableModuleItem'
 import PublishIconView from 'compiled/views/PublishIconView'
 import LockIconView from 'compiled/views/LockIconView'
@@ -1275,13 +1275,13 @@ function scrollTo ($thing, time = 500) {
           $container[0].appendChild(item)
 
           const order = data.context_module.content_tags.map(item => item.content_tag.id)
-          MoveItem.reorderElements(order, $container[0], id => `#context_module_item_${id}`)
+          reorderElements(order, $container[0], id => `#context_module_item_${id}`)
           $container.sortable('enable').sortable('refresh')
         },
         focusOnExit: () => currentItem.querySelector('.al-trigger'),
       }
 
-      MoveItem.renderTray(moveTrayProps, document.getElementById('not_right_side'))
+      renderTray(moveTrayProps, document.getElementById('not_right_side'))
     })
 
     $('.move_module_link').on('click keyclick', function (event) {
@@ -1305,13 +1305,13 @@ function scrollTo ($thing, time = 500) {
         formatSaveUrl: () => `${ENV.CONTEXT_URL_ROOT}/modules/reorder`,
         onMoveSuccess: res => {
           const container = document.querySelector('#context_modules.ui-sortable')
-          MoveItem.reorderElements(res.data.map(item => item.context_module.id), container, (id) => `#context_module_${id}`)
+          reorderElements(res.data.map(item => item.context_module.id), container, (id) => `#context_module_${id}`)
           $(container).sortable('refresh')
         },
         focusOnExit: () => currentModule.querySelector('.al-trigger'),
       }
 
-      MoveItem.renderTray(moveTrayProps, document.getElementById('not_right_side'))
+      renderTray(moveTrayProps, document.getElementById('not_right_side'))
     })
 
     $('.move_module_contents_link').on('click keyclick', function (event) {
@@ -1334,6 +1334,9 @@ function scrollTo ($thing, time = 500) {
         id: item.getAttribute('id').substring('context_module_item_'.length),
         title: item.querySelector('.title').textContent.trim(),
       }))
+      if (items.length === 0) {
+        return
+      }
       items[0].groupId = currentModule.getAttribute('id').substring('context_module_'.length)
 
       const moveTrayProps = {
@@ -1355,14 +1358,14 @@ function scrollTo ($thing, time = 500) {
           })
 
           const order = data.context_module.content_tags.map(item => item.content_tag.id)
-          MoveItem.reorderElements(order, $container[0], id => `#context_module_item_${id}`)
+          reorderElements(order, $container[0], id => `#context_module_item_${id}`)
 
           $container.sortable('enable').sortable('refresh')
         },
         focusOnExit: () => currentModule.querySelector('.al-trigger'),
       }
 
-      MoveItem.renderTray(moveTrayProps, document.getElementById('not_right_side'))
+      renderTray(moveTrayProps, document.getElementById('not_right_side'))
     })
 
     $('.drag_and_drop_warning').on('focus', function (event) {
