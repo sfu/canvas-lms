@@ -247,6 +247,7 @@ export default class TopicView extends Backbone.View {
       const modelData = this.model.toJSON()
       modelData.showBoxReplyLink = true
       modelData.root = true
+      modelData.title = ENV.DISCUSSION.TOPIC.TITLE
       modelData.isForMainDiscussion = true
       const html = replyTemplate(modelData)
       this.$('#discussion_topic').append(html)

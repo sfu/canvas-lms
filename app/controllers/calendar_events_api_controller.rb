@@ -268,7 +268,6 @@ class CalendarEventsApiController < ApplicationController
 
   before_action :require_user, :except => %w(public_feed index)
   before_action :get_calendar_context, :only => :create
-  before_action :require_context, :only => [:user_index]
   before_action :require_user_or_observer, :only => [:user_index]
   before_action :require_authorization, :only => %w(index user_index)
 
@@ -758,9 +757,9 @@ class CalendarEventsApiController < ApplicationController
 
         calendar = Icalendar::Calendar.new
         # to appease Outlook
-        calendar.custom_property("METHOD", "PUBLISH")
-        calendar.custom_property("X-WR-CALNAME", name)
-        calendar.custom_property("X-WR-CALDESC", description)
+        calendar.append_custom_property("METHOD", "PUBLISH")
+        calendar.append_custom_property("X-WR-CALNAME", name)
+        calendar.append_custom_property("X-WR-CALDESC", description)
 
         # scan the descriptions for attachments
         preloaded_attachments = api_bulk_load_user_content_attachments(@events.map(&:description))

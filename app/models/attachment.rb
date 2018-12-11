@@ -862,15 +862,17 @@ class Attachment < ActiveRecord::Base
     end
   end
 
+  class FailedResponse < StandardError; end
   # GETs this attachment's public_url and streams the response to the
   # passed block; this is a helper function for #open
   # (you should call #open instead of this)
   private def streaming_download(dest=nil, &block)
     retries ||= 0
     CanvasHttp.get(public_url) do |response|
+      raise FailedResponse.new("Expected 200, got #{response.code}: #{response.body}") unless response.code.to_i == 200
       response.read_body(dest, &block)
     end
-  rescue Net::ReadTimeout => e
+  rescue FailedResponse, Net::ReadTimeout => e
     if (retries += 1) < Setting.get(:streaming_download_retries, '5').to_i
       Canvas::Errors.capture_exception(:attachment, e)
       retry
@@ -1833,10 +1835,6 @@ class Attachment < ActiveRecord::Base
 
   def canvadoc_available?
     canvadoc.try(:available?)
-  end
-
-  def view_inline_ping_url
-    "/#{context_url_prefix}/files/#{self.id}/inline_view"
   end
 
   def canvadoc_url(user, opts={})
