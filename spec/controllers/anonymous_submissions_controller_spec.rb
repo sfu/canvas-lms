@@ -124,4 +124,231 @@ RSpec.describe AnonymousSubmissionsController do
       expect(assigns[:visible_rubric_assessments]).to eq [@assessment]
     end
   end
+
+  context 'originality report' do
+    let(:account) { Account.default }
+    let(:course) do
+      course = account.courses.create!
+      course.account.enable_service(:avatars)
+      course.enroll_teacher(teacher, enrollment_state: 'active')
+      course.enroll_student(student, enrollment_state: 'active')
+      course
+    end
+
+    let(:teacher) { User.create! }
+    let(:student) { User.create! }
+    let(:assignment) { course.assignments.create!(title: 'test assignment') }
+    let(:attachment) { student.attachments.create!(filename: "submission.doc", uploaded_data: default_uploaded_data) }
+    let(:submission) { assignment.submit_homework(student, attachments: [attachment]) }
+    let!(:originality_report) do
+      OriginalityReport.create!(
+        attachment: attachment,
+        submission: submission,
+        originality_score: 0.5,
+        originality_report_url: 'http://www.instructure.com'
+      )
+    end
+
+    before { user_session(teacher) }
+
+    describe 'GET originality_report' do
+      it 'redirects to the originality report URL if it exists' do
+        get 'originality_report', params: {
+          course_id: assignment.context_id,
+          assignment_id: assignment.id,
+          anonymous_id: submission.anonymous_id,
+          asset_string: attachment.asset_string
+        }
+        expect(response).to redirect_to originality_report.originality_report_url
+      end
+
+      it 'shows a notice if no URL is present for the OriginalityReport' do
+        originality_report.update!(originality_report_url: nil)
+        get 'originality_report', params: {
+          course_id: assignment.context_id,
+          assignment_id: assignment.id,
+          anonymous_id: submission.anonymous_id,
+          asset_string: attachment.asset_string
+        }
+        expect(flash[:error]).to be_present
+      end
+
+      it 'redirects to SpeedGrader if no URL is present for the OriginalityReport' do
+        originality_report.update!(originality_report_url: nil)
+        get 'originality_report', params: {
+          course_id: assignment.context_id,
+          assignment_id: assignment.id,
+          anonymous_id: submission.anonymous_id,
+          asset_string: attachment.asset_string
+        }
+
+        redirect_url = speed_grader_course_gradebook_url(
+          assignment.course,
+          assignment_id: assignment.id,
+          anchor: "{\"anonymous_id\":\"#{submission.anonymous_id}\"}"
+        )
+        expect(response).to redirect_to(redirect_url)
+      end
+
+      it 'returns an error if the assignment does not exist' do
+        get 'originality_report', params: {
+          course_id: assignment.context_id,
+          assignment_id: -1,
+          anonymous_id: '{ user_id }',
+          asset_string: attachment.asset_string
+        }
+        expect(response).to have_http_status(:not_found)
+      end
+
+      it 'returns an error if anonymous_id is not valid' do
+        get 'originality_report', params: {
+          course_id: assignment.context_id,
+          assignment_id: assignment.id,
+          anonymous_id: '{ user_id }',
+          asset_string: attachment.asset_string
+        }
+        expect(response).to have_http_status(:bad_request)
+      end
+
+      it "returns unauthorized for users who can't read submission" do
+        unauthorized_user = User.create
+        user_session(unauthorized_user)
+        get 'originality_report', params: {
+          course_id: assignment.context_id,
+          assignment_id: assignment.id,
+          anonymous_id: submission.anonymous_id,
+          asset_string: attachment.asset_string
+        }
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    describe 'POST resubmit_to_turnitin' do
+      it 'returns an error if assignment_id is not an integer' do
+        post 'resubmit_to_turnitin', params: {
+          course_id: assignment.context_id,
+          assignment_id: 'assignment-id',
+          anonymous_id: submission.anonymous_id
+        }
+        expect(response).to have_http_status(:bad_request)
+      end
+
+      it "returns an error if the assignment does not exist" do
+        post 'resubmit_to_turnitin', params: {
+          course_id: assignment.context_id,
+          assignment_id: -1,
+          anonymous_id: submission.anonymous_id,
+        }
+        expect(response).to have_http_status(:not_found)
+      end
+
+      it "returns an error if the anonymous_id does not exist" do
+        post 'resubmit_to_turnitin', params: {
+          course_id: assignment.context_id,
+          assignment_id: assignment.id,
+          anonymous_id: '!?!?!',
+        }
+        expect(response).to have_http_status(:bad_request)
+      end
+
+      it "emits a 'plagiarism_resubmit' live event if originality report exists" do
+        expect(Canvas::LiveEvents).to receive(:plagiarism_resubmit)
+        post 'resubmit_to_turnitin', params: {
+          course_id: assignment.context_id,
+          assignment_id: assignment.id,
+          anonymous_id: submission.anonymous_id
+        }
+      end
+
+      it "emits a 'plagiarism_resubmit' live event if originality report does not exist" do
+        originality_report.destroy!
+        expect(Canvas::LiveEvents).to receive(:plagiarism_resubmit)
+        post 'resubmit_to_turnitin', params: {
+          course_id: assignment.context_id,
+          assignment_id: assignment.id,
+          anonymous_id: submission.anonymous_id
+        }
+      end
+    end
+  end
+
+  describe 'GET turnitin_report' do
+    let(:course) { Course.create! }
+    let(:student) { course.enroll_student(User.create!).user }
+    let(:teacher) { course.enroll_teacher(User.create!).user }
+    let(:assignment) do
+      course.assignments.create!(
+        anonymous_grading: true,
+        submission_types: 'online_text_entry',
+        title: 'hi'
+      )
+    end
+    let(:submission) { assignment.submit_homework(student, body: 'zzzzzzzzzz') }
+    let(:asset_string) { submission.id.to_s }
+
+    before { user_session(teacher) }
+
+    it 'returns bad_request if anonymous_id is not valid' do
+      get 'turnitin_report', params: {
+        course_id: assignment.context_id,
+        assignment_id: assignment.id,
+        anonymous_id: '{ anonymous_id }',
+        asset_string: asset_string
+      }
+      expect(response).to have_http_status(:bad_request)
+    end
+
+    context "when the submission's turnitin data contains a report URL" do
+      before(:each) do
+        submission.update!(turnitin_data: {asset_string => {report_url: 'MY_GREAT_REPORT'}})
+      end
+
+      it "redirects to the course tool retrieval URL" do
+        get 'turnitin_report', params: {
+          course_id: assignment.context_id,
+          assignment_id: assignment.id,
+          anonymous_id: submission.anonymous_id,
+          asset_string: asset_string
+        }
+        expect(response).to redirect_to(/#{retrieve_course_external_tools_url(course.id)}/)
+      end
+
+      it "includes the report URL in the redirect" do
+        get 'turnitin_report', params: {
+          course_id: assignment.context_id,
+          assignment_id: assignment.id,
+          anonymous_id: submission.anonymous_id,
+          asset_string: asset_string
+        }
+        expect(response).to redirect_to(/MY_GREAT_REPORT/)
+      end
+    end
+
+    it "redirects the user to SpeedGrader if no turnitin URL exists" do
+      get 'turnitin_report', params: {
+        course_id: assignment.context_id,
+        assignment_id: assignment.id,
+        anonymous_id: submission.anonymous_id,
+        asset_string: asset_string
+      }
+
+      speed_grader_url = speed_grader_course_gradebook_url(
+        course,
+        assignment_id: assignment.id,
+        anchor: "{\"anonymous_id\":\"#{submission.anonymous_id}\"}"
+      )
+      expect(response).to redirect_to(speed_grader_url)
+    end
+
+    it "displays a flash error if no turnitin URL exists" do
+      get 'turnitin_report', params: {
+        course_id: assignment.context_id,
+        assignment_id: assignment.id,
+        anonymous_id: submission.anonymous_id,
+        asset_string: asset_string
+      }
+
+      expect(flash[:error]).to be_present
+    end
+  end
 end
