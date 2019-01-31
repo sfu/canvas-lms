@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - present Instructure, Inc.
+ * Copyright (C) 2019 - present Instructure, Inc.
  *
  * This file is part of Canvas.
  *
@@ -16,17 +16,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-export default class {
-  static contentPlacements = ['resource_selection']
+import tinymce from 'compiled/editor/stocktiny'
 
-  static contentMessageTypes = ['ContentItemSelectionRequest', 'LtiDeepLinkingRequest']
-
-  static isContentMessage(placement, placements = {}) {
-    const message_type = placement && placement.message_type
-
-    return (
-      this.contentPlacements.some(p => Object.keys(placements).includes(p)) ||
-      this.contentMessageTypes.includes(message_type)
-    )
-  }
+export default function sanitizeHtml(html) {
+  return new tinymce.html.Serializer().serialize(new tinymce.html.DomParser().parse(html));
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - present Instructure, Inc.
+ * Copyright (C) 2019 - present Instructure, Inc.
  *
  * This file is part of Canvas.
  *
@@ -16,17 +16,14 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-export default class {
-  static contentPlacements = ['resource_selection']
-
-  static contentMessageTypes = ['ContentItemSelectionRequest', 'LtiDeepLinkingRequest']
-
-  static isContentMessage(placement, placements = {}) {
-    const message_type = placement && placement.message_type
-
-    return (
-      this.contentPlacements.some(p => Object.keys(placements).includes(p)) ||
-      this.contentMessageTypes.includes(message_type)
-    )
+/**
+ * Replaces bad urls with harmless urls in cases where bad urls might cause harm
+ * @param {string} url
+ */
+export default function sanitizeUrl (url) {
+  const badSchemeRegex = /javascript:/
+  if (url.match(badSchemeRegex)) {
+    return 'about:blank'
   }
+  return url
 }
