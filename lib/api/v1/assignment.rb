@@ -180,6 +180,7 @@ module Api::V1::Assignment
 
     hash['is_quiz_assignment'] = assignment.quiz? && assignment.quiz.assignment?
     hash['can_duplicate'] = assignment.can_duplicate?
+    hash['original_course_id'] = assignment.duplicate_of&.course&.id
     hash['original_assignment_id'] = assignment.duplicate_of&.id
     hash['original_assignment_name'] = assignment.duplicate_of&.name
     hash['workflow_state'] = assignment.workflow_state
@@ -284,7 +285,8 @@ module Api::V1::Assignment
           'id' => rubric.id,
           'title' => rubric.title,
           'points_possible' => rubric.points_possible,
-          'free_form_criterion_comments' => !!rubric.free_form_criterion_comments
+          'free_form_criterion_comments' => !!rubric.free_form_criterion_comments,
+          'hide_score_total' => !!assignment.rubric_association.hide_score_total
         }
       end
     end
@@ -505,7 +507,8 @@ module Api::V1::Assignment
     end
 
     response
-  rescue ActiveRecord::RecordInvalid
+  rescue ActiveRecord::RecordInvalid => e
+    assignment.errors.add('invalid_record', e)
     false
   rescue Lti::AssignmentSubscriptionsHelper::AssignmentSubscriptionError => e
     assignment.errors.add('plagiarism_tool_subscription', e)
