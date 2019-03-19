@@ -1722,7 +1722,7 @@ class ApplicationController < ActionController::Base
 
   # escape everything but slashes, see http://code.google.com/p/phusion-passenger/issues/detail?id=113
   FILE_PATH_ESCAPE_PATTERN = Regexp.new("[^#{URI::PATTERN::UNRESERVED}/]")
-  def safe_domain_file_url(attachment, host_and_shard=nil, verifier = nil, download = false) # TODO: generalize this
+  def safe_domain_file_url(attachment, host_and_shard: nil, verifier: nil, download: false, return_url: nil) # TODO: generalize this
     if !host_and_shard
       host_and_shard = HostUrl.file_host_with_shard(@domain_root_account || Account.default, request.host_with_port)
     end
@@ -1739,7 +1739,7 @@ class ApplicationController < ActionController::Base
       # will authorize file access but not full app access.  We need this in
       # case there are relative URLs in the file that point to other pieces
       # of content.
-      opts = generate_access_verifier
+      opts = generate_access_verifier(return_url: return_url)
       opts[:verifier] = verifier if verifier.present?
 
       if download
@@ -2349,6 +2349,8 @@ class ApplicationController < ActionController::Base
     ctx[:real_user_id] = @real_current_user.global_id if @real_current_user
     ctx[:context_type] = @context.class.to_s if @context
     ctx[:context_id] = @context.global_id if @context
+    ctx[:context_sis_source_id] = @context.sis_source_id if @context.respond_to?(:sis_source_id)
+
     if @context_membership
       ctx[:context_role] =
         if @context_membership.respond_to?(:role)
