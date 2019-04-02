@@ -821,7 +821,7 @@ class UsersController < ApplicationController
 
   include Api::V1::TodoItem
   # @API List the TODO items
-  # A paginated list of the current user's list of todo items, as seen on the user dashboard.
+  # A paginated list of the current user's list of todo items.
   #
   # @argument include[] [String, "ungraded_quizzes"]
   #   "ungraded_quizzes":: Optionally include ungraded quizzes (such as practice quizzes and surveys) in the list.
@@ -1918,6 +1918,7 @@ class UsersController < ApplicationController
         if @user.update_attributes(user_params)
           @user.avatar_state = (old_avatar_state == :locked ? old_avatar_state : 'approved') if admin_avatar_update
           @user.email = new_email if update_email
+          @user.profile.save if @user.profile.changed?
           @user.save if admin_avatar_update || update_email
           session.delete(:require_terms)
           flash[:notice] = t('user_updated', 'User was successfully updated.')
