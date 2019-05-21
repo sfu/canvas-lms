@@ -47,7 +47,7 @@ describe Canvas::Migration::Helpers::SelectiveContentFormatter do
       allow(@migration).to receive(:cache_key).and_return('1')
       allow(@migration).to receive(:close)
       allow(@migration).to receive(:read).and_return(@overview.to_json)
-      @formatter = Canvas::Migration::Helpers::SelectiveContentFormatter.new(@migration, "https://example.com")
+      @formatter = Canvas::Migration::Helpers::SelectiveContentFormatter.new(@migration, "https://example.com", global_identifiers: true)
     end
 
     it "should list top-level items" do
@@ -175,7 +175,7 @@ describe Canvas::Migration::Helpers::SelectiveContentFormatter do
 
   context "course copy" do
     include_context "lti2_course_spec_helper"
-    let(:formatter) { Canvas::Migration::Helpers::SelectiveContentFormatter.new(@migration) }
+    let(:formatter) { Canvas::Migration::Helpers::SelectiveContentFormatter.new(@migration, global_identifiers: true) }
 
     before do
       course_model
@@ -191,6 +191,8 @@ describe Canvas::Migration::Helpers::SelectiveContentFormatter do
       @migration = double()
       allow(@migration).to receive(:migration_type).and_return('course_copy_importer')
       allow(@migration).to receive(:source_course).and_return(@course)
+      export = @course.content_exports.create!(:export_type => ContentExport::COURSE_COPY)
+      allow(@migration).to receive(:content_export).and_return(export)
       @course_outcome = outcome_model
       @account_outcome = outcome_model(:outcome_context => @course.account)
     end

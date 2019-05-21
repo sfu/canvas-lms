@@ -245,6 +245,8 @@ class Account < ActiveRecord::Base
   # For setting the default dashboard (e.g. Student Planner/List View, Activity Stream, Dashboard Cards)
   add_setting :default_dashboard_view, :inheritable => true
 
+  add_setting :require_confirmed_email, :boolean => true, :root_only => true, :default => false
+
   def settings=(hash)
     if hash.is_a?(Hash) || hash.is_a?(ActionController::Parameters)
       hash.each do |key, val|
@@ -1327,7 +1329,7 @@ class Account < ActiveRecord::Base
   end
 
   def self.update_all_update_account_associations
-    Account.root_accounts.active.find_each(&:update_account_associations)
+    Account.root_accounts.active.non_shadow.find_each(&:update_account_associations)
   end
 
   def course_count
@@ -1773,5 +1775,9 @@ class Account < ActiveRecord::Base
 
   def available_course_visibility_override_options(_options=nil)
     {}
+  end
+
+  def user_needs_verification?(user)
+    self.require_confirmed_email? && (user.nil? || !user.cached_active_emails.any?)
   end
 end

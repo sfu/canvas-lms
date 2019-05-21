@@ -435,6 +435,8 @@ class ExternalToolsController < ApplicationController
   end
 
   def find_tool(id, selection_type)
+    return unless selection_type == 'editor_button' || verified_user_check
+
     if selection_type.nil? || Lti::ResourcePlacement::PLACEMENTS.include?(selection_type.to_sym)
       @tool = ContextExternalTool.find_for(id, @context, selection_type, false)
     end
@@ -496,7 +498,7 @@ class ExternalToolsController < ApplicationController
     expander = variable_expander(assignment: assignment, tool: tool, launch: lti_launch, post_message_token: opts[:launch_token])
 
     adapter = if tool.use_1_3?
-      Lti::LtiAdvantageAdapter.new(
+      a = Lti::LtiAdvantageAdapter.new(
         tool: tool,
         user: @current_user,
         context: @context,
@@ -504,6 +506,10 @@ class ExternalToolsController < ApplicationController
         expander: expander,
         opts: opts
       )
+
+      # Prevent attempting OIDC login flow with the target link uri
+      opts.delete(:launch_url)
+      a
     else
       Lti::LtiOutboundAdapter.new(tool, @current_user, @context).prepare_tool_launch(
         @return_url,

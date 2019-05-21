@@ -59,10 +59,7 @@ module Lti
 
     private
     def pseudonym
-      unless instance_variable_defined?(:@pseudonym)
-        @pseudonym = SisPseudonym.for(@canvas_user, @canvas_root_account, type: :trusted, require_sis: false)
-      end
-      @pseudonym
+      @pseudonym ||= SisPseudonym.for(@canvas_user, @canvas_context, type: :trusted, require_sis: false, root_account: @canvas_root_account)
     end
 
     def current_roles
@@ -82,9 +79,9 @@ module Lti
     end
 
     def current_course_enrollments
-      return [] unless @canvas_context.is_a?(Course)
+      return Enrollment.none unless @canvas_context.is_a?(Course)
 
-      @current_course_enrollments ||= @canvas_user.enrollments.current.where(course_id: @canvas_context).preload(:enrollment_state).to_a
+      @current_course_enrollments ||= @canvas_user.enrollments.current.where(course_id: @canvas_context).preload(:enrollment_state, :sis_pseudonym)
     end
 
     def current_course_observee_lti_context_ids

@@ -32,6 +32,15 @@ describe UserMerge do
       expect(user2).to be_deleted
     end
 
+    it 'should require mark as failed on failure users' do
+      mergeme = UserMerge.from(user2)
+      # make any method that gets called raise an error
+      allow(mergeme).to receive(:copy_favorites).and_raise('boom')
+      expect { mergeme.into(user1) }.to raise_error('boom')
+      expect(mergeme.merge_data.workflow_state).to eq 'failed'
+      expect(mergeme.merge_data.items.where(item_type: 'merge_error').take.item.first).to eq 'boom'
+    end
+
     it "should move pseudonyms to the new user" do
       pseudonym = user2.pseudonyms.create!(unique_id: 'sam@yahoo.com')
       pseudonym2 = user2.pseudonyms.create!(unique_id: 'sam2@yahoo.com')
@@ -674,6 +683,49 @@ describe UserMerge do
 
   context "sharding" do
     specs_require_sharding
+
+    it 'should move prefs over' do
+      @shard1.activate do
+        @user2 = user_model
+        account = Account.create!
+        @shard_course = course_factory(account: account)
+        @user2.preferences[:custom_colors] = {"course_#{@course.id}"=>"#254284"}
+      end
+      course = course_factory
+      user1 = user_model
+      @user2.preferences[:custom_colors]["course_#{course.global_id}"] = "#346543"
+      @user2.save!
+      UserMerge.from(@user2).into(user1)
+      expect(user1.reload.preferences[:custom_colors].keys).to eq ["course_#{@shard_course.global_id}", "course_#{course.id}"]
+    end
+
+    it 'should move nicknames' do
+      @shard1.activate do
+        @user2 = user_model
+        account = Account.create!
+        @shard_course = course_factory(account: account)
+        @user2.preferences[:course_nicknames] = {@shard_course.id=>"Marketing"}
+      end
+      course = course_factory
+      user1 = user_model
+      @user2.preferences[:course_nicknames][course.global_id] = "Math"
+      @user2.save!
+      UserMerge.from(@user2).into(user1)
+      expect(user1.reload.preferences[:course_nicknames].keys).to eq [@shard_course.global_id, course.id]
+    end
+
+    it 'should handle favorites' do
+      @shard1.activate do
+        @user2 = user_model
+        account = Account.create!
+        @shard_course = course_factory(account: account)
+        @shard_course.enroll_user(@user2)
+        @fav = Favorite.create!(user: @user2, context: @shard_course)
+      end
+      user1 = user_model
+      UserMerge.from(@user2).into(user1)
+      expect(user1.favorites.take.context_id).to eq @shard_course.global_id
+    end
 
     it 'should merge with user_services across shards' do
       user1 = user_model
