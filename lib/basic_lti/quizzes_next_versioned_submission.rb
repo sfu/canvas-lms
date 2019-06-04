@@ -31,7 +31,9 @@ module BasicLTI
     end
 
     def commit_history(launch_url, grade, grader_id)
+      return true if grading_period_closed?
       return false unless valid?(launch_url, grade)
+
       attempt = attempt_history_by_key(launch_url)
       grade, score = @assignment.compute_grade_and_score(grade, nil)
       # if score is not changed, stop creating a new version
@@ -65,6 +67,10 @@ module BasicLTI
       grade1 = submission.grade
       score_equal = (score1.nil? && score2.nil?) || (score1.present? && score2.present? && (score1 - score2).abs < 0.000001)
       score_equal && (grade1 == grade2) && submission.url == launch_url
+    end
+
+    def grading_period_closed?
+      !!(submission.grading_period&.closed?)
     end
 
     def valid?(launch_url, grade)
@@ -124,8 +130,9 @@ module BasicLTI
       @_attempts_hash ||= begin
         attempts = submission.versions.sort_by(&:created_at).each_with_object({}) do |v, a|
           h = YAML.safe_load(v.yaml).with_indifferent_access
-          url = h[:url]
+          url = v.model.url
           next if url.blank?
+          h[:url] = url
           (a[url] = (a[url] || [])) << h.slice(*JSON_FIELDS)
         end
 

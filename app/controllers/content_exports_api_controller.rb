@@ -153,7 +153,13 @@ class ContentExportsApiController < ApplicationController
       export.settings[:skip_notifications] = true if value_to_boolean(params[:skip_notifications])
 
       # ZipExporter accepts unhashed asset strings, to avoid having to instantiate all the files and folders
-      selected_content = ContentMigration.process_copy_params(params[:select]&.to_unsafe_h, true, params[:export_type] == ContentExport::ZIP) if params[:select]
+      if params[:select]
+        selected_content = ContentMigration.process_copy_params(params[:select]&.to_unsafe_h,
+          for_content_export: true,
+          return_asset_strings: params[:export_type] == ContentExport::ZIP,
+          global_identifiers: export.can_use_global_identifiers?)
+      end
+
       case params[:export_type]
       when 'qti'
         export.export_type = ContentExport::QTI
@@ -193,7 +199,8 @@ class ContentExportsApiController < ApplicationController
   def content_list
     if authorized_action(@context, @current_user, :read_as_admin)
       base_url = polymorphic_url([:api_v1, @context, :content_list])
-      formatter = Canvas::Migration::Helpers::SelectiveContentFormatter.new(nil, base_url)
+      formatter = Canvas::Migration::Helpers::SelectiveContentFormatter.new(nil, base_url,
+        global_identifiers: @context.content_exports.temp_record.can_use_global_identifiers?)
 
       unless formatter.valid_type?(params[:type])
         return render :json => {:message => "unsupported migration type"}, :status => :bad_request

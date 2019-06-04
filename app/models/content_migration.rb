@@ -111,6 +111,13 @@ class ContentMigration < ActiveRecord::Base
     !!migration_settings[:import_immediately]
   end
 
+  def content_export
+    if !association(:content_export).loaded? && source_course_id && Shard.shard_for(source_course_id) != self.shard
+      association(:content_export).target = Shard.shard_for(source_course_id).activate { ContentExport.where(:content_migration_id => self).first }
+    end
+    super
+  end
+
   def converter_class=(c_class)
     migration_settings[:converter_class] = c_class
   end
@@ -843,14 +850,24 @@ class ContentMigration < ActiveRecord::Base
     end
   end
 
+  def use_global_identifiers?
+    if self.content_export
+      self.content_export.global_identifiers?
+    elsif self.source_course
+      self.source_course.content_exports.temp_record.can_use_global_identifiers?
+    else
+      false
+    end
+  end
+
   # strips out the "id_" prepending the migration ids in the form
   # also converts arrays of migration ids (or real ids for course exports) into the old hash format
-  def self.process_copy_params(hash, for_content_export=false, return_asset_strings=false)
+  def self.process_copy_params(hash, for_content_export: false, return_asset_strings: false, global_identifiers: false)
     return {} if hash.blank?
     process_key = if return_asset_strings
       ->(asset_string) { asset_string }
     else
-      ->(asset_string) { CC::CCHelper.create_key(asset_string) }
+      ->(asset_string) { CC::CCHelper.create_key(asset_string, global: global_identifiers) }
     end
     new_hash = {}
 
