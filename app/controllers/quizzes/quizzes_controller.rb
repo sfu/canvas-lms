@@ -518,6 +518,7 @@ class Quizzes::QuizzesController < ApplicationController
         end
 
         if @quiz.assignment && (@overrides_affected.to_i > 0 || cached_due_dates_changed || created_quiz)
+          @quiz.assignment.clear_cache_key(:availability)
           DueDateCacher.recompute(@quiz.assignment, update_grades: true, executing_user: @current_user)
         end
 
@@ -668,7 +669,7 @@ class Quizzes::QuizzesController < ApplicationController
       if params[:quiz_submission_id]
         @submission = @quiz.quiz_submissions.find(params[:quiz_submission_id])
       else
-        user_id = params[:user_id].presence || @current_user.id
+        user_id = params[:user_id].presence || @current_user&.id
         @submission = @quiz.quiz_submissions.where(user_id: user_id).order(:created_at).first
       end
       if @submission && !@submission.user_id && logged_out_index = params[:u_index]
