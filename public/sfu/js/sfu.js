@@ -94,7 +94,9 @@
     .show()
 
   // Replace the Start a New Course button with a link to our form (CANVAS-192)
-  utils.onPage(/^\/$/, () => {
+  // The onPage regexp should catch the button on the home page (/), and on the
+  // couress page (/courses)
+  utils.onPage(/^\/(?:courses\/?)?$/, () => {
     utils.onElementRendered('#start_new_course', () => {
       const newCourseButton = document.createElement('a')
       newCourseButton.setAttribute('class', 'Button button-sidebar-wide')
@@ -103,6 +105,11 @@
 
       const buttonEl = document.getElementById('start_new_course')
       buttonEl.replaceWith(newCourseButton)
+    })
+
+    // remove the built-in new course form from the DOM
+    utils.onElementRendered('#new_course_form', () => {
+      $('#new_course_form').remove()
     })
   })
 

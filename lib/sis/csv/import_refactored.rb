@@ -57,6 +57,7 @@ module SIS
         @override_sis_stickiness = opts[:override_sis_stickiness]
         @add_sis_stickiness = opts[:add_sis_stickiness]
         @clear_sis_stickiness = opts[:clear_sis_stickiness]
+        @previous_diff_import = opts[:previous_diff_import]
 
         @total_rows = 1
         @current_row = 0
@@ -142,9 +143,11 @@ module SIS
         rows = 0
         ::CSV.open(csv[:fullpath], "rb", CSVBaseImporter::PARSE_ARGS) do |faster_csv|
           while faster_csv.shift
-            if create_importers && rows % @rows_for_parallel == 0
-              @parallel_importers[importer] ||= []
-              @parallel_importers[importer] << create_parallel_importer(csv, importer, rows)
+            unless @previous_diff_import
+              if create_importers && rows % @rows_for_parallel == 0
+                @parallel_importers[importer] ||= []
+                @parallel_importers[importer] << create_parallel_importer(csv, importer, rows)
+              end
             end
             rows += 1
           end
@@ -206,7 +209,7 @@ module SIS
 
       def update_progress
         completed_count = @batch.parallel_importers.where(workflow_state: "completed").count
-        current_progress = (completed_count.to_f * 100 / @batch.parallel_importers.count).round
+        current_progress = (completed_count.to_f * 100 / @parallel_importers.values.map(&:count).sum).round
         SisBatch.where(:id => @batch).where("progress IS NULL or progress < ?", current_progress).update_all(progress: current_progress)
       end
 
@@ -283,7 +286,7 @@ module SIS
       end
 
       def queue_next_importer_set
-        next_importer_type = IMPORTERS.detect{|i| !@batch.data[:completed_importers].include?(i) && @batch.parallel_importers.where(importer_type: i).not_completed.exists?}
+        next_importer_type = IMPORTERS.detect{|i| !@batch.data[:completed_importers].include?(i) && @parallel_importers[i].present?}
         return finish unless next_importer_type
 
         enqueue_args = { :priority => Delayed::LOW_PRIORITY, :on_permanent_failure => :fail_with_error!, :max_attempts => 5}
@@ -293,20 +296,20 @@ module SIS
           enqueue_args[:n_strand] = ["sis_parallel_import", @batch.data[:strand_account_id] || @root_account.global_id]
         end
 
-        importers_to_queue = @batch.parallel_importers.where(importer_type: next_importer_type).not_completed.pluck(:id)
+        importers_to_queue = @parallel_importers[next_importer_type]
         updated_count = @batch.parallel_importers.where(:id => importers_to_queue, :workflow_state => "pending").
           update_all(:workflow_state => "queued")
         if updated_count != importers_to_queue.count
           raise "state mismatch error queuing parallel import jobs"
         end
-        importers_to_queue.each do |pi_id|
-          self.send_later_enqueue_args(:run_parallel_importer, enqueue_args, pi_id)
+        importers_to_queue.each do |pi|
+          self.send_later_enqueue_args(:run_parallel_importer, enqueue_args, pi)
         end
       end
 
       def is_last_parallel_importer_of_type?(parallel_importer)
         importer_type = parallel_importer.importer_type.to_sym
-        return false if @batch.parallel_importers.where(:importer_type => importer_type).not_completed.exists?
+        return false if @batch.parallel_importers.where(:importer_type => importer_type, :workflow_state => %w{queued running retry}).exists?
 
         SisBatch.transaction do
           @batch.reload(:lock => true)
@@ -345,11 +348,14 @@ module SIS
               row.each {|header| header&.downcase!}
               importer = IMPORTERS.index do |type|
                 if SIS::CSV.const_get(type.to_s.camelcase + 'Importer').send(type.to_s + '_csv?', row)
-                  if type == :user && (row & HEADERS_TO_EXCLUDE_FOR_DOWNLOAD).any?
-                    filtered_att = create_filtered_csv(csv, row)
-                    @batch.data[:downloadable_attachment_ids] << filtered_att.id if filtered_att
-                  else
-                    @batch.data[:downloadable_attachment_ids] << att.id
+                  unless @previous_diff_import
+                    downloadable_att = (type == :user && (row & HEADERS_TO_EXCLUDE_FOR_DOWNLOAD).any?) ? create_filtered_csv(csv, row) : att
+                    if downloadable_att
+                      @batch.data[:downloadable_attachment_ids] << downloadable_att.id
+                      if @batch.data[:diffed_against_sis_batch_id]
+                        (@batch.data[:diffed_attachment_ids] ||= []) << downloadable_att.id
+                      end
+                    end
                   end
                   @csvs[type] << csv
                   @headers[type].merge(row)

@@ -261,7 +261,7 @@ require [
 
     ReactDOM.render(
       React.createElement(
-        SFUCopyrightComplianceNotice,
+        SFUCopyrightComplianceNotice.default,
         { className: 'sfu-ic-wizard-box__message-text__copyright_compliance' }
       ),
       document.getElementsByClassName('copyright')[0]
