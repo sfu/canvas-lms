@@ -16,4 +16,11 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-module.exports = require('./frontend_build/baseWebpackConfig')
+// SFU MOD - Temporarily increase maximum asset size
+const config = require('./frontend_build/baseWebpackConfig')
+config.performance.maxAssetSize = 2000000
+module.exports = config
+
+// Uncomment following line and remove all others to restore to default.
+// module.exports = require('./frontend_build/baseWebpackConfig')
+// END SFU MOD

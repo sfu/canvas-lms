@@ -54,16 +54,7 @@
   }
 
   const loadModule = module => {
-    const WEBPACK_BASE = ENV.WEBPACK_BASE || '/dist/webpack-production'
-    const MANIFEST_URL = `${WEBPACK_BASE}/webpack-manifest.json`
-    $.getJSON(MANIFEST_URL, manifest => {
-      const HASHED_FILE = manifest[module]
-      if (!HASHED_FILE) {
-        console.error(`loadModule: no such module ${module}`)
-        return false
-      }
-      $.getScript(`${WEBPACK_BASE}/${HASHED_FILE}`)
-    })
+    (window.bundles || (window.bundles = [])).push(module);
   }
 
   // add Canvas Spaces to nav
@@ -128,7 +119,7 @@
     const $publishButton = $('.btn-publish')
     if ($publishButton.length) {
       $publishButton.attr('disabled', true)
-      loadModule('sfu_copyright_notice_modal_dialog.js')
+      loadModule('sfu_copyright_notice_modal_dialog')
     }
   })
 
@@ -139,7 +130,7 @@
     */
   utils.onPage(/^\/courses\/\d+\/collaborations\/?$/, () => {
     INST.collaboration_types = INST.collaboration_types || ENV.collaboration_types
-    loadModule('sfu_google_docs_pia_notice.js')
+    loadModule('sfu_google_docs_pia_notice')
   })
 
   utils.onPage(/^\/profile\/settings\/?$/, () => {
