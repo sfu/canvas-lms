@@ -28,11 +28,11 @@ function getGradePercentage(score, pointsPossible) {
   return round(grade, round.DEFAULT)
 }
 
-function buildMutedAssignmentsWarning() {
+function buildHiddenAssignmentsWarning() {
   return {
-    icon: 'icon-muted',
+    icon: 'icon-off',
     warningText: I18n.t(
-      "This grade differs from the student's view of the grade because some assignments are muted"
+      "This grade differs from the student's view of the grade because some assignment grades are not yet posted"
     )
   }
 }
@@ -127,8 +127,8 @@ export default class TotalGradeCellFormatter {
       listInvalidAssignmentGroups() {
         return gradebook.listInvalidAssignmentGroups()
       },
-      listMutedAssignments() {
-        return gradebook.listMutedAssignments()
+      listHiddenAssignments(studentId) {
+        return gradebook.listHiddenAssignments(studentId)
       },
       shouldShowPoints() {
         return gradebook.options.show_total_grade_as_points
@@ -136,7 +136,7 @@ export default class TotalGradeCellFormatter {
     }
   }
 
-  render = (_row, _cell, grade /* value */, _columnDef, _dataContext) => {
+  render = (_row, _cell, grade /* value */, _columnDef, student /* dataContext */) => {
     if (grade == null) {
       return ''
     }
@@ -153,8 +153,8 @@ export default class TotalGradeCellFormatter {
     }
 
     let warning
-    if (this.options.listMutedAssignments().length > 0) {
-      warning = buildMutedAssignmentsWarning()
+    if (this.options.listHiddenAssignments(student.id).length > 0) {
+      warning = buildHiddenAssignmentsWarning()
     }
 
     if (!warning) {
