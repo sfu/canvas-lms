@@ -57,7 +57,7 @@ class Assignment < ActiveRecord::Base
     anonymous_instructor_annotations
   ].freeze
 
-  attr_accessor :previous_id, :copying, :user_submitted
+  attr_accessor :previous_id, :copying, :user_submitted, :grade_posting_in_progress
   attr_reader :assignment_changed
   attr_writer :updating_user
 
@@ -921,7 +921,9 @@ class Assignment < ActiveRecord::Base
   end
 
   def update_submittable
-    return true if self.deleted?
+    # If we're updating the assignment's muted status as part of posting
+    # grades, don't bother doing this
+    return true if self.deleted? || grade_posting_in_progress
     if self.submission_types == "online_quiz" && @saved_by != :quiz
       quiz = Quizzes::Quiz.where(assignment_id: self).first || self.context.quizzes.build
       quiz.assignment_id = self.id
@@ -1565,7 +1567,7 @@ class Assignment < ActiveRecord::Base
   end
 
   def participants(opts={})
-    return context.participants(include_observers: opts[:include_observers], excluded_user_ids: opts[:excluded_user_ids]) unless differentiated_assignments_applies?
+    return context.participants(opts) unless differentiated_assignments_applies?
     participants_with_visibility(opts)
   end
 
@@ -1914,9 +1916,6 @@ class Assignment < ActiveRecord::Base
       submissions: []
     }
 
-    # Only teachers (those who can manage grades) can have hidden comments
-    opts[:hidden] = muted? && self.context.grants_right?(opts[:author], :manage_grades) unless opts.key?(:hidden)
-
     if opts[:comment] && opts[:assessment_request]
       # if there is no rubric the peer review is complete with just a comment
       opts[:assessment_request].complete unless opts[:assessment_request].rubric_association
@@ -1952,6 +1951,10 @@ class Assignment < ActiveRecord::Base
   end
 
   def save_comment_to_submission(submission, group, opts, uuid = nil)
+    # Only teachers (those who can manage grades) can have hidden comments
+    unless opts.key?(:hidden)
+      opts[:hidden] = submission.hide_grade_from_student? && self.context.grants_right?(opts[:author], :manage_grades)
+    end
     submission.group = group
     submission.save! if submission.changed?
     opts[:group_comment_id] = uuid if group && uuid
@@ -2071,7 +2074,7 @@ class Assignment < ActiveRecord::Base
   def sections_with_visibility(user)
     return context.active_course_sections unless self.differentiated_assignments_applies?
 
-    visible_student_ids = visible_students_for_speed_grader(user).map(&:id)
+    visible_student_ids = visible_students_for_speed_grader(user: user).map(&:id)
     context.active_course_sections.joins(:student_enrollments).
       where(:enrollments => {:user_id => visible_student_ids, :type => "StudentEnrollment"}).distinct.reorder("name")
   end
@@ -2116,8 +2119,8 @@ class Assignment < ActiveRecord::Base
   # for group assignments, returns a single "student" for each
   # group's submission.  the students name will be changed to the group's
   # name.  for non-group assignments this just returns all visible users
-  def representatives(user, includes: [:inactive])
-    return visible_students_for_speed_grader(user, includes: includes) unless grade_as_group?
+  def representatives(user:, includes: [:inactive], group_id: nil)
+    return visible_students_for_speed_grader(user: user, includes: includes, group_id: group_id) unless grade_as_group?
 
     submissions = self.submissions.to_a
     user_ids_with_submissions = submissions.select(&:has_submission?).map(&:user_id).to_set
@@ -2143,7 +2146,7 @@ class Assignment < ActiveRecord::Base
     enrollment_priority = { 'active' => 1, 'inactive' => 2 }
     enrollment_priority.default = 100
 
-    visible_student_ids = visible_students_for_speed_grader(user, includes: includes).map(&:id).to_set
+    visible_student_ids = visible_students_for_speed_grader(user: user, includes: includes).map(&:id).to_set
 
     reps_and_others = groups_and_ungrouped(user, includes: includes).map do |group_name, group_info|
       group_students = group_info[:users]
@@ -2180,7 +2183,7 @@ class Assignment < ActiveRecord::Base
       groups.active.preload(group_memberships: :user).
       map { |g| [g.name, { sortable_name: g.name, users: g.users}] }
     users_in_group = groups_and_users.flat_map { |_, group_info| group_info[:users] }
-    groupless_users = visible_students_for_speed_grader(user, includes: includes) - users_in_group
+    groupless_users = visible_students_for_speed_grader(user: user, includes: includes) - users_in_group
     phony_groups = groupless_users.map do |u|
       sortable_name = users_in_group.empty? ? u.sortable_name : u.name
       [u.name, { sortable_name: sortable_name, users: [u] }]
@@ -2190,14 +2193,25 @@ class Assignment < ActiveRecord::Base
   private :groups_and_ungrouped
 
   # using this method instead of students_with_visibility so we
-  # can add the includes and students_visible_to/participating_students scopes
-  def visible_students_for_speed_grader(user, includes: [:inactive])
+  # can add the includes and students_visible_to/participating_students scopes.
+  # a group_id filter can optionally be supplied.
+  def visible_students_for_speed_grader(user:, includes: [:inactive], group_id: nil)
     @visible_students_for_speed_grader ||= {}
-    @visible_students_for_speed_grader[[user.global_id, includes]] ||= (
-      student_scope = user ? context.students_visible_to(user, include: includes) : context.participating_students
-      students_with_visibility(student_scope)
-    ).order_by_sortable_name.distinct.to_a
+    @visible_students_for_speed_grader[[user.global_id, includes, group_id]] ||= begin
+      student_scope = if user.present?
+        context.students_visible_to(user, include: includes)
+      else
+        context.participating_students
+      end
+      students = students_with_visibility(student_scope).order_by_sortable_name.distinct
+      if group_id.present?
+        students = students.joins(:group_memberships).
+          where(group_memberships: {group_id: group_id, workflow_state: :accepted})
+      end
+      students.to_a
+    end
   end
+  private :visible_students_for_speed_grader
 
   def visible_rubric_assessments_for(user, opts={})
     return [] unless user && self.rubric_association
@@ -2893,10 +2907,7 @@ class Assignment < ActiveRecord::Base
   end
 
   def quiz_lti?
-    external_tool? &&
-      external_tool_tag.present? &&
-      external_tool_tag.content.present? &&
-      external_tool_tag.content.try(:tool_id) == 'Quizzes 2'
+    external_tool? && !!external_tool_tag&.content&.try(:quiz_lti?)
   end
 
   def quiz_lti!
@@ -3154,8 +3165,20 @@ class Assignment < ActiveRecord::Base
     User.clear_cache_keys(user_ids, :submissions)
     unless skip_updating_timestamp
       update_time = Time.zone.now
+      # broadcast_notifications will reload each submission individually; this
+      # cuts down on unneeded work when possible. This makes the assumption
+      # that only unposted submissions need notifications.
+      previously_unposted_submissions = submissions.unposted.to_a
       submissions.update_all(posted_at: update_time, updated_at: update_time)
+
+      previously_unposted_submissions.each do |submission|
+        submission.grade_posting_in_progress = true
+        # Need to broadcast assignment_unmuted here.
+        submission.broadcast_notifications
+        submission.grade_posting_in_progress = false
+      end
     end
+
     submissions.in_workflow_state('graded').each(&:assignment_muted_changed)
 
     show_stream_items(submissions: submissions)

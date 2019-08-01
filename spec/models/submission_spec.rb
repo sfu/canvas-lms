@@ -1492,6 +1492,42 @@ describe Submission do
 
         expect(submission.messages_sent.keys).to eq ['Group Assignment Submitted Late']
       end
+
+      context "Assignment Unmuted" do
+        let(:submission) { @assignment.submissions.find_by!(user: @student) }
+
+        before(:once) do
+          @assignment_unmuted_notification = Notification.create!(name: "Assignment Unmuted")
+          @course.enable_feature!(:new_gradebook)
+          PostPolicy.enable_feature!
+          @student.update!(email: "fakeemail@example.com")
+          @student.email_channel.update!(workflow_state: :active)
+        end
+
+        it "sends a notification when a submission is posted and assignment posts manually" do
+          @assignment.ensure_post_policy(post_manually: true)
+
+          expect {
+            @assignment.post_submissions(submission_ids: [submission.id])
+          }.to change {
+            DelayedMessage.where(
+              communication_channel: @student.email_channel,
+              notification: @assignment_unmuted_notification
+            ).count
+          }.by(1)
+        end
+
+        it "does not send a notification when a submission is posted and assignment posts automatically" do
+          expect {
+            @assignment.grade_student(@student, grader: @teacher, score: 10)
+          }.not_to change {
+            DelayedMessage.where(
+              communication_channel: @student.email_channel,
+              notification: @assignment_unmuted_notification
+            ).count
+          }
+        end
+      end
     end
 
     context "Submission Graded" do
@@ -1760,16 +1796,30 @@ describe Submission do
 
       context "when post policies feature is enabled" do
         before(:once) do
+          @course.enable_feature!(:new_gradebook)
           PostPolicy.enable_feature!
         end
 
-        it "user can read their own grade when their submission is posted" do
+        it "returns true when their submission is posted and assignment manually posts" do
+          @assignment.ensure_post_policy(post_manually: true)
           @submission.update!(posted_at: Time.zone.now)
           expect(@submission.grants_right?(@student, :read_grade)).to be true
         end
 
-        it "user cannot read their own grade when their submission is not posted" do
+        it "returns false when their submission is not posted and assignment manually posts" do
+          @assignment.ensure_post_policy(post_manually: true)
           expect(@submission.grants_right?(@student, :read_grade)).to be false
+        end
+
+        it "returns true when their submission is posted and assignment automatically posts" do
+          @assignment.ensure_post_policy(post_manually: false)
+          @submission.update!(posted_at: Time.zone.now)
+          expect(@submission.grants_right?(@student, :read_grade)).to be true
+        end
+
+        it "returns true when their submission is not posted and assignment automatically posts" do
+          @assignment.ensure_post_policy(post_manually: false)
+          expect(@submission.grants_right?(@student, :read_grade)).to be true
         end
       end
 
@@ -2042,16 +2092,30 @@ describe Submission do
 
     context "when post policies feature is enabled" do
       before(:once) do
+        @course.enable_feature!(:new_gradebook)
         PostPolicy.enable_feature!
       end
 
-      it "user can read their own grade when their submission is posted" do
+      it "returns true when their submission is posted and assignment manually posts" do
+        @assignment.ensure_post_policy(post_manually: true)
         @submission.update!(posted_at: Time.zone.now)
         expect(@submission.user_can_read_grade?(@student)).to be true
       end
 
-      it "user cannot read their own grade when their submission is not posted" do
+      it "returns false when their submission is not posted and assignment manually posts" do
+        @assignment.ensure_post_policy(post_manually: true)
         expect(@submission.user_can_read_grade?(@student)).to be false
+      end
+
+      it "returns true when their submission is posted and assignment automatically posts" do
+        @assignment.ensure_post_policy(post_manually: false)
+        @submission.update!(posted_at: Time.zone.now)
+        expect(@submission.user_can_read_grade?(@student)).to be true
+      end
+
+      it "returns true when their submission is not posted and assignment automatically posts" do
+        @assignment.ensure_post_policy(post_manually: false)
+        expect(@submission.user_can_read_grade?(@student)).to be true
       end
     end
 
@@ -2656,17 +2720,15 @@ describe Submission do
   end
 
   describe "'view_turnitin_report' right" do
-    let(:teacher) do
-      user = User.create
-      @context.enroll_teacher(user)
-      user
-    end
+    subject { @submission }
+
+    let(:teacher) { @teacher }
+    let(:student) { @student }
 
     before :once do
       @assignment.update!(submission_types: "online_upload,online_text_entry")
-
-      @submission = @assignment.submit_homework(@user, {body: "hello there", submission_type: 'online_text_entry'})
-      @submission.turnitin_data = {
+      @submission = @assignment.submit_homework(student, {body: "hello there", submission_type: 'online_text_entry'})
+      @submission.update!(turnitin_data: {
         "submission_#{@submission.id}" => {
           web_overlap: 92,
           error: true,
@@ -2676,8 +2738,7 @@ describe Submission do
           student_overlap: 90,
           similarity_score: 92
         }
-      }
-      @submission.save!
+      })
     end
 
     it "is available when the plagiarism report is from turnitin" do
@@ -2692,6 +2753,55 @@ describe Submission do
     it "is not available when the plagiarism report is from vericite" do
       @submission.turnitin_data[:provider] = 'vericite'
       expect(@submission).not_to be_grants_right(teacher, nil, :view_turnitin_report)
+    end
+
+    context 'when post policies are enabled' do
+      before do
+        @course.enable_feature!(:new_gradebook)
+        PostPolicy.enable_feature!
+      end
+
+      it { expect(@submission).to be_grants_right(student, nil, :view_turnitin_report) }
+
+      context 'when originality report visibility is after_grading' do
+        before do
+          @assignment.update!(
+            turnitin_settings: @assignment.turnitin_settings.merge(originality_report_visibility: 'after_grading')
+          )
+        end
+
+        it { is_expected.not_to be_grants_right(student, nil, :view_turnitin_report) }
+
+        context 'when the submission is graded' do
+          subject(:submission) { @assignment.grade_student(student, grade: 10, grader: teacher).first }
+
+          it { is_expected.to be_grants_right(student, nil, :view_turnitin_report) }
+        end
+      end
+
+      context 'when originality report visibility is after_due_date' do
+        before do
+          @assignment.update!(
+            turnitin_settings: @assignment.turnitin_settings.merge(originality_report_visibility: 'after_due_date')
+          )
+        end
+
+        it { is_expected.not_to be_grants_right(student, nil, :view_turnitin_report) }
+
+        context 'when assignment.due_date is in the past' do
+          before { @assignment.update!(due_at: 1.day.ago) }
+          it { is_expected.to be_grants_right(student, nil, :view_turnitin_report) }
+        end
+      end
+
+      context 'when originality report visibility is never' do
+        before do
+          @assignment.update!(
+            turnitin_settings: @assignment.turnitin_settings.merge(originality_report_visibility: 'never')
+          )
+        end
+        it { is_expected.not_to be_grants_right(student, nil, :view_turnitin_report) }
+      end
     end
   end
 
@@ -3116,6 +3226,21 @@ describe Submission do
 
         expect(Submission.missing).to be_empty
       end
+
+      it 'includes missing quiz_lti assignments' do
+        @course.context_external_tools.create!(
+          name: 'Quizzes.Next',
+          consumer_key: 'test_key',
+          shared_secret: 'test_secret',
+          tool_id: 'Quizzes 2',
+          url: 'http://example.com/launch'
+        )
+        @assignment.quiz_lti!
+        @assignment.due_at = 1.day.ago(@now)
+        @assignment.save!
+
+        expect(Submission.missing).to include @submission
+      end
     end
 
     context "submitted" do
@@ -3274,6 +3399,22 @@ describe Submission do
       @submission.update_columns(submission_type: nil)
 
       expect(@submission).not_to be_missing
+    end
+
+    it 'returns true for missing quiz_lti submissions' do
+        @course.context_external_tools.create!(
+          name: 'Quizzes.Next',
+          consumer_key: 'test_key',
+          shared_secret: 'test_secret',
+          tool_id: 'Quizzes 2',
+          url: 'http://example.com/launch'
+        )
+
+        @another_assignment.quiz_lti!
+        @another_assignment.save!
+
+        @another_submission.reload
+        expect(@another_submission).to be_missing
     end
   end
 
@@ -4547,10 +4688,12 @@ describe Submission do
 
     context "when post policies are enabled" do
       before(:each) do
+        @assignment.course.enable_feature!(:new_gradebook)
         PostPolicy.enable_feature!
       end
 
       it "returns empty if submission is unposted and user cannot :read_grade" do
+        @assignment.ensure_post_policy(post_manually: true)
         @viewing_user = @student
         expect(subject).to be_empty
       end
@@ -4637,6 +4780,26 @@ describe Submission do
       @submission.update!(attempt: 4)
       comment = @submission.add_comment(author: @teacher, comment: '42', attempt: 3)
       expect(comment.attempt).to eq 3
+    end
+
+    it "sets comment hidden to false if comment causes posting" do
+      PostPolicy.enable_feature!
+      @course.enable_feature!(:new_gradebook)
+      @assignment.ensure_post_policy(post_manually: false)
+      @assignment.grade_student(@student, grader: @teacher, score: 5)
+      @submission.update!(posted_at: nil)
+      comment = @submission.add_comment(author: @teacher, comment: 'a comment!', hidden: true)
+      expect(comment).not_to be_hidden
+    end
+
+    it "does not set comment hidden to false if comment does not cause posting" do
+      PostPolicy.enable_feature!
+      @course.enable_feature!(:new_gradebook)
+      @assignment.ensure_post_policy(post_manually: true)
+      @assignment.grade_student(@student, grader: @teacher, score: 5)
+      @submission.update!(posted_at: nil)
+      comment = @submission.add_comment(author: @teacher, comment: 'a comment!', hidden: true)
+      expect(comment).to be_hidden
     end
 
     describe 'audit event logging' do
@@ -6441,52 +6604,85 @@ describe Submission do
     end
   end
 
+  describe "#hide_grade_from_student?" do
+    subject(:submission) { assignment.submissions.find_by!(user: student) }
+
+    let(:course) { @course }
+    let(:assignment) { @assignment }
+    let(:teacher) { @teacher }
+    let(:student) { @student }
+
+    before do
+      course.enroll_student(student)
+      course.enroll_teacher(teacher)
+    end
+
+    it { is_expected.not_to be_hide_grade_from_student }
+
+    context 'when assignment is muted' do
+      before { assignment.mute! }
+      it { is_expected.to be_hide_grade_from_student }
+    end
+
+    context "when Post Policies are enabled" do
+      before do
+        course.enable_feature!(:new_gradebook)
+        PostPolicy.enable_feature!
+      end
+
+      context 'when assignment posts manually' do
+        before { assignment.ensure_post_policy(post_manually: true) }
+
+        it { is_expected.to be_hide_grade_from_student }
+        it { is_expected.not_to be_hide_grade_from_student(for_plagiarism: true) }
+
+        context 'when a submissions is posted' do
+          before { submission.update!(posted_at: Time.zone.now) }
+          it { is_expected.not_to be_hide_grade_from_student }
+        end
+      end
+
+      context 'when assignment posts automatically' do
+        before { assignment.ensure_post_policy(post_manually: false) }
+        it { is_expected.not_to be_hide_grade_from_student }
+
+        context 'when submission is posted' do
+          before { submission.update!(posted_at: Time.zone.now) }
+          it { is_expected.not_to be_hide_grade_from_student }
+        end
+      end
+    end
+  end
+
   describe "posting and unposting" do
-    before(:each) do
+    subject(:submission) { @assignment.submissions.first }
+
+    before do
       @assignment.course.enable_feature!(:new_gradebook)
       PostPolicy.enable_feature!
     end
 
-    let(:submission) { @assignment.submissions.first }
-
     describe "#posted?" do
+      it { is_expected.not_to be_posted }
+
       it "returns true if the submission's posted_at date is not nil" do
         submission.update!(posted_at: Time.zone.now)
         expect(submission).to be_posted
-      end
-
-      it "returns false if the submission's posted_at date is nil" do
-        expect(submission).not_to be_posted
       end
     end
 
     describe "#handle_posted_at_changed" do
       context "when posting an individual submission" do
         context "when post policies are enabled" do
-          it "calls post_submissions on the assignment with the posted submission" do
-            expect(@assignment).to receive(:post_submissions).with(hash_including(submission_ids: [submission.id]))
+          it "unmutes the assignment if all submissions are now posted" do
             submission.update!(posted_at: Time.zone.now)
+            expect(@assignment.reload).not_to be_muted
           end
 
-          it "refrains from re-updating the timestamp of the posted submission" do
-            expect(@assignment).to receive(:post_submissions).with(hash_including(skip_updating_timestamp: true))
+          it "does not unmute the assignment if some submissions remain unposted" do
+            @course.enroll_student(User.create!, enrollment_state: "active")
             submission.update!(posted_at: Time.zone.now)
-          end
-
-          it "does not call post_submissions if the submission was already posted" do
-            submission.update!(posted_at: 1.day.ago)
-
-            expect(@assignment).not_to receive(:post_submissions)
-            submission.update!(posted_at: Time.zone.now)
-          end
-        end
-
-        context "when post policies are disabled" do
-          before(:each) { PostPolicy.disable_feature! }
-
-          it "does not call post_submissions on the assignment" do
-            expect(@assignment).not_to receive(:post_submissions)
-            submission.update!(posted_at: Time.zone.now)
+            expect(@assignment.reload).to be_muted
           end
         end
       end
@@ -6495,30 +6691,11 @@ describe Submission do
         before(:each) { submission.update!(posted_at: 1.day.ago) }
 
         context "when post policies are enabled" do
-          it "calls post_submissions on the assignment with the posted submission" do
-            expect(@assignment).to receive(:hide_submissions).with(hash_including(submission_ids: [submission.id]))
-            submission.update!(posted_at: nil)
-          end
+          it "mutes an unmuted assignment when a submission is hidden" do
+            @assignment.post_submissions
 
-          it "refrains from re-updating the timestamp of the posted submission" do
-            expect(@assignment).to receive(:hide_submissions).with(hash_including(skip_updating_timestamp: true))
             submission.update!(posted_at: nil)
-          end
-
-          it "does not call hide_submissions if the submission was already posted" do
-            submission.update!(posted_at: nil)
-
-            expect(@assignment).not_to receive(:hide_submissions)
-            submission.update!(posted_at: nil)
-          end
-        end
-
-        context "when post policies are disabled" do
-          before(:each) { PostPolicy.disable_feature! }
-
-          it "does not call post_submissions on the assignment" do
-            expect(@assignment).not_to receive(:hide_submissions)
-            submission.update!(posted_at: nil)
+            expect(@assignment.reload).to be_muted
           end
         end
       end

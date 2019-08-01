@@ -30,43 +30,33 @@ describe Canvas::LiveEvents do
     )
   end
 
-  context 'when using a custom stream client' do
+  before do
+    LiveEvents.stream_client = FakeStreamClient.new
+  end
 
-    class FakeSettings
-      def call
-        {
-          'kinesis_stream_name' => 'fake_stream',
-          'aws_region' => 'us-east-1'
-        }
-      end
+  class FakeSettings
+    def call
+      {
+        'kinesis_stream_name' => 'fake_stream',
+        'aws_region' => 'us-east-1'
+      }
+    end
+  end
+
+  class FakeStreamClient
+    attr_accessor :data, :stream, :stream_name
+
+    def initialize(stream_name = 'stream')
+      @stream_name = stream_name
     end
 
-    class FakeStreamClient
-      attr_accessor :data
-
-      def put_record(stream_name:, data:, partition_key:) # rubocop:disable Lint/UnusedMethodArgument
-        @data = JSON.parse(data)
-      end
-
-      def body
-        @data['body']
-      end
+    def put_records(stream_name:, records:)
+      @data = records
+      @stream = stream_name
     end
 
-    it 'sends the event message with the injected client' do
-      fake_client = FakeStreamClient.new
-      LiveEvents.stream_client = fake_client
-      LiveEvents.set_context(nil)
-      LiveEvents.settings = FakeSettings.new
-      course = course_model
-      amended_context = described_class.amended_context(course)
-      event_name = 'a_fake_event'
-      payload = { fake: 'yes' }
-
-      described_class.post_event_stringified(event_name, payload, amended_context)
-      run_jobs
-
-      expect(fake_client.body).to eq({ 'fake' => 'yes' })
+    def body
+      @data['body']
     end
   end
 
@@ -136,7 +126,7 @@ describe Canvas::LiveEvents do
       expect_event('group_category_created',
         hash_including(
           context_type: 'Course',
-          context_id: course.global_id.to_s,
+          context_id: course.id.to_s,
           group_limit: 2
         ))
       Canvas::LiveEvents.group_category_created(group_category)
@@ -150,7 +140,7 @@ describe Canvas::LiveEvents do
       expect_event('group_category_updated',
         hash_including(
           context_type: 'Course',
-          context_id: course.global_id.to_s,
+          context_id: course.id.to_s,
           group_limit: 2
         ))
       Canvas::LiveEvents.group_category_updated(group_category)
@@ -422,14 +412,42 @@ describe Canvas::LiveEvents do
         course_with_student_submissions
       end
 
-      let(:submission) { @course.assignments.first.submissions.first }
+      let(:assignment) { @course.assignments.first }
+      let(:submission) { assignment.submissions.first }
 
-      it "is true when assignment is muted" do
-        submission.assignment.mute!
-        expect_event('grade_change', hash_including(
-          muted: true
-        ), course_context)
-        Canvas::LiveEvents.grade_changed(submission)
+      context "with post policies enabled" do
+        before(:each) do
+          @course.enable_feature!(:new_gradebook)
+          PostPolicy.enable_feature!
+
+          assignment.hide_submissions
+        end
+
+        it "is not called when a grade is changed for a submission that is not posted" do
+          expect_event('grade_change', hash_including(
+            muted: true
+          ), course_context)
+          Canvas::LiveEvents.grade_changed(submission)
+        end
+
+        it "is false when the grade is changed for a submission that is posted" do
+          assignment.post_submissions
+
+          expect_event('grade_change', hash_including(
+            muted: false
+          ), course_context)
+          Canvas::LiveEvents.grade_changed(submission)
+        end
+      end
+
+      context "with post policies disabled" do
+        it "is true when assignment is muted" do
+          submission.assignment.mute!
+          expect_event('grade_change', hash_including(
+            muted: true
+          ), course_context)
+          Canvas::LiveEvents.grade_changed(submission)
+        end
       end
     end
   end
