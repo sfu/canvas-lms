@@ -422,6 +422,10 @@ class Quizzes::QuizSubmission < ActiveRecord::Base
       @assignment_submission.user_id = self.user_id
       @assignment_submission.submission_type = "online_quiz"
       @assignment_submission.saved_by = :quiz_submission
+
+      unless @assignment_submission.posted? || @assignment_submission.assignment.post_manually?
+        @assignment_submission.posted_at = @assignment_submission.graded_at
+      end
     end
   end
 
@@ -879,5 +883,11 @@ class Quizzes::QuizSubmission < ActiveRecord::Base
 
     check_time = attributes['finished_at'] - 60.seconds
     check_time > due_at
+  end
+
+  def posted?
+    # Ungraded surveys and practice quizzes will not have associated Assignment
+    # or Submission objects, and so results should always be shown to the student.
+    quiz.ungraded? || !!submission&.posted?
   end
 end

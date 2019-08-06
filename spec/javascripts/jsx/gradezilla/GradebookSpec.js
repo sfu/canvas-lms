@@ -4330,6 +4330,52 @@ test('has no effect when the grid has not been initialized', function() {
   ok(true, 'no error was thrown')
 })
 
+QUnit.module('Gradebook#updateTotalGradeColumn', hooks => {
+  let gradebook
+
+  hooks.beforeEach(() => {
+    const columns = [
+      {id: 'student', type: 'student'},
+      {id: 'assignment_232', type: 'assignment'},
+      {id: 'total_grade', type: 'total_grade'},
+      {id: 'assignment_group_12', type: 'assignment'}
+    ]
+    gradebook = createGradebook()
+    gradebook.gridData.rows = [{id: '1101'}, {id: '1102'}]
+    sinon.stub(gradebook.courseContent.students, 'listStudentIds').returns(['1101', '1102'])
+
+    gradebook.gradebookGrid.grid = {
+      updateCell: sinon.stub(),
+      getColumns() {
+        return columns
+      }
+    }
+  })
+
+  test('makes exactly one update for each currently loaded student', () => {
+    gradebook.updateTotalGradeColumn()
+    strictEqual(gradebook.gradebookGrid.grid.updateCell.callCount, 2)
+  })
+
+  test('includes the row index of the student when updating', () => {
+    gradebook.updateTotalGradeColumn()
+    const rows = _.map(gradebook.gradebookGrid.grid.updateCell.args, args => args[0])
+    deepEqual(rows, [0, 1])
+  })
+
+  test('includes the index of the total_grade column when updating', () => {
+    gradebook.updateTotalGradeColumn()
+    const rows = _.map(gradebook.gradebookGrid.grid.updateCell.args, args => args[1])
+    deepEqual(rows, [2, 2])
+  })
+
+  test('has no effect when the grid has not been initialized', () => {
+    gradebook.gradebookGrid.grid = null
+    gradebook.updateTotalGradeColumn()
+    ok(true, 'no error was thrown')
+  })
+})
+
 QUnit.module('Gradebook Rows', function() {
   QUnit.module('#buildRows', function() {
     test('invalidates the grid', function() {
@@ -4925,6 +4971,38 @@ QUnit.module('Gradebook "Enter Grades as" Setting', function(suiteHooks) {
         strictEqual(gradebook.gradebookGrid.invalidate.callCount, 1)
       })
       gradebook.updateEnterGradesAsSetting('2301', 'percent')
+    })
+  })
+
+  QUnit.module('#postAssignmentGradesTrayOpenChanged', hooks => {
+    let updateGridStub
+
+    hooks.beforeEach(() => {
+      const assignment = {id: '2301'}
+      const column = gradebook.buildAssignmentColumn(assignment)
+      gradebook.gridData.columns.definitions[column.id] = column
+      updateGridStub = sinon.stub(gradebook, 'updateGrid')
+    })
+
+    hooks.afterEach(() => {
+      updateGridStub.restore()
+    })
+
+    test('sets the column definition postAssignmentGradesTrayOpenForAssignmentId', () => {
+      gradebook.postAssignmentGradesTrayOpenChanged({assignmentId: '2301', isOpen: true})
+      const columnId = gradebook.getAssignmentColumnId('2301')
+      const definition = gradebook.gridData.columns.definitions[columnId]
+      strictEqual(definition.postAssignmentGradesTrayOpenForAssignmentId, true)
+    })
+
+    test('calls updateGrid if a corresponding column is found', () => {
+      gradebook.postAssignmentGradesTrayOpenChanged({assignmentId: '2301', isOpen: true})
+      strictEqual(updateGridStub.callCount, 1)
+    })
+
+    test('does not call updateGrid if a corresponding column is not found', () => {
+      gradebook.postAssignmentGradesTrayOpenChanged({assignmentId: '2399', isOpen: true})
+      strictEqual(updateGridStub.callCount, 0)
     })
   })
 })
@@ -9076,7 +9154,7 @@ QUnit.module('Gradebook#gotAllAssignmentGroups', hooks => {
   })
 })
 
-QUnit.module('Gradebook#handleAssignmentMutingChange', hooks => {
+QUnit.module('Gradebook#handleSubmissionPostedChange', hooks => {
   let columnId
   let server
   let options
@@ -9105,14 +9183,14 @@ QUnit.module('Gradebook#handleAssignmentMutingChange', hooks => {
 
   test('resets grading', () => {
     sinon.stub(gradebook, 'resetGrading')
-    gradebook.handleAssignmentMutingChange({id: '2301'})
+    gradebook.handleSubmissionPostedChange({id: '2301'})
     strictEqual(gradebook.resetGrading.callCount, 1)
     gradebook.resetGrading.restore()
   })
 
   test('when sorted by an anonymous assignment, gradebook changes sort', () => {
     gradebook.setSortRowsBySetting(columnId, 'grade', 'ascending')
-    gradebook.handleAssignmentMutingChange({id: '2301', anonymize_students: true})
+    gradebook.handleSubmissionPostedChange({id: '2301', anonymize_students: true})
     deepEqual(gradebook.getSortRowsBySetting(), sortByStudentNameSettings)
   })
 
@@ -9123,7 +9201,7 @@ QUnit.module('Gradebook#handleAssignmentMutingChange', hooks => {
       'grade',
       'ascending'
     )
-    gradebook.handleAssignmentMutingChange({
+    gradebook.handleSubmissionPostedChange({
       id: '2301',
       anonymize_students: true,
       assignment_group_id: groupId
@@ -9133,22 +9211,46 @@ QUnit.module('Gradebook#handleAssignmentMutingChange', hooks => {
 
   test('when sorted by total grade, gradebook changes sort', () => {
     gradebook.setSortRowsBySetting('total_grade', 'grade', 'ascending')
-    gradebook.handleAssignmentMutingChange({id: '2301', anonymize_students: true})
+    gradebook.handleSubmissionPostedChange({id: '2301', anonymize_students: true})
     deepEqual(gradebook.getSortRowsBySetting(), sortByStudentNameSettings)
   })
 
   test('when assignment is not anonymous, gradebook does not change sort', () => {
     gradebook.setSortRowsBySetting(columnId, 'grade', 'ascending')
     const sortSettings = gradebook.getSortRowsBySetting()
-    gradebook.handleAssignmentMutingChange({id: '2301', anonymize_students: false})
+    gradebook.handleSubmissionPostedChange({id: '2301', anonymize_students: false})
     deepEqual(gradebook.getSortRowsBySetting(), sortSettings)
   })
 
   test('when gradebook is sorted by an unrelated column, gradebook does not change sort', () => {
     gradebook.setSortRowsBySetting(gradebook.getAssignmentColumnId('2222'), 'grade', 'ascending')
     const sortSettings = gradebook.getSortRowsBySetting()
-    gradebook.handleAssignmentMutingChange({id: '2301', anonymize_students: true})
+    gradebook.handleSubmissionPostedChange({id: '2301', anonymize_students: true})
     deepEqual(gradebook.getSortRowsBySetting(), sortSettings)
+  })
+})
+
+QUnit.module('Gradebook#getSubmission', hooks => {
+  let gradebook
+
+  hooks.beforeEach(() => {
+    gradebook = createGradebook()
+    gradebook.students = {
+      1101: {id: '1101', assignment_201: {score: 10, possible: 20}, assignment_202: {}},
+      1102: {id: '1102', assignment_201: {}}
+    }
+  })
+
+  test('returns the submission when the student and submission are both present', () => {
+    deepEqual(gradebook.getSubmission('1101', '201'), {score: 10, possible: 20})
+  })
+
+  test('returns undefined when the student is present but the submission is not', () => {
+    strictEqual(gradebook.getSubmission('1101', '999'), undefined)
+  })
+
+  test('returns undefined when the student is not present', () => {
+    strictEqual(gradebook.getSubmission('2202', '201'), undefined)
   })
 })
 

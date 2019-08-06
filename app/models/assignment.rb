@@ -57,7 +57,7 @@ class Assignment < ActiveRecord::Base
     anonymous_instructor_annotations
   ].freeze
 
-  attr_accessor :previous_id, :copying, :user_submitted
+  attr_accessor :previous_id, :copying, :user_submitted, :grade_posting_in_progress
   attr_reader :assignment_changed
   attr_writer :updating_user
 
@@ -503,7 +503,8 @@ class Assignment < ActiveRecord::Base
               :apply_late_policy,
               :update_line_items,
               :ensure_manual_posting_if_anonymous,
-              :ensure_manual_posting_if_moderated
+              :ensure_manual_posting_if_moderated,
+              :create_default_post_policy
 
   with_options if: -> { auditable? && @updating_user.present? } do
     after_create :create_assignment_created_audit_event!
@@ -673,7 +674,7 @@ class Assignment < ActiveRecord::Base
   def needs_to_recompute_grade?
     !id_before_last_save.nil? && (
       saved_change_to_points_possible? ||
-      (saved_change_to_muted? && !course.feature_enabled?(:post_policies)) ||
+      (saved_change_to_muted? && !course.post_policies_enabled?) ||
       saved_change_to_workflow_state? ||
       saved_change_to_assignment_group_id? ||
       saved_change_to_only_visible_to_overrides? ||
@@ -920,7 +921,9 @@ class Assignment < ActiveRecord::Base
   end
 
   def update_submittable
-    return true if self.deleted?
+    # If we're updating the assignment's muted status as part of posting
+    # grades, don't bother doing this
+    return true if self.deleted? || grade_posting_in_progress
     if self.submission_types == "online_quiz" && @saved_by != :quiz
       quiz = Quizzes::Quiz.where(assignment_id: self).first || self.context.quizzes.build
       quiz.assignment_id = self.id
@@ -1650,7 +1653,11 @@ class Assignment < ActiveRecord::Base
   end
 
   def submission_for_student(user)
-    self.all_submissions.where(user_id: user.id).first_or_initialize
+    submission_for_student_id(user.id)
+  end
+
+  def submission_for_student_id(user_id)
+    self.all_submissions.where(user_id: user_id).first_or_initialize
   end
 
   def compute_grade_and_score(grade, score)
@@ -1796,7 +1803,7 @@ class Assignment < ActiveRecord::Base
       submission.grade_matches_current_submission = true
       submission.regraded = true
       submission.graded_at = Time.zone.now
-      submission.posted_at = submission.graded_at unless submission.posted? || post_manually?
+      submission.posted_at = submission.graded_at unless submission.posted_at.present? || post_manually?
     end
     submission.audit_grade_changes = did_grade || submission.excused_changed?
 
@@ -1909,9 +1916,6 @@ class Assignment < ActiveRecord::Base
       submissions: []
     }
 
-    # Only teachers (those who can manage grades) can have hidden comments
-    opts[:hidden] = muted? && self.context.grants_right?(opts[:author], :manage_grades) unless opts.key?(:hidden)
-
     if opts[:comment] && opts[:assessment_request]
       # if there is no rubric the peer review is complete with just a comment
       opts[:assessment_request].complete unless opts[:assessment_request].rubric_association
@@ -1947,6 +1951,10 @@ class Assignment < ActiveRecord::Base
   end
 
   def save_comment_to_submission(submission, group, opts, uuid = nil)
+    # Only teachers (those who can manage grades) can have hidden comments
+    unless opts.key?(:hidden)
+      opts[:hidden] = submission.hide_grade_from_student? && self.context.grants_right?(opts[:author], :manage_grades)
+    end
     submission.group = group
     submission.save! if submission.changed?
     opts[:group_comment_id] = uuid if group && uuid
@@ -3128,7 +3136,7 @@ class Assignment < ActiveRecord::Base
   end
 
   def post_manually?
-    if course.feature_enabled?(:post_policies)
+    if course.post_policies_enabled?
       !!effective_post_policy&.post_manually?
     else
       muted?
@@ -3154,7 +3162,7 @@ class Assignment < ActiveRecord::Base
     submissions.in_workflow_state('graded').each(&:assignment_muted_changed)
 
     show_stream_items(submissions: submissions)
-    if course.feature_enabled?(:post_policies)
+    if course.post_policies_enabled?
       course.recompute_student_scores(submissions.pluck(:user_id))
       update_muted_status!
     end
@@ -3175,7 +3183,7 @@ class Assignment < ActiveRecord::Base
     submissions.update_all(posted_at: nil, updated_at: Time.zone.now) unless skip_updating_timestamp
     submissions.in_workflow_state('graded').each(&:assignment_muted_changed)
     hide_stream_items(submissions: submissions)
-    if course.feature_enabled?(:post_policies)
+    if course.post_policies_enabled?
       course.recompute_student_scores(submissions.pluck(:user_id))
       update_muted_status!
     end
@@ -3183,7 +3191,8 @@ class Assignment < ActiveRecord::Base
   end
 
   def ensure_post_policy(post_manually:)
-    return unless course.feature_enabled?(:post_policies)
+    # Anonymous assignments can never be set to automatically posted
+    return if anonymous_grading? && !post_manually
 
     build_post_policy(course: course) if post_policy.blank?
     post_policy.update!(post_manually: post_manually)
@@ -3221,19 +3230,29 @@ class Assignment < ActiveRecord::Base
   end
 
   def set_muted_if_post_policies_enabled
-    return unless course.feature_enabled?(:post_policies)
+    return unless course.post_policies_enabled?
     self.muted = true
   end
   private :set_muted_if_post_policies_enabled
 
   def ensure_manual_posting_if_anonymous
-    return unless course.feature_enabled?(:post_policies) && saved_change_to_anonymous_grading?(from: false, to: true)
-    ensure_post_policy(post_manually: true)
+    ensure_post_policy(post_manually: true) if saved_change_to_anonymous_grading?(from: false, to: true)
   end
 
   def ensure_manual_posting_if_moderated
-    return unless course.feature_enabled?(:post_policies) && saved_change_to_moderated_grading?(from: false, to: true)
-    ensure_post_policy(post_manually: true)
+    ensure_post_policy(post_manually: true) if saved_change_to_moderated_grading?(from: false, to: true)
+  end
+
+  def create_default_post_policy
+    return if post_policy.present?
+
+    post_manually = if course.default_post_policy.present?
+      course.default_post_policy.post_manually
+    else
+      false
+    end
+
+    create_post_policy!(course: course, post_manually: post_manually)
   end
 
   def due_date_ok?

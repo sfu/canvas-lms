@@ -25,6 +25,7 @@ import _ from 'underscore'
 import $ from 'jquery'
 import calcCmd from './calcCmd'
 import htmlEscape from './str/htmlEscape'
+import numberHelper from 'jsx/shared/helpers/numberHelper'
 import pluralize from './str/pluralize'
 import Handlebars from 'compiled/handlebars_helpers'
 import DueDateOverrideView from 'compiled/views/assignments/DueDateOverride'
@@ -266,7 +267,12 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
       var answer = $.extend({}, quiz.defaultAnswerData, currentData, data);
 
       $answer.find(".answer_type").hide().filter("." + answer.answer_type).show();
-      answer.answer_weight = parseFloat(answer.answer_weight);
+      answer.answer_weight = numberHelper.parse(answer.answer_weight);
+
+      // For every float_valued input, localize the string before display
+      $answer.find('input.float_value').each(function (idx, inputEl) {
+        answer[inputEl.name] = I18n.n(answer[inputEl.name]);
+      });
 
       if (isNaN(answer.answer_weight)) {
         answer.answer_weight = 0;
@@ -540,7 +546,7 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
       $question.find(".multiple_answer_sets_holder").css('display', 'none');
       $question.find(".variable_definitions_holder").css('display', 'none').find("tbody").empty();
       $question.find(".formulas_holder").css('display', 'none').find(".formulas_list").empty();
-      $question.find('.question_points').text(question.points_possible);
+      $question.find('.question_points').text(I18n.n(question.points_possible));
       var details = quiz.answerTypeDetails(question.question_type);
       var answer_type = details.answer_type,
           question_type = details.question_type,
@@ -562,13 +568,13 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
           $td.text(variable.name);
           $tr.append($td);
           $td = $("<td class='min'/>");
-          $td.text(variable.min);
+          $td.text(I18n.n(variable.min));
           $tr.append($td);
           $td = $("<td class='max'/>");
-          $td.text(variable.max);
+          $td.text(I18n.n(variable.max));
           $tr.append($td);
           $td = $("<td class='scale'/>");
-          $td.text(variable.scale);
+          $td.text(I18n.n(variable.scale));
           $tr.append($td);
           $question.find(".variable_definitions_holder").css('display', '');
           $question.find(".variable_definitions tbody").append($tr);
@@ -597,16 +603,18 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
             var $tr = $("<tr/>");
             for(var idx in data.variables) {
               var $td = $("<td/>");
-              $td.text(data.variables[idx].value);
+              $td.text(I18n.n(data.variables[idx].value));
               $tr.append($td);
             }
             var $td = $("<td class='final_answer'/>");
-            var answerHtml = data.answer;
+            var answerHtml = I18n.n(data.answer);
             if (question.answerDecimalPoints || question.answer_tolerance) {
               var tolerance = parseFloatOrPercentage(question.answer_tolerance);
               tolerance = tolerance || Math.pow(0.1, question.answerDecimalPoints);
-              answerHtml = answerHtml + " <span style='font-size: 0.8em;'>+/-</span> " + htmlEscape(tolerance);
-              $question.find(".answer_tolerance").text(tolerance);
+              if (tolerance) {
+                answerHtml = answerHtml + " <span style='font-size: 0.8em;'>+/-</span> " + htmlEscape(formatFloatOrPercentage(tolerance));
+                $question.find(".answer_tolerance").text(formatFloatOrPercentage(tolerance));
+              }
             }
             $td.html(answerHtml);
             $tr.append($td);
@@ -879,12 +887,12 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
     calculatePointsPossible: function() {
       var tally = 0;
       $("#questions .question_holder:not(.group) .question:not(#question_new)").each(function() {
-        var val = parseFloat($(this).find(".question_points,.question_points.hidden").text());
+        var val = numberHelper.parse($(this).find(".question_points,.question_points.hidden").text());
         if (isNaN(val) || val < 0) { val = 0; }
         tally += val;
       });
       $("#questions .group_top:not(#group_top_new)").each(function(){
-        var val = parseFloat($(this).find(".question_points").text());
+        var val = numberHelper.parse($(this).find(".question_points").text());
         if (isNaN(val) || val < 0) { val = 0; }
         var pickCount = $(this).find(".pick_count").text() || 0;
         if (isNaN(pickCount)) { pickCount = 0; }
@@ -928,7 +936,7 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
           $warning.hide();
         }
       });
-      $(".points_possible").text(this.calculatePointsPossible());
+      $(".points_possible").text(I18n.n(this.calculatePointsPossible()));
     },
 
     findContainerGroup: function($obj) {
@@ -947,20 +955,18 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
     parseInput: function($input, type, precision = 10) {
       if ($input.val() == "") { return; }
 
-      var val = $input.val().replace(/,/g, '');
+      var val = numberHelper.parse($input.val())
 
       if (type == "int") {
-        val = parseInt(val, 10);
         if (isNaN(val)) { val = 0; }
       } else if (type == "float") {
-        val = Math.round(parseFloat(val) * 100.0) / 100.0;
+        val = Math.round(val * 100.0) / 100.0;
         if (isNaN(val)) { val = 0.0; }
       } else if (type == "float_long") {
-        val = Math.round(parseFloat(val) * 10000.0) / 10000.0;
+        val = Math.round(val * 10000.0) / 10000.0;
         if (isNaN(val)) { val = 0.0; }
       } else if (type == "precision") {
         // Parse value and force NaN to 0
-        val = parseFloat(val)
         if (isNaN(val)) { val = 0.0; }
 
         if (val === 0) {
@@ -980,7 +986,7 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
         }
       }
 
-      $input.val(val);
+      $input.val(I18n.n(val));
     },
 
     /*****
@@ -1003,7 +1009,7 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
     validateAnswerTolerance: function($input) {
       var val = $input.val();
       if (val == "") { return; }
-      $input.val( parseFloatOrPercentage(val) );
+      $input.val(formatFloatOrPercentage(parseFloatOrPercentage(val)));
     },
 
     defaultQuestionData: {
@@ -1051,7 +1057,7 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
 
     validatePoints: function() {
       var value  = $("input#quiz_points_possible").val();
-      var numVal = parseInt(value);
+      var numVal = numberHelper.parse(value);
 
       if (value && isNaN(numVal)) {
         $("input#quiz_points_possible").trigger("invalid:not_a_number");
@@ -1340,7 +1346,7 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
     $answer.find('div.answer_match_left').showIf(!data.answer_match_left_html);
     $answer.find('div.answer_match_left_html').showIf(data.answer_match_left_html);
     delete answer['answer_type'];
-    answer.answer_weight = parseFloat(answer.answer_weight);
+    answer.answer_weight = numberHelper.parse(answer.answer_weight);
     if (isNaN(answer.answer_weight)) { answer.answer_weight = 0; }
 
     $answer.fillFormData({answer_text: answer.answer_text});
@@ -1366,7 +1372,7 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
     var answer = $.extend({}, quiz.defaultAnswerData, data);
     var $answer = $("#form_answer_template").clone(true).attr('id', '');
     $answer.find(".answer_type").hide().filter("." + answer.answer_type).show();
-    answer.answer_weight = parseFloat(answer.answer_weight);
+    answer.answer_weight = numberHelper.parse(answer.answer_weight);
 
     if (isNaN(answer.answer_weight)) { answer.answer_weight = 0; }
     quiz.updateFormAnswer($answer, answer, true);
@@ -1433,6 +1439,9 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
         question.variables = [];
         $question.find(".variable_definitions_holder .variable_definitions tbody tr").each(function() {
           var data = $(this).getTemplateData({textValues: ['name', 'min', 'max', 'scale']});
+          data.min = numberHelper.parse(data.min);
+          data.max = numberHelper.parse(data.max);
+          data.scale = numberHelper.parse(data.scale);
           question.variables.push(data);
         });
         question.answers = [];
@@ -1442,17 +1451,19 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
           $(this).find("td:not(.final_answer)").each(function(i) {
             var variable = {};
             variable.name = question.variables[i].name;
-            variable.value = parseFloat($(this).text(), 10) || 0;
+            variable.value = numberHelper.parse($(this).text()) || 0;
             data.variables.push(variable);
           });
-          data.answer_text = parseFloat($(this).find(".final_answer").text(), 10) || 0;
+          var final_answer = $(this).find("td.final_answer").text().split('+/-')[0];
+          data.answer_text = numberHelper.parse(final_answer) || 0;
+
           question.answers.push(data);
         });
-        question.formula_decimal_places = parseInt($question.find(".formula_decimal_places").text(), 10) || 0;
-        question.answer_tolerance = parseFloatOrPercentage($question.find(".answer_tolerance").text(), 10) || 0;
+        question.formula_decimal_places = numberHelper.parse($question.find(".formula_decimal_places").text()) || 0;
+        question.answer_tolerance = parseFloatOrPercentage($question.find(".answer_tolerance").text());
       }
       question.position = i;
-      question.question_points = parseFloat(question.question_points);
+      question.question_points = numberHelper.parse(question.question_points);
       if (isNaN(question.question_points) || question.question_points < 0) {
         question.question_points = 0;
       }
@@ -1556,19 +1567,24 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
     var result;
 
     // percentage value
-    if ((val + "").indexOf('%') === val.length - 1) {
-      var number = val.replace("%", "");
-      result = (Math.round(parseFloat(number) * 10000.0) / 10000.0) + "%";
-
+    if ($.trim(val + "").indexOf('%') === val.length - 1) {
+      result = (Math.round(numberHelper.parse(val.replace("%", "")) * 10000.0) / 10000.0) + "%";
     // point value
-    } else if (!isNaN(val)) {
-      result = Math.round(parseFloat(val) * 10000.0) / 10000.0;
-      if (isNaN(result)) { result = 0.0; }
-
     } else {
-      result = 0.0;
+      result = Math.round(numberHelper.parse(val) * 10000.0) / 10000.0;
     }
-    return result;
+    return result || 0;
+  }
+
+  function formatFloatOrPercentage(val) {
+    var valstr = val + "";
+    if (!val) {
+      return ""
+    } else if (valstr.indexOf('%') >= 0) {
+      return I18n.n(valstr.replace("%", "")) + "%";
+    } else {
+      return I18n.n(valstr);
+    }
   }
 
   function toggleConditionalReleaseTab(quizType) {
@@ -1846,8 +1862,10 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
           $('html,body').scrollTo({top: offset.top, left:0});
           return false;
         }
-
         data['quiz[title]'] = quiz_title;
+
+        data['quiz[points_possible'] = numberHelper.parse($("input[name='quiz[points_possible]']").val());
+
         if (!lockedItems.content) {
           data['quiz[description]'] = RichContentEditor.callOnRCE($('#quiz_description'), 'get_code');
         }
@@ -2114,10 +2132,7 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
       $question.find(".matching_answer_incorrect_matches_list li").each(function() {
         matches.push($(this).text());
       });
-
       question.matching_answer_incorrect_matches = matches.join("\n");
-      question.question_points = parseFloat(question.question_points, 10);
-      if (isNaN(question.question_points) || question.question_points < 0) { question.question_points = 0; }
       var $form = $("#question_form_template").clone(true).attr('id', '');
       var $formQuestion = $form.find(".question");
       $formQuestion.addClass('initialLoad');
@@ -2151,9 +2166,9 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
             $var = $($form.find(".variables .variable").get(idx));
           }
           if ($var && $var.length > 0) {
-            $var.find(".min").val(question.variables[idx].min);
-            $var.find(".max").val(question.variables[idx].max);
-            $var.find(".round").val(question.variables[idx].scale);
+            $var.find(".min").val(I18n.n(question.variables[idx].min));
+            $var.find(".max").val(I18n.n(question.variables[idx].max));
+            $var.find(".round").val(I18n.n(question.variables[idx].scale));
           }
           var $th = $("<th/>");
           $th.text(question.variables[idx].name);
@@ -2170,20 +2185,20 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
           $form.find(".save_formula_button").click();
         }
         if (question.answer_tolerance) {
-          $form.find(".combination_answer_tolerance").val(question.answer_tolerance);
+          $form.find(".combination_answer_tolerance").val(formatFloatOrPercentage(question.answer_tolerance));
         }
         $form.find(".combination_count").val(question.answers.length);
         for(var idx in question.answers) {
           var $tr = $("<tr/>");
           for(var jdx in question.answers[idx].variables) {
             var $td = $("<td/>");
-            $td.text(question.answers[idx].variables[jdx].value);
+            $td.text(I18n.n(question.answers[idx].variables[jdx].value));
             $td.attr('aria-labelledby', 'possible_solution_' + question.answers[idx].variables[jdx].name);
             $tr.append($td);
           }
-          var html = question.answers[idx].answer_text;
+          var html = I18n.n(question.answers[idx].answer_text);
           if (question.answer_tolerance) {
-            html = html + " <span style='font-size: 0.8em;'>+/-</span> " + htmlEscape(question.answer_tolerance);
+            html = html + " <span style='font-size: 0.8em;'>+/-</span> " + htmlEscape(formatFloatOrPercentage(question.answer_tolerance));
           }
           var $td = $("<td class='final_answer'/>");
           $td.html(html);
@@ -2997,13 +3012,9 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
 
       // save any open html answers or comments
       $form.find('.edit_html_done').trigger('click');
-      var questionData = $question.getFormData({
-        textValues: ['question_type', 'question_name', 'question_points', 'correct_comments', 'incorrect_comments', 'neutral_comments',
-          'question_text', 'answer_selection_type', 'text_after_answers', 'matching_answer_incorrect_matches',
-          'regrade_option', 'regrade_disabled'],
-        htmlValues: ['correct_comments_html', 'incorrect_comments_html', 'neutral_comments_html']
-      });
+      var questionData = $question.getFormData();
 
+      questionData.question_points = numberHelper.parse(questionData.question_points);
       if (questionData.question_points && questionData.question_points < 0) {
         $form.find("input[name='question_points']").errorBox(I18n.t('question.positive_points', "Must be zero or greater"));
         return;
@@ -3052,7 +3063,7 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
         return;
       }
       var question = $.extend({}, questionData);
-      question.points_possible = parseFloat(question.question_points);
+      question.points_possible = questionData.question_points;
       question.answers = [];
 
       $displayQuestion.find(".blank_id_select").empty();
@@ -3077,6 +3088,12 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
         data.blank_id = $answer.find(".blank_id").text();
         data.answer_text = $answer.find("input[name='answer_text']:visible").val();
         data.answer_html = $answer.find(".answer_html").html();
+
+        // Parse any of our float_valued inputs out of the user's locale for submission
+        $answer.find('input.float_value').each(function (idx, inputEl) {
+          data[inputEl.name] = numberHelper.parse($(inputEl).val());
+        });
+
         if (questionData.question_type == "true_false_question") {
           data.answer_text = $answer.find(".fixed_answer .answer_text").text();
           if (data.answer_text.length == 0) {
@@ -3101,9 +3118,9 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
           var data = {};
           data.scale = "0";
           data.name = $(this).find(".name").text();
-          data.scale = parseFloat($(this).find(".round").val(), 10) || 0;
-          data.min = parseFloat($(this).find(".min").val(), 10) || 0;
-          data.max = parseFloat($(this).find(".max").val(), 10) || 0;
+          data.scale = numberHelper.parse($(this).find(".round").val()) || 0;
+          data.min = numberHelper.parse($(this).find(".min").val()) || 0;
+          data.max = numberHelper.parse($(this).find(".max").val()) || 0;
           sorts[data.name] = i;
           question.variables.push(data);
         });
@@ -3113,18 +3130,21 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
           data.formula = $.trim($(this).text());
           question.formulas.push(data);
         });
-        question.formula_decimal_places = parseInt($question.find(".decimal_places .round").val(), 10) || 0;
+        question.formula_decimal_places = numberHelper.parse($question.find(".decimal_places .round").val()) || 0;
         question.answer_tolerance = parseFloatOrPercentage($question.find(".combination_answer_tolerance").val());
-        question.answerDecimalPoints = parseFloat($question.find(".combination_error_margin").val(), 10) || 0;
+        question.answerDecimalPoints = numberHelper.parse($question.find(".combination_error_margin").val()) || 0;
         var $ths = $question.find(".combinations thead th");
         $question.find(".combinations tbody tr").each(function() {
           var data = {};
           data.variables = [];
-          data.answer = parseFloat($(this).find("td.final_answer").text(), 10) || 0;
+
+          var final_answer = $(this).find("td.final_answer").text().split('+/-')[0];
+          data.answer = numberHelper.parse(final_answer) || 0;
+
           $(this).find("td:not(.final_answer)").each(function(i) {
             var variable = {};
             variable.name = $.trim($ths.eq(i).text());
-            variable.value = parseFloat($(this).text(), 10) || 0;
+            variable.value = numberHelper.parse($(this).text()) || 0;
             data.variables.push(variable);
           });
           data.variables = data.variables.sort(function(a, b) {
@@ -3221,6 +3241,8 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
         quiz.parseInput($el, 'float_long');
       } else if ($el.hasClass('precision')) {
         quiz.parseInput($el, 'precision', $el.siblings('.precision_value').val());
+      } else if ($el.hasClass('percentage')) {
+        quiz.validateAnswerTolerance($el);
       } else {
         quiz.parseInput($el, 'float');
       }
@@ -3235,14 +3257,6 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
       var $el = $(this);
       quiz.parseInputRange($el, 'int', 1, 16);
       $el.siblings('.float_value.precision').change();
-    });
-
-    $(document).delegate("input.combination_answer_tolerance", 'keydown', function(event) {
-      if (!event.metaKey && event.keyCode > 57 && event.keyCode < 91) {
-        event.preventDefault();
-      }
-    }).delegate('input.combination_answer_tolerance', 'change blur focus', function(event) {
-      quiz.validateAnswerTolerance($(this));
     });
 
     $("#questions").delegate('.question_teaser_link', 'click', function(event) {
@@ -3267,7 +3281,7 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
         $teaser.after($question);
         $teaser.remove();
         $question.show();
-        $question.find(".question_points").text(questionData.points_possible);
+        $question.find(".question_points").text(I18n.n(questionData.points_possible));
         quiz.updateDisplayQuestion($question.find(".display_question"), questionData, true);
         $questionHeader.attr('tabindex', '0');
         $questionHeader.focus();
@@ -4050,7 +4064,7 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
       $th.addClass('final_answer');
       $table.find("thead tr").append($th);
       $table.find("tbody").empty();
-      var cnt = parseInt($question.find(".combination_count").val(), 10) || 10;
+      var cnt = numberHelper.parse($question.find(".combination_count").val()) || 10;
       if (cnt < 0) {
         cnt = 10;
       } else if (cnt > ENV.quiz_max_combination_count) {
@@ -4096,15 +4110,14 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
               var $result = $("<tr/>");
               $variable_values.each(function() {
                 var $td = $("<td/>");
-                $td.html($(this).attr('data-value'));
+                $td.text(I18n.n($(this).attr('data-value')));
                 $result.append($td);
               });
               var $td = $("<td/>");
               $td.addClass('final_answer');
-              var html = htmlEscape(solution.rawText());
-              var tolerance = answer_tolerance;
-              if (tolerance) {
-                html += " <span style='font-size: 0.8em;'>+/-</span> " + htmlEscape(tolerance);
+              var html = htmlEscape(I18n.n(solution.rawValue()));
+              if (answer_tolerance) {
+                html += " <span style='font-size: 0.8em;'>+/-</span> " + htmlEscape(formatFloatOrPercentage(answer_tolerance));
               }
               $td.html(html);
               $result.append($td);
@@ -4172,8 +4185,8 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
       var data = $variable.data('cached_data');
       if (!data || !options || !options.cache || (options.recompute && options.cache)) {
         data = $variable.getFormData();
-        data.min = parseFloat(data.min) || 0;
-        data.max = Math.max(data.min, parseFloat(data.max) || 0);
+        data.min = numberHelper.parse(data.min) || 0;
+        data.max = Math.max(data.min, numberHelper.parse(data.max) || 0);
         data.round = parseInt(data.round, 10) || 0;
         data.range = data.max - data.min;
         data.rounder = Math.pow(10, data.round) || 1;
@@ -4185,7 +4198,7 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
       val = Math.round(val * data.rounder) / (data.rounder);
       $variable.attr('data-value', val);
       if (!options || options.template || options.recompute) {
-        $variable.find(".value").text(val);
+        $variable.find(".value").text(I18n.n(val));
       }
       if (!options || options.recompute) {
         $question.find(".supercalc").superCalc('recalculate');
@@ -4230,9 +4243,9 @@ const lockedItems = lockManager.isChildContent() ? lockManager.getItemLocks() : 
 
                 $variable = $("<tr class='variable'>"
                               + "<th id='" + label_id + "' class='name'></th>"
-                              + "<td><div><input aria-labelledby='" + label_id + " equation_var_minimum' type='text' name='min' class='min variable_setting' style='width: 70%;' value='1'/></div></td>"
-                              + "<td><div><input aria-labelledby='" + label_id + " equation_var_maximum' type='text' name='max' class='max variable_setting' style='width: 70%;' value='10'/></div></td>"
-                              + "<td><div style='width: 70%;'><select aria-labelledby='" + label_id + " equation_var_precision' name='round' class='round variable_setting'><option>0</option><option>1</option><option>2</option><option>3</option></div></td>"
+                              + "<td><div><input aria-labelledby='" + label_id + " equation_var_minimum' type='text' name='min' class='float_value min variable_setting' style='width: 70%;' value='1'/></div></td>"
+                              + "<td><div><input aria-labelledby='" + label_id + " equation_var_maximum' type='text' name='max' class='float_value max variable_setting' style='width: 70%;' value='10'/></div></td>"
+                              + "<td><div style='width: 70%;'><select aria-labelledby='" + label_id + " equation_var_precision' name='round' class='float_value round variable_setting'><option>0</option><option>1</option><option>2</option><option>3</option></div></td>"
                               + "<td aria-labelledby='equation_var_example' class='value'></td></tr>");
 
                 $question.find(".variables tbody").append($variable);
