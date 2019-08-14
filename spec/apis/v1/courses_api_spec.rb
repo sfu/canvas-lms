@@ -3590,6 +3590,7 @@ describe CoursesController, type: :request do
           'allow_student_discussion_topics' => true,
           'allow_student_forum_attachments' => false,
           'allow_student_discussion_editing' => true,
+          'filter_speed_grader_by_student_group' => false,
           'grading_standard_enabled' => false,
           'grading_standard_id' => nil,
           'allow_student_organized_groups' => true,
@@ -3608,6 +3609,7 @@ describe CoursesController, type: :request do
 
       it "should update settings" do
         @course.enable_feature!(:new_gradebook)
+        @course.root_account.enable_feature!(:filter_speed_grader_by_student_group)
         @course.enable_feature!(:final_grades_override)
         expect(Auditors::Course).to receive(:record_updated).
           with(anything, anything, anything, source: :api)
@@ -3623,6 +3625,7 @@ describe CoursesController, type: :request do
           :allow_student_forum_attachments => true,
           :allow_student_discussion_editing => false,
           :allow_student_organized_groups => false,
+          :filter_speed_grader_by_student_group => true,
           :hide_distribution_graphs => true,
           :hide_final_grades => true,
           :lock_all_announcements => true,
@@ -3636,6 +3639,7 @@ describe CoursesController, type: :request do
           'allow_student_discussion_topics' => false,
           'allow_student_forum_attachments' => true,
           'allow_student_discussion_editing' => false,
+          'filter_speed_grader_by_student_group' => true,
           'grading_standard_enabled' => false,
           'grading_standard_id' => nil,
           'allow_student_organized_groups' => false,
@@ -3681,6 +3685,7 @@ describe CoursesController, type: :request do
           'allow_student_discussion_topics' => true,
           'allow_student_forum_attachments' => false,
           'allow_student_discussion_editing' => true,
+          'filter_speed_grader_by_student_group' => false,
           'grading_standard_enabled' => false,
           'grading_standard_id' => nil,
           'allow_student_organized_groups' => true,

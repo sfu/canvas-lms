@@ -688,7 +688,7 @@ module ApplicationHelper
   end
   private :brand_config_account
 
-  def include_account_js(options = {})
+  def include_account_js
     return if params[:global_includes] == '0' || !@domain_root_account
 
     includes = if @domain_root_account.allow_global_includes? && (abc = active_brand_config(ignore_high_contrast_preference: true))
@@ -698,7 +698,6 @@ module ApplicationHelper
     end
 
     if includes.present?
-      includes.unshift("/node_modules/jquery/jquery.js") if options[:raw]
       javascript_include_tag(*includes, defer: true)
     end
   end
@@ -1014,14 +1013,15 @@ module ApplicationHelper
     super
   end
 
-  def generate_access_verifier(return_url: nil)
+  def generate_access_verifier(return_url: nil, fallback_url: nil)
     Users::AccessVerifier.generate(
       user: @current_user,
       real_user: logged_in_user,
       developer_key: @access_token&.developer_key,
       root_account: @domain_root_account,
       oauth_host: request.host_with_port,
-      return_url: return_url
+      return_url: return_url,
+      fallback_url: fallback_url
     )
   end
 
@@ -1193,6 +1193,15 @@ module ApplicationHelper
     # deferred redirect through route because it may be saved for later use
     # after a direct link to attachment.thumbnail_url would have expired
     super(attachment, uuid || attachment.uuid, url_options)
+  end
+
+  def prefetch_assignment_external_tools
+    content_tag(:div, id: 'assignment_external_tools') do
+      prefetch_xhr(api_v1_course_launch_definitions_path(
+        @context,
+        'placements[]' => 'assignment_view'
+      ))
+    end
   end
 
   if CANVAS_RAILS5_1
