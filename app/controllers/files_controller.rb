@@ -194,10 +194,13 @@ class FilesController < ApplicationController
   end
 
   def check_file_access_flags
+    access_verifier = {}
     begin
       access_verifier = validate_access_verifier
+    rescue Canvas::Security::TokenExpired
+      # maybe their browser is being stupid and came to the files domain directly with an old verifier - try to go back and get a new one
+      return redirect_to_fallback_url if files_domain?
     rescue Users::AccessVerifier::InvalidVerifier
-      access_verifier = {}
     end
 
     if access_verifier[:user]
@@ -227,6 +230,16 @@ class FilesController < ApplicationController
     true
   end
   protected :check_file_access_flags
+
+  def redirect_to_fallback_url
+    fallback_url = params[:sf_verifier] && Canvas::Security.decode_jwt(params[:sf_verifier], ignore_expiration: true)[:fallback_url]
+    if fallback_url
+      redirect_to fallback_url
+    else
+      render_unauthorized_action # oh well we tried
+    end
+  end
+  protected :redirect_to_fallback_url
 
   def index
     return react_files
@@ -478,6 +491,7 @@ class FilesController < ApplicationController
       # this implicit context magic happens in ApplicationController#get_context
       if @context.nil? || @current_user.nil? || @context == @current_user
         @attachment = Attachment.find(params[:id])
+        @context = nil unless @context == @current_user || @context == @attachment.context
         @skip_crumb = true unless @context
       else
         # note that Attachment#find has special logic to find overwriting files; see FindInContextAssociation
@@ -1186,7 +1200,8 @@ class FilesController < ApplicationController
       attachment = Attachment.active.where(id: params[:id], uuid: params[:uuid]).first if params[:id].present?
       thumb_opts = params.slice(:size)
       url = authenticated_thumbnail_url(attachment, thumb_opts)
-      Rails.cache.write(cache_key, url, :expires_in => attachment.url_ttl) if url
+      # only cache for half the time because of use_consistent_iat
+      Rails.cache.write(cache_key, url, :expires_in => (attachment.url_ttl / 2)) if url
     end
     url ||= '/images/no_pic.gif'
     redirect_to url

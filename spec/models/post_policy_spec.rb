@@ -20,7 +20,7 @@ require_relative '../spec_helper'
 
 describe PostPolicy do
   describe "relationships" do
-    it { is_expected.to belong_to(:course).inverse_of(:post_policies) }
+    it { is_expected.to belong_to(:course).required.inverse_of(:post_policies) }
     it { is_expected.to validate_presence_of(:course) }
 
     it { is_expected.to belong_to(:assignment).inverse_of(:post_policy) }
@@ -43,6 +43,51 @@ describe PostPolicy do
 
     it "sets the course based on the associated assignment if no course is specified" do
       expect(assignment.post_policy.course).to eq(course)
+    end
+  end
+
+  describe "callbacks" do
+    let(:course) { Course.create! }
+    let(:assignment) { course.assignments.create!(title: '!!!') }
+
+    context "when the policy is for a specific assignment" do
+      let(:policy) { assignment.post_policy }
+
+      it "updates the assignment's updated_at date when saved" do
+        assignment.update!(updated_at: 1.day.ago)
+
+        save_time = Time.zone.now
+        Timecop.freeze(save_time) do
+          expect {
+            policy.update!(post_manually: true)
+          }.to change { assignment.updated_at }.to(save_time)
+        end
+      end
+
+      it "does not update the owning course's updated_at date when saved" do
+        course.update!(updated_at: 1.day.ago)
+
+        Timecop.freeze(Time.zone.now) do
+          expect {
+            policy.update!(post_manually: true)
+          }.not_to change { course.updated_at }
+        end
+      end
+    end
+
+    context "when the policy is the default policy for a course" do
+      let(:policy) { course.default_post_policy }
+
+      it "updates the course's updated_at date when saved" do
+        course.update!(updated_at: 1.day.ago)
+        save_time = Time.zone.now
+
+        Timecop.freeze(save_time) do
+          expect {
+            policy.update!(post_manually: true)
+          }.to change { course.updated_at }.to(save_time)
+        end
+      end
     end
   end
 
