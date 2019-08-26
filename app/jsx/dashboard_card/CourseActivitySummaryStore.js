@@ -16,34 +16,44 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-import _ from 'underscore'
 import createStore from '../shared/helpers/createStore'
-import $ from 'jquery'
 
 const CourseActivitySummaryStore = createStore({streams: {}})
 
-CourseActivitySummaryStore.getStateForCourse = function(courseId) {
-  if (_.isUndefined(courseId)) return CourseActivitySummaryStore.getState()
-
-  if (_.has(CourseActivitySummaryStore.getState().streams, courseId)) {
-    return CourseActivitySummaryStore.getState().streams[courseId]
+// filter a response to raise an error on a 400+ status
+function checkStatus(response) {
+  if (response.status < 400) {
+    return response
   } else {
-    CourseActivitySummaryStore.getState().streams[courseId] = {}
-    CourseActivitySummaryStore._fetchForCourse(courseId)
-    return {}
+    const error = new Error(response.statusText)
+    error.response = response
+    throw error
   }
 }
 
-CourseActivitySummaryStore._fetchForCourse = function(courseId) {
-  let state
+CourseActivitySummaryStore.getStateForCourse = function(courseId) {
+  if (typeof courseId === 'undefined') return CourseActivitySummaryStore.getState()
 
-  $.getJSON(`/api/v1/courses/${courseId}/activity_stream/summary`, stream => {
-    state = CourseActivitySummaryStore.getState()
-    state.streams[courseId] = {
-      stream
-    }
-    CourseActivitySummaryStore.setState(state)
+  const {streams} = CourseActivitySummaryStore.getState()
+  if (!(courseId in streams)) {
+    streams[courseId] = {}
+    CourseActivitySummaryStore._fetchForCourse(courseId)
+  }
+  return streams[courseId]
+}
+
+CourseActivitySummaryStore._fetchForCourse = function(courseId) {
+  const fetch = window.fetchIgnoredByNewRelic || window.fetch // don't let this count against us in newRelic's SPA load time stats
+  return fetch(`/api/v1/courses/${courseId}/activity_stream/summary`, {
+    headers: {Accept: 'application/json'}
   })
+    .then(checkStatus)
+    .then(res => res.json())
+    .then(stream => {
+      const state = CourseActivitySummaryStore.getState()
+      state.streams[courseId] = {stream}
+      CourseActivitySummaryStore.setState(state)
+    })
 }
 
 export default CourseActivitySummaryStore
