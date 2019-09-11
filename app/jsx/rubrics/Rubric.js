@@ -15,18 +15,19 @@
  * You should have received a copy of the GNU Affero General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-import React from 'react'
-import _ from 'lodash'
-import PropTypes from 'prop-types'
-import Table from '@instructure/ui-elements/lib/components/Table'
-import Flex, { FlexItem } from '@instructure/ui-layout/lib/components/Flex'
+import Flex, {FlexItem} from '@instructure/ui-layout/lib/components/Flex'
+import {get, keyBy, isUndefined, max, sum} from 'lodash'
 import I18n from 'i18n!edit_rubricRubric'
+import PropTypes from 'prop-types'
+import React from 'react'
+import ScreenReaderContent from '@instructure/ui-a11y/lib/components/ScreenReaderContent'
+import Table from '@instructure/ui-elements/lib/components/Table'
 
 import Criterion from './Criterion'
 
-import { getSavedComments } from './helpers'
-import { rubricShape, rubricAssessmentShape, rubricAssociationShape } from './types'
-import { roundIfWhole } from './Points'
+import {getSavedComments} from './helpers'
+import {rubricShape, rubricAssessmentShape, rubricAssociationShape} from './types'
+import {roundIfWhole} from './Points'
 
 const totalString = (score) => I18n.t('Total Points: %{total}', {
   total: I18n.toNumber(score, { precision: 2, strip_insignificant_zeros: true })
@@ -50,12 +51,12 @@ const Rubric = (props) => {
     flexWidth
   } = props
 
-  const peerReview = _.get(rubricAssessment, 'assessment_type') === 'peer_review'
+  const peerReview = get(rubricAssessment, 'assessment_type') === 'peer_review'
   const assessing = onAssessmentChange !== null
-  const priorData = _.get(rubricAssessment, 'data', [])
-  const byCriteria = _.keyBy(priorData, (ra) => ra.criterion_id)
-  const criteriaById = _.keyBy(rubric.criteria, (c) => c.id)
-  const hidePoints = _.get(rubricAssociation, 'hide_points', false)
+  const priorData = get(rubricAssessment, 'data', [])
+  const byCriteria = keyBy(priorData, (ra) => ra.criterion_id)
+  const criteriaById = keyBy(rubric.criteria, (c) => c.id)
+  const hidePoints = get(rubricAssociation, 'hide_points', false)
   const freeForm = rubric.free_form_criterion_comments
 
   const onCriteriaChange = (id) => (update) => {
@@ -63,15 +64,15 @@ const Rubric = (props) => {
       prior.criterion_id === id ? { ...prior, ...update } : prior
     ))
 
-    const ignore = (c) => _.isUndefined(c) ? true : c.ignore_for_scoring
+    const ignore = (c) => isUndefined(c) ? true : c.ignore_for_scoring
     const points = data
       .filter((result) => !ignore(criteriaById[result.criterion_id]))
-      .map((result) => _.get(result, 'points.value', 0))
+      .map((result) => get(result, 'points.value', 0))
 
     onAssessmentChange({
       ...rubricAssessment,
       data,
-      score: _.sum(points)
+      score: sum(points)
     })
   }
 
@@ -104,12 +105,12 @@ const Rubric = (props) => {
   })
 
   const possible = rubric.points_possible
-  const points = _.get(rubricAssessment, 'score', possible)
+  const points = get(rubricAssessment, 'score', possible)
   const total = assessing ? totalAssessingString(points, possible) : totalString(points)
-  const hideScoreTotal = _.get(rubricAssociation, 'hide_score_total') === true
-  const noScore = _.get(rubricAssociation, 'score') === null
+  const hideScoreTotal = get(rubricAssociation, 'hide_score_total') === true
+  const noScore = get(rubricAssociation, 'score') === null
   const showTotalPoints = !hidePoints && !hideScoreTotal
-  const maxRatings = _.max(rubric.criteria.map((c) => c.ratings.length))
+  const maxRatings = max(rubric.criteria.map((c) => c.ratings.length))
   const minSize = () => {
     if (isSummary || flexWidth) return {}
     else {
@@ -118,25 +119,36 @@ const Rubric = (props) => {
     }
   }
 
+  const headingCells = [
+    <th scope="col" className="rubric-criteria">
+      {I18n.t('Criteria')}
+    </th>,
+    <th scope="col" className="ratings">{I18n.t('Ratings')}</th>,
+    showPointsColumn() ? (
+      <th className="rubric-points" scope="col">{I18n.t('Pts')}</th>
+    ) : null
+  ]
+
   return (
     <div className="react-rubric" style={minSize()}>
-      <Table caption={rubric.title}>
+      <Table caption={<ScreenReaderContent>{rubric.title}</ScreenReaderContent>}>
         <thead>
+          {/* This row is a hack to force the fixed layout to render as if the title does not exist */}
+          <tr style={{visibility: 'collapse'}}>
+            {headingCells}
+          </tr>
           <tr>
-            <th scope="col" className="rubric-criteria">
-              {I18n.t('Criteria')}
+            <th colSpan="3" scope="colgroup" className="rubric-title">
+              {rubric.title}
             </th>
-            <th scope="col" className="ratings">{I18n.t('Ratings')}</th>
-            {
-              showPointsColumn() && (
-                <th className="rubric-points" scope="col">{I18n.t('Pts')}</th>
-              )
-            }
+          </tr>
+          <tr>
+            {headingCells}
           </tr>
         </thead>
         <tbody className="criterions">
           {criteria}
-          { showTotalPoints && (
+          {showTotalPoints && (
             <tr>
               <td colSpan={isSummary ? "2" : "3"}>
                 <Flex justifyItems="end">
@@ -152,6 +164,7 @@ const Rubric = (props) => {
     </div>
   )
 }
+
 Rubric.propTypes = {
   allowExtraCredit: PropTypes.bool,
   customRatings: PropTypes.arrayOf(PropTypes.object),
@@ -166,6 +179,7 @@ Rubric.propTypes = {
   isSummary: PropTypes.bool,
   flexWidth: PropTypes.bool
 }
+
 Rubric.defaultProps = {
   allowExtraCredit: false,
   customRatings: [],
