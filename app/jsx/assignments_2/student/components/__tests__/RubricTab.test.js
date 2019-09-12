@@ -16,7 +16,7 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-import {MockedProvider} from 'react-apollo/test-utils'
+import {MockedProvider} from '@apollo/react-testing'
 import {mockQuery} from '../../mocks'
 import React from 'react'
 import {render} from '@testing-library/react'
@@ -32,31 +32,31 @@ async function mockRubric(overrides = {}) {
 describe('RubricTab', () => {
   it('contains the rubric criteria heading', async () => {
     const rubric = await mockRubric({})
-    const {getByText} = render(
+    const {getAllByText} = render(
       <MockedProvider>
         <Rubric rubric={rubric} />
       </MockedProvider>
     )
-    expect(getByText('Criteria')).toBeInTheDocument()
+    expect(getAllByText('Criteria')[1]).toBeInTheDocument()
   })
 
   it('contains the rubric ratings heading', async () => {
     const rubric = await mockRubric({})
-    const {getByText} = render(
+    const {getAllByText} = render(
       <MockedProvider>
         <Rubric rubric={rubric} />
       </MockedProvider>
     )
-    expect(getByText('Ratings')).toBeInTheDocument()
+    expect(getAllByText('Ratings')[1]).toBeInTheDocument()
   })
 
   it('contains the rubric points heading', async () => {
     const rubric = await mockRubric({})
-    const {getByText} = render(
+    const {getAllByText} = render(
       <MockedProvider>
         <Rubric rubric={rubric} />
       </MockedProvider>
     )
-    expect(getByText('Pts')).toBeInTheDocument()
+    expect(getAllByText('Pts')[1]).toBeInTheDocument()
   })
 })
