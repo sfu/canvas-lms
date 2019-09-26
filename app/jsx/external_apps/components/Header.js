@@ -18,9 +18,10 @@
 
 import I18n from 'i18n!external_tools'
 import React from 'react'
-import IconExternalLink from '@instructure/ui-icons/lib/Line/IconExternalLink'
-import Link from '@instructure/ui-elements/lib/components/Link'
-import ScreenReaderContent from '@instructure/ui-a11y/lib/components/ScreenReaderContent';
+
+import {IconExternalLinkLine} from '@instructure/ui-icons'
+import {Link} from '@instructure/ui-elements'
+import {ScreenReaderContent} from '@instructure/ui-a11y'
 import SFUPrivacyNotice from '../../sfu_pia_notice/SFUPrivacyNotice' /* SFU MOD */
 
 export default class Header extends React.Component {
@@ -28,7 +29,7 @@ export default class Header extends React.Component {
     this.linkRef.focus()
   }
 
-  setLinkRef = (node) => this.linkRef = node
+  setLinkRef = node => (this.linkRef = node)
 
   render() {
     return (
@@ -46,7 +47,7 @@ export default class Header extends React.Component {
           </p>
           <p>
             <Link
-              icon={IconExternalLink}
+              icon={IconExternalLinkLine}
               href="https://www.eduappcenter.com/"
               linkRef={this.setLinkRef}
             >
