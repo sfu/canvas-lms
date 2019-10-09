@@ -20,7 +20,7 @@ require 'inst_statsd'
 
 module LiveEvents
   class << self
-    attr_accessor :logger, :cache, :statsd
+    attr_accessor :logger, :cache, :statsd, :error_reporter
     attr_reader :stream_client
 
     # rubocop:disable Style/TrivialAccessors
@@ -95,7 +95,7 @@ module LiveEvents
       if @client && !new_client?
         @client
       else
-        @client = LiveEvents::Client.new(LiveEvents::Client.config, @stream_client, @stream_client&.stream_name)
+        @client = LiveEvents::Client.new(LiveEvents::Client.config, @stream_client, @stream_client&.stream_name, worker: @worker)
       end
     end
 
