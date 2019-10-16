@@ -1,4 +1,5 @@
 /* eslint-env jquery */
+/* global MathJax */
 /* eslint-disable no-console,notice/notice,no-sequences,no-unused-expressions */
 /*
     sfu.js
@@ -54,7 +55,7 @@
   }
 
   const loadModule = module => {
-    (window.bundles || (window.bundles = [])).push(module);
+    ;(window.bundles || (window.bundles = [])).push(module)
   }
 
   // add Canvas Spaces to nav
@@ -168,6 +169,21 @@
   })
   // END CANVAS-259
 
+  // Add MathJax on course wiki pages
+  utils.onPage(/^\/courses\/\d+\/pages\//, () => {
+    const script = document.createElement('script')
+    script.type = 'text/javascript'
+    script.async = true
+    script.src =
+      'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.6/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
+    const config = document.createElement('script')
+    config.type = 'text/x-mathjax-config'
+
+    config.innerHTML =
+      "MathJax.Hub.Config({tex2jax: {inlineMath: [['$$', '$$'], ['\\\\(', '\\\\)']]}})"
+    document.body.appendChild(config)
+    document.body.appendChild(script)
+  })
 })(jQuery)
 
 // google analytics
