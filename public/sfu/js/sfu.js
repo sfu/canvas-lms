@@ -169,8 +169,8 @@
   })
   // END CANVAS-259
 
-  // Add MathJax on course wiki pages
-  utils.onPage(/^\/courses\/\d+\/pages\//, () => {
+  // Add MathJax on certain course URLs
+  const loadMathjax = () => {
     const script = document.createElement('script')
     script.type = 'text/javascript'
     script.async = true
@@ -183,6 +183,12 @@
       "MathJax.Hub.Config({tex2jax: {inlineMath: [['$$', '$$'], ['\\\\(', '\\\\)']]}})"
     document.body.appendChild(config)
     document.body.appendChild(script)
+  }
+  utils.onPage(/^\/courses\/\d+\/pages\//, () => {
+    loadMathjax()
+  })
+  utils.onPage(/^\/courses\/\d+\/discussion_topics\//, () => {
+    loadMathjax()
   })
 })(jQuery)
 
