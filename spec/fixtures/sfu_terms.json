@@ -289,24 +289,6 @@
   },
   {
     "enrollment_term": {
-      "id": 40,
-      "name": "Spring 2018",
-      "sis_source_id": "1181",
-      "start_at": "2018-01-03T08:00:00Z",
-      "end_at": "2018-05-06T07:00:00Z"
-    }
-  },
-  {
-    "enrollment_term": {
-      "id": 41,
-      "name": "Summer 2018",
-      "sis_source_id": "1184",
-      "start_at": "2018-05-07T07:00:00Z",
-      "end_at": "2018-09-03T07:00:00Z"
-    }
-  },
-  {
-    "enrollment_term": {
       "id": 42,
       "name": "Fall 2018",
       "sis_source_id": "1187",
@@ -316,20 +298,20 @@
   },
   {
     "enrollment_term": {
-      "id": 43,
-      "name": "Spring 2019",
-      "sis_source_id": "1191",
-      "start_at": "2019-01-03T08:00:00Z",
-      "end_at": "2019-05-05T07:00:00Z"
-    }
-  },
-  {
-    "enrollment_term": {
       "id": 44,
       "name": "Summer 2019",
       "sis_source_id": "1194",
       "start_at": "2019-05-06T07:00:00Z",
       "end_at": "2019-09-02T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 40,
+      "name": "Spring 2018",
+      "sis_source_id": "1181",
+      "start_at": "2018-01-02T08:00:00Z",
+      "end_at": "2018-05-07T07:00:00Z"
     }
   },
   {
@@ -375,6 +357,78 @@
       "sis_source_id": "1167",
       "start_at": "2016-09-06T07:00:00Z",
       "end_at": "2017-01-04T08:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 41,
+      "name": "Summer 2018",
+      "sis_source_id": "1184",
+      "start_at": "2018-05-07T07:00:00Z",
+      "end_at": "2018-09-04T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 43,
+      "name": "Spring 2019",
+      "sis_source_id": "1191",
+      "start_at": "2019-01-02T08:00:00Z",
+      "end_at": "2019-05-06T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 50,
+      "name": "Summer 2021",
+      "sis_source_id": "1214",
+      "start_at": "2021-05-10T07:00:00Z",
+      "end_at": "2021-09-07T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 49,
+      "name": "Spring 2021",
+      "sis_source_id": "1211",
+      "start_at": "2021-01-05T08:00:00Z",
+      "end_at": "2021-05-10T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 48,
+      "name": "Fall 2020",
+      "sis_source_id": "1207",
+      "start_at": "2020-09-08T07:00:00Z",
+      "end_at": "2021-01-05T08:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 47,
+      "name": "Summer 2020",
+      "sis_source_id": "1204",
+      "start_at": "2020-05-11T07:00:00Z",
+      "end_at": "2020-09-08T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 46,
+      "name": "Spring 2020",
+      "sis_source_id": "1201",
+      "start_at": "2020-01-06T08:00:00Z",
+      "end_at": "2020-05-11T07:00:00Z"
+    }
+  },
+  {
+    "enrollment_term": {
+      "id": 45,
+      "name": "Fall 2019",
+      "sis_source_id": "1197",
+      "start_at": "2019-09-03T07:00:00Z",
+      "end_at": "2020-01-06T08:00:00Z"
     }
   }
 ]
