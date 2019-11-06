@@ -4026,7 +4026,7 @@ describe Course, 'tabs_available' do
     tabs = @course.external_tool_tabs({}, User.new)
     expect(tabs.map{|t| t[:id]}).not_to include(tool.asset_string)
 
-    @course.root_account.enable_feature!(:analytics_2)
+    @course.enable_feature!(:analytics_2)
     tabs = @course.external_tool_tabs({}, User.new)
     expect(tabs.map{|t| t[:id]}).to include(tool.asset_string)
   end
@@ -5347,36 +5347,66 @@ describe Course, 'touch_root_folder_if_necessary' do
   end
 
   context "inheritable settings" do
-    before :each do
-      account_model
-      course_factory(:account => @account)
+    shared_examples 'inherited setting should inherit' do
+      before :each do
+        account_model
+        course_factory(:account => @account)
+      end
+
+      def set_value(value)
+        @course.send(:"#{setting}=", value)
+      end
+
+      def calculated_value
+        @course.send(:"#{setting}?")
+      end
+
+      it "should inherit account values by default" do
+        expect(calculated_value).to be_falsey
+
+        @account.settings[setting] = {:locked => false, :value => true}
+        @account.save!
+
+        expect(calculated_value).to be_truthy
+
+        set_value(false)
+        @course.save!
+
+        expect(calculated_value).to be_falsey
+      end
+
+      it "should be overridden by locked values from the account" do
+        @account.settings[setting] = {:locked => true, :value => true}
+        @account.save!
+
+        expect(calculated_value).to be_truthy
+
+        # explicitly setting shouldn't change anything
+        set_value(false)
+        @course.save!
+
+        expect(calculated_value).to be_truthy
+      end
     end
 
-    it "should inherit account values by default" do
-      expect(@course.restrict_student_future_view?).to be_falsey
-
-      @account.settings[:restrict_student_future_view] = {:locked => false, :value => true}
-      @account.save!
-
-      expect(@course.restrict_student_future_view?).to be_truthy
-
-      @course.restrict_student_future_view = false
-      @course.save!
-
-      expect(@course.restrict_student_future_view?).to be_falsey
+    describe "restrict_student_future_view" do
+      let(:setting) { :restrict_student_future_view }
+      include_examples 'inherited setting should inherit'
     end
 
-    it "should be overridden by locked values from the account" do
-      @account.settings[:restrict_student_future_view] = {:locked => true, :value => true}
-      @account.save!
+    describe "restrict_student_past_view" do
+      let(:setting) { :restrict_student_past_view }
+      include_examples 'inherited setting should inherit'
+    end
 
-      expect(@course.restrict_student_future_view?).to be_truthy
+    describe "lock_all_announcements" do
+      let(:setting) { :lock_all_announcements }
+      include_examples 'inherited setting should inherit'
+    end
 
-      # explicitly setting shouldn't change anything
-      @course.restrict_student_future_view = false
-      @course.save!
-
-      expect(@course.restrict_student_future_view?).to be_truthy
+    describe "usage_rights_required" do
+      let(:setting) { :usage_rights_required }
+      include_examples 'inherited setting should inherit'
     end
   end
 end

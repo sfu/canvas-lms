@@ -1,4 +1,5 @@
 /* eslint-env jquery */
+/* global MathJax */
 /* eslint-disable no-console,notice/notice,no-sequences,no-unused-expressions */
 /*
     sfu.js
@@ -54,7 +55,7 @@
   }
 
   const loadModule = module => {
-    (window.bundles || (window.bundles = [])).push(module);
+    ;(window.bundles || (window.bundles = [])).push(module)
   }
 
   // add Canvas Spaces to nav
@@ -168,37 +169,42 @@
   })
   // END CANVAS-259
 
-  // Setup Backbone event handler that will be called when all the content DOM elements
-  // have been rendered. This will activate the accordion and tab components on the page.
-  function setupAccordionAndTabActivation() {
-    $.subscribe('userContent/change', () => {
-      $('div.accordion').accordion({header: 'h3'})
-      $('.sfu-tabs').tabs()
-    })
+  // Add MathJax on certain course URLs
+  const loadMathjax = () => {
+    const script = document.createElement('script')
+    script.type = 'text/javascript'
+    script.async = true
+    script.src =
+      'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.6/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
+    const config = document.createElement('script')
+    config.type = 'text/x-mathjax-config'
+
+    config.innerHTML =
+      "MathJax.Hub.Config({tex2jax: {inlineMath: [['$$', '$$'], ['\\\\(', '\\\\)']]}})"
+    document.body.appendChild(config)
+    document.body.appendChild(script)
   }
-
-  // On course and wiki pages, activate accordion and tab components, if they exist.
-  utils.onPage(
-    /^\/(courses|groups)\/\d+\/pages\/[A-Za-z0-9_\-+~<>]+$/,
-    setupAccordionAndTabActivation
-  )
-
-  // A page designated as a front page has a different url.
-  utils.onPage(/^\/(courses|groups)\/\d+\/wiki$/, setupAccordionAndTabActivation)
+  utils.onPage(/^\/courses\/\d+\/pages\//, () => {
+    loadMathjax()
+  })
+  utils.onPage(/^\/courses\/\d+\/discussion_topics\//, () => {
+    loadMathjax()
+  })
 })(jQuery)
 
 // google analytics
 if (window.location.hostname && window.location.hostname === 'canvas.sfu.ca') {
-  const _gaq = _gaq || []
-  _gaq.push(['_setAccount', 'UA-36473171-1'])
-  _gaq.push(['_trackPageview'])
+  window.dataLayer = window.dataLayer || []
+  const gtag = function() {
+    window.dataLayer.push(arguments)
+  }
+  gtag('js', new Date())
+
+  gtag('config', 'UA-36473171-1')
   ;(function() {
     const ga = document.createElement('script')
-    ga.type = 'text/javascript'
     ga.async = true
-    ga.src = `${
-      document.location.protocol === 'https:' ? 'https://ssl' : 'http://www'
-    }.google-analytics.com/ga.js`
+    ga.src = 'https://www.googletagmanager.com/gtag/js?id=UA-36473171-1'
     const s = document.getElementsByTagName('script')[0]
     s.parentNode.insertBefore(ga, s)
   })()
