@@ -264,7 +264,7 @@ class ApplicationController < ActionController::Base
 
     tools.select! do |tool|
       tool.visible_with_permission_check?(type, @current_user, context, session) &&
-        tool.feature_flag_enabled?
+        tool.feature_flag_enabled?(context)
     end
 
     tools.map do |tool|
@@ -1749,7 +1749,7 @@ class ApplicationController < ActionController::Base
     # when flag is enabled, new quizzes quiz creation can only be initiated from quizzes page
     # but we still use the assignment#new page to create the quiz.
     # also handles launch from existing quiz on quizzes page.
-    if @assignment&.quiz_lti?
+    if ref.present? && @assignment&.quiz_lti?
       if (ref.include?('assignments/new') || ref.include?('quiz')) && @context.root_account.feature_enabled?(:newquizzes_on_quiz_page)
         return polymorphic_url([@context, :quizzes])
       end

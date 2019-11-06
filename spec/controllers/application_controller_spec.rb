@@ -755,6 +755,12 @@ RSpec.describe ApplicationController do
           expect(assigns[:return_url]).to eq 'named_context_url'
         end
 
+        it 'is not set to quizzes page when there is no referer' do
+          allow(controller.request).to receive(:referer).and_return(nil)
+          controller.send(:content_tag_redirect, course, content_tag, nil)
+          expect(assigns[:return_url]).to eq 'named_context_url'
+        end
+
         it 'is set using named_context_url when not launched from quizzes page' do
           allow(controller.request).to receive(:referer).and_return('assignments')
           controller.context.root_account.enable_feature! :newquizzes_on_quiz_page
@@ -862,7 +868,7 @@ RSpec.describe ApplicationController do
       external_tools = controller.external_tools_display_hashes(:course_navigation, @course)
       expect(external_tools).not_to include({title: 'Analytics 2', base_url: 'http://example.com', icon_url: nil, canvas_icon_class: 'icon-analytics', tool_id: ContextExternalTool::ANALYTICS_2})
 
-      @course.root_account.enable_feature!(:analytics_2)
+      @course.enable_feature!(:analytics_2)
       external_tools = controller.external_tools_display_hashes(:course_navigation, @course)
       expect(external_tools).to include({title: 'Analytics 2', base_url: 'http://example.com', icon_url: nil, canvas_icon_class: 'icon-analytics', tool_id: ContextExternalTool::ANALYTICS_2})
     end
