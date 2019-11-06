@@ -194,16 +194,17 @@
 
 // google analytics
 if (window.location.hostname && window.location.hostname === 'canvas.sfu.ca') {
-  const _gaq = _gaq || []
-  _gaq.push(['_setAccount', 'UA-36473171-1'])
-  _gaq.push(['_trackPageview'])
+  window.dataLayer = window.dataLayer || []
+  const gtag = function() {
+    window.dataLayer.push(arguments)
+  }
+  gtag('js', new Date())
+
+  gtag('config', 'UA-36473171-1')
   ;(function() {
     const ga = document.createElement('script')
-    ga.type = 'text/javascript'
     ga.async = true
-    ga.src = `${
-      document.location.protocol === 'https:' ? 'https://ssl' : 'http://www'
-    }.google-analytics.com/ga.js`
+    ga.src = 'https://www.googletagmanager.com/gtag/js?id=UA-36473171-1'
     const s = document.getElementsByTagName('script')[0]
     s.parentNode.insertBefore(ga, s)
   })()
