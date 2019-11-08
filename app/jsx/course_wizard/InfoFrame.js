@@ -22,6 +22,8 @@ import React from 'react'
 import PropTypes from 'prop-types'
 import I18n from 'i18n!course_wizard'
 import ListItems from './ListItems'
+import getCookie from '../shared/helpers/getCookie'
+
 import SFUCopyrightComplianceNotice from '../sfu_copyright_compliance_notice/SFUCopyrightComplianceNotice' /* SFU MOD */
 
 const courseNotSetUpItem = {
@@ -136,7 +138,7 @@ class InfoFrame extends React.Component {
           >
             <input name="utf8" type="hidden" value="✓" />
             <input name="_method" type="hidden" value="put" />
-            <input name="authenticity_token" type="hidden" value={$.cookie('_csrf_token')} />
+            <input name="authenticity_token" type="hidden" value={getCookie('_csrf_token')} />
             <input type="hidden" name="course[event]" value="offer" />
             <button
               ref={e => (this.callToAction = e)}
@@ -177,7 +179,7 @@ class InfoFrame extends React.Component {
         <SFUCopyrightComplianceNotice className="sfu-ic-wizard-box__message-text__copyright_compliance" />
       )
     } else {
-      return null;
+      return null
     }
   }
   // END SFU MOD
