@@ -335,7 +335,9 @@ class GradebooksController < ApplicationController
 
   def old_gradebook_env
     @gradebook_is_editable = @context.grants_right?(@current_user, session, :manage_grades)
-    per_page = Setting.get('api_max_per_page', '50').to_i
+    # SFU MOD - statically set api_max_per_page
+    per_page = 50 # Setting.get('api_max_per_page', '50').to_i
+    # END SFU MOD
     teacher_notes = @context.custom_gradebook_columns.not_deleted.where(teacher_notes: true).first
     ag_includes = [:assignments, :assignment_visibility, :grades_published]
     last_exported_attachment = @last_exported_gradebook_csv.try(:attachment)
