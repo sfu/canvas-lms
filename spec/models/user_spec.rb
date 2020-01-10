@@ -808,6 +808,22 @@ describe User do
     expect(@user.workflow_state).to eq "deleted"
   end
 
+  it "destroys associated active eportfolios upon soft-deletion" do
+    user = User.create
+    user.eportfolios.create!
+    expect { user.destroy }.to change {
+      user.reload.eportfolios.active.count
+    }.from(1).to(0)
+  end
+
+  it "destroys associated active eportfolios when removed from root account" do
+    user = User.create
+    user.eportfolios.create!
+    expect { user.remove_from_root_account(Account.default) }.to change {
+      user.reload.eportfolios.active.count
+    }.from(1).to(0)
+  end
+
   it "should record deleted_at" do
     user = User.create
     user.destroy
@@ -2586,6 +2602,40 @@ describe User do
       it "is not granted to sub-account admins w/o :generate_observer_pairing_code" do
         @root_account.role_overrides.create!(role: admin_role, enabled: false, permission: :generate_observer_pairing_code)
         expect(@student.grants_right?(@sub_admin, :generate_observer_pairing_code)).to eq false
+      end
+    end
+
+    describe ":moderate_user_content" do
+      before(:once) do
+        root_account = Account.default
+        @root_admin = account_admin_user(account: root_account)
+        sub_account = Account.create!(root_account: root_account)
+        @sub_admin = account_admin_user(account: sub_account)
+        @student = course_with_student(account: sub_account, active_all: true).user
+      end
+
+      it "cannot moderate your own content" do
+        expect(@student.grants_right?(@student, :moderate_user_content)).to be false
+      end
+
+      it "cannot moderate content if you are an admin without permission to moderate user content" do
+        Account.default.role_overrides.create!(role: admin_role, enabled: false, permission: :moderate_user_content)
+        expect(@student.grants_right?(@root_admin, :moderate_user_content)).to be false
+      end
+
+      it "cannot moderate content if you are a subadmin without permission to moderate user content" do
+        Account.default.role_overrides.create!(role: admin_role, enabled: false, permission: :moderate_user_content)
+        expect(@student.grants_right?(@sub_admin, :moderate_user_content)).to be false
+      end
+
+      it "can moderate content if you are an admin with permission to moderate user content" do
+        Account.default.role_overrides.create!(role: admin_role, enabled: true, permission: :moderate_user_content)
+        expect(@student.grants_right?(@root_admin, :moderate_user_content)).to be true
+      end
+
+      it "can moderate content if you are a subadmin with permission to moderate user content" do
+        Account.default.role_overrides.create!(role: admin_role, enabled: true, permission: :moderate_user_content)
+        expect(@student.grants_right?(@sub_admin, :moderate_user_content)).to be true
       end
     end
   end
