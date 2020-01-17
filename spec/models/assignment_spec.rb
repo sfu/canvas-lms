@@ -872,7 +872,7 @@ describe Assignment do
 
   describe '#anonymize_students?' do
     before(:once) do
-      @assignment = @course.assignments.build
+      @assignment = @course.assignments.create!
     end
 
     it 'returns false when the assignment is not graded anonymously' do
@@ -881,27 +881,69 @@ describe Assignment do
 
     context 'when the assignment is anonymously graded' do
       before(:once) do
-        @assignment.anonymous_grading = true
+        @assignment.update!(anonymous_grading: true)
       end
 
-      it 'returns true when the assignment is muted' do
-        @assignment.muted = true
-        expect(@assignment).to be_anonymize_students
+      context "when the assignment is moderated" do
+        before(:each) do
+          @assignment.moderated_grading = true
+        end
+
+        it 'returns true when the assignment is moderated and grades are unpublished' do
+          expect(@assignment).to be_anonymize_students
+        end
+
+        it 'returns false when the assignment is moderated and grades are published' do
+          @assignment.grades_published_at = Time.zone.now
+          expect(@assignment).not_to be_anonymize_students
+        end
       end
 
-      it 'returns false when the assignment is unmuted' do
-        expect(@assignment).not_to be_anonymize_students
-      end
+      context "when the assignment is unmoderated" do
+        context "when Post Policies is not enabled" do
+          it 'returns true when the assignment is muted' do
+            @assignment.mute!
+            expect(@assignment).to be_anonymize_students
+          end
 
-      it 'returns true when the assignment is moderated and grades are unpublished' do
-        @assignment.moderated_grading = true
-        expect(@assignment).to be_anonymize_students
-      end
+          it 'returns false when the assignment is unmuted' do
+            @assignment.unmute!
+            expect(@assignment).not_to be_anonymize_students
+          end
+        end
 
-      it 'returns false when the assignment is moderated and grades are published' do
-        @assignment.moderated_grading = true
-        @assignment.grades_published_at = Time.zone.now
-        expect(@assignment).not_to be_anonymize_students
+        context "when Post Policies is enabled" do
+          let(:course) { @assignment.course }
+          let(:active_student) { User.create! }
+          let(:student2) { User.create! }
+          let(:student3) { User.create! }
+
+          before(:each) do
+            course.enable_feature!(:new_gradebook)
+            PostPolicy.enable_feature!
+
+            course.enroll_student(active_student, workflow_state: :active)
+            course.enroll_student(student2, workflow_state: :active)
+            course.enroll_student(student3, workflow_state: :active)
+          end
+
+          it "returns true when at least one active student has an unposted submission" do
+            expect(@assignment).to be_anonymize_students
+          end
+
+          it "returns false when all active submissions are posted" do
+            student2.enrollments.find_by(course: course).conclude
+            student3.enrollments.find_by(course: course).deactivate
+
+            @assignment.post_submissions
+            expect(@assignment).not_to be_anonymize_students
+          end
+
+          it "returns false when all submissions are posted" do
+            @assignment.post_submissions
+            expect(@assignment).not_to be_anonymize_students
+          end
+        end
       end
     end
   end
@@ -5673,18 +5715,84 @@ describe Assignment do
       expect(@assignment.instance_variable_get(:@ignored_files)).to eq [ignore_file]
     end
 
-    it "should mark comments as hidden for submission zip uploads" do
-      @assignment = @course.assignments.create! name: "Mute Comment Test",
-                                                submission_types: %w(online_upload)
-      @assignment.update_attribute :muted, true
-      submit_homework(@student)
+    describe "newly-created comments" do
+      before(:each) do
+        @assignment = @course.assignments.create!(name: "Mute Comment Test", submission_types: %w(online_upload))
+      end
 
-      zip = zip_submissions
+      let(:zip) { zip_submissions }
+      let(:added_comment) { @assignment.submission_for_student(@student).submission_comments.last }
 
-      @assignment.generate_comments_from_files(zip.open.path, @user)
+      context "with post policies enabled" do
+        before(:each) do
+          @course.enable_feature!(:new_gradebook)
+          PostPolicy.enable_feature!
+        end
 
-      submission = @assignment.submission_for_student(@student)
-      expect(submission.submission_comments.last.hidden).to eq true
+        context "for a manually-posted assignment" do
+          before(:each) do
+            @assignment.post_policy.update!(post_manually: true)
+          end
+
+          it "hides new comments if the submission is not posted" do
+            submit_homework(@student)
+
+            @assignment.generate_comments_from_files(zip.open.path, @user)
+            expect(added_comment).to be_hidden
+          end
+
+          it "shows new comments if the submission is posted" do
+            submit_homework(@student)
+            @assignment.post_submissions
+
+            @assignment.generate_comments_from_files(zip.open.path, @user)
+            expect(added_comment).not_to be_hidden
+          end
+        end
+
+        context "for a automatically-posted assignment" do
+          it "shows new comments if the submission is posted" do
+            submit_homework(@student)
+            @assignment.post_submissions
+
+            @assignment.generate_comments_from_files(zip.open.path, @user)
+            expect(added_comment).not_to be_hidden
+          end
+
+          it "hides new comments if the submission is graded but not posted" do
+            submit_homework(@student)
+            @assignment.grade_student(@student, grade: 1, grader: @teacher)
+            @assignment.hide_submissions
+
+            @assignment.generate_comments_from_files(zip.open.path, @user)
+            expect(added_comment).to be_hidden
+          end
+
+          it "shows new comments if the submission is neither graded nor posted" do
+            submit_homework(@student)
+
+            @assignment.generate_comments_from_files(zip.open.path, @user)
+            expect(added_comment).not_to be_hidden
+          end
+        end
+      end
+
+      context "with post policies not enabled" do
+        it "hides new comments when the assignment is muted" do
+          @assignment.mute!
+          submit_homework(@student)
+
+          @assignment.generate_comments_from_files(zip.open.path, @user)
+          expect(added_comment).to be_hidden
+        end
+
+        it "shows new comments when the assignment is not muted" do
+          submit_homework(@student)
+
+          @assignment.generate_comments_from_files(zip.open.path, @user)
+          expect(added_comment).not_to be_hidden
+        end
+      end
     end
   end
 
