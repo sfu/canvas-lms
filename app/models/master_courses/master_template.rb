@@ -86,7 +86,10 @@ class MasterCourses::MasterTemplate < ActiveRecord::Base
   end
 
   def destroy_subscriptions_later
-    self.send_later_if_production(:destroy_subscriptions)
+    self.send_later_if_production_enqueue_args(:destroy_subscriptions, {
+      :n_strand => ["master_courses_destroy_subscriptions", self.course.global_root_account_id],
+      :priority => Delayed::LOW_PRIORITY
+    })
   end
 
   def destroy_subscriptions
@@ -277,7 +280,9 @@ class MasterCourses::MasterTemplate < ActiveRecord::Base
         select("#{self.table_name}.*, courses.sis_source_id AS sis_source_id").to_a
       if templates.count != master_sis_ids.count
         (master_sis_ids - templates.map(&:sis_source_id)).each do |missing_id|
-          messages << "Unknown blueprint course \"#{missing_id}\""
+          associations[missing_id].each do |target_course_id|
+            messages << "Unknown blueprint course \"#{missing_id}\" for course \"#{target_course_id}\""
+          end
         end
       end
 

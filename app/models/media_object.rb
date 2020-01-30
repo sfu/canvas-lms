@@ -224,7 +224,6 @@ class MediaObject < ActiveRecord::Base
     end
     self.total_size = [self.max_size || 0, assets.map{|a| (a[:size] || 0).to_i }.sum].max
     self.save
-    ensure_attachment
     self.data
   end
 
@@ -239,6 +238,8 @@ class MediaObject < ActiveRecord::Base
 
     entry = client.mediaGet(self.media_id)
     media_type = client.mediaTypeToSymbol(entry[:mediaType]).to_s if entry
+    # attachment#build_content_types_sql assumes the content_type has a "/"
+    media_type = "#{media_type}/*" unless media_type.blank? || media_type.include?("/")
     assets = client.flavorAssetGetByEntryId(self.media_id) || []
     process_retrieved_details(entry, media_type, assets)
   end
@@ -291,28 +292,6 @@ class MediaObject < ActiveRecord::Base
     self.workflow_state = 'deleted'
     self.attachment_id = nil
     save!
-  end
-
-  def ensure_attachment
-    return if self.attachment_id
-    sources = self.media_sources
-    return unless sources&.length
-
-    attachment = build_attachment({
-      "context" => context,
-      "display_name" => self.title,
-      "filename" => self.title,
-      "content_type" => self.media_type,
-      "media_entry_id" => self.media_id,
-      "workflow_state" => "processed"
-    })
-
-    url = self.data.dig(:download_url)
-    url = sources.select { |s| s[:isOriginal] == '1' }.first&.dig(:url) if url.blank?
-    url = sources.sort_by { |a| a[:bitrate].to_i }.first&.dig(:url) if url.blank?
-
-    attachment.clone_url(url, :rename, false) # no check_quota because the bits are in kaltura
-    attachment.save!
   end
 
   scope :active, -> { where("media_objects.workflow_state<>'deleted'") }

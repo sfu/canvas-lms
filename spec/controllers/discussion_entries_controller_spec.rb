@@ -346,7 +346,6 @@ describe DiscussionEntriesController do
       allow(mock_client).to receive(:startSession)
       allow(mock_client).to receive(:mediaGet).and_return(nil)
       allow(mock_client).to receive(:flavorAssetGetByEntryId).and_return(nil)
-      allow(mock_client).to receive(:media_sources).and_return(nil)
       allow(CanvasKaltura::ClientV3).to receive(:new).and_return(mock_client)
 
       topic_with_media_reply
@@ -364,7 +363,7 @@ describe DiscussionEntriesController do
     end
 
     it 'respects podcast_has_student_posts for course discussions' do
-      @topic.update_attributes(podcast_enabled: true, podcast_has_student_posts: false)
+      @topic.update(podcast_enabled: true, podcast_has_student_posts: false)
       get 'public_feed', params: {:discussion_topic_id => @topic.id, :feed_code => @enrollment.feed_code}, :format => 'rss'
       expect(assigns[:discussion_entries].length).to eql 0
     end
@@ -375,7 +374,7 @@ describe DiscussionEntriesController do
       @topic = @group.discussion_topics.create(title: "group topic", user: @teacher)
       @entry = @topic.discussion_entries.create(message: "some message", user: @student)
 
-      @topic.update_attributes(podcast_enabled: true, podcast_has_student_posts: false)
+      @topic.update(podcast_enabled: true, podcast_has_student_posts: false)
       get 'public_feed', params: {:discussion_topic_id => @topic.id, :feed_code => membership.feed_code}, :format => 'rss'
       expect(assigns[:discussion_entries].length).to eql 1
     end
