@@ -64,7 +64,7 @@ gem 'brotli', '0.2.3', require: false
 gem 'canvas_connect', '0.3.11'
   gem 'adobe_connect', '1.0.8', require: false
 gem 'canvas_webex', '0.17'
-gem 'inst-jobs', '0.15.14'
+gem 'inst-jobs', '0.15.15'
   gem 'fugit', '1.3.3', require: false
     gem 'et-orbi', '1.2.2', require: false
 gem 'switchman-inst-jobs', '1.3.7'
@@ -82,7 +82,7 @@ gem 'icalendar', '2.5.3', require: false
 gem 'ims-lti', '2.3.0', require: 'ims'
 gem 'json_schemer', '0.2.7'
 gem 'simple_oauth', '0.3.1', require: false
-gem 'json', '2.2.0'
+gem 'json', '2.3.0'
 gem 'link_header', '0.0.8'
 gem 'oj', '3.3.9'
 gem 'json-jwt', '1.10.2', require: false
@@ -125,11 +125,11 @@ gem 'inst_statsd', '2.1.6'
   gem 'dogstatsd-ruby', '4.5.0'
 gem 'inst-jobs-statsd', '1.2.3'
 gem 'gepub', '1.0.4'
-gem 'imperium', '0.5.1', require: false
+gem 'imperium', '0.5.2', require: false
 gem 'academic_benchmarks', '0.0.11', require: false
 
-gem 'graphql', '1.9.11'
-gem 'graphql-batch', '0.4.1'
+gem 'graphql', '1.9.16'
+gem 'graphql-batch', '0.4.2'
 
 gem 'prawn-rails', '1.3.0'
 
