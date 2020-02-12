@@ -500,6 +500,20 @@ describe "RCE next tests" do
       expect(upload_document_modal).to be_displayed
     end
 
+    it "should not include media upload option if disabled" do
+      double('CanvasKaltura::ClientV3')
+      allow(CanvasKaltura::ClientV3).to receive(:config).and_return({
+        'hide_rte_button' => true
+      })
+      visit_front_page_edit(@course)
+      media_button = media_toolbar_button
+      media_button.click
+      menu_id = media_button.attribute('aria-owns')
+      expect(menu_item_by_menu_id(menu_id, "Course Media")).to be_displayed
+      expect(menu_item_by_menu_id(menu_id, "User Media")).to be_displayed
+      expect(menu_items_by_menu_id(menu_id).length).to be(2)
+    end
+
     it "should close sidebar after drag and drop" do
       skip("kills many selenium tests. Address in CORE-3147")
       title = "Assignment-Title"
@@ -552,7 +566,7 @@ describe "RCE next tests" do
         visit_existing_wiki_edit(@course, page_title)
         driver.switch_to.frame('wiki_page_body_ifr')
         f('table td').click # put the cursor in the table
-        f('body').send_keys [:control, :f9]
+        driver.action.key_down(:control).send_keys(:f9).key_up(:control).perform
 
         driver.switch_to.default_content
         expect(f('.tox-pop__dialog button[title="Table properties"]')).to eq(driver.switch_to.active_element)
@@ -565,7 +579,7 @@ describe "RCE next tests" do
         visit_existing_wiki_edit(@course, page_title)
         driver.switch_to.frame('wiki_page_body_ifr')
         f('a').click # put the cursor in the table
-        f('body').send_keys [:control, :f9]
+        driver.action.key_down(:control).send_keys(:f9).key_up(:control).perform
 
         driver.switch_to.default_content
         expect(f('.tox-pop__dialog button[title="Show link options"]')).to eq(driver.switch_to.active_element)
