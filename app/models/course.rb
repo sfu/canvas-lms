@@ -198,6 +198,7 @@ class Course < ActiveRecord::Base
   has_many :master_course_templates, :class_name => "MasterCourses::MasterTemplate"
   has_many :master_course_subscriptions, :class_name => "MasterCourses::ChildSubscription", :foreign_key => 'child_course_id'
   has_one :late_policy, dependent: :destroy, inverse_of: :course
+  has_many :notification_policy_overrides, as: :context, inverse_of: :context
 
   has_many :post_policies, dependent: :destroy, inverse_of: :course
   has_many :assignment_post_policies, -> { where.not(assignment_id: nil) }, class_name: 'PostPolicy', inverse_of: :course
@@ -1575,11 +1576,14 @@ class Course < ActiveRecord::Base
     return false unless user && permission && !self.deleted?
 
     is_unpublished = self.created? || self.claimed?
-    active_enrollments = fetch_on_enrollments("active_enrollments_for_permissions", user, is_unpublished) do
+    active_enrollments = fetch_on_enrollments("active_enrollments_for_permissions2", user, is_unpublished) do
       scope = self.enrollments.for_user(user).active_or_pending_by_date.select("enrollments.*, enrollment_states.state AS date_based_state_in_db")
       scope = scope.where(:type => ['TeacherEnrollment', 'TaEnrollment', 'DesignerEnrollment', 'StudentViewEnrollment']) if is_unpublished
-      scope.to_a
+      ens = scope.to_a
+      ens.each{|e| e.instance_variable_set(:@association_cache, {})}
+      ens
     end
+    active_enrollments.each{|e| e.course = self} # set association so we don't requery
     active_enrollments.any? {|e| (allow_future || e.date_based_state_in_db == 'active') && e.has_permission_to?(permission) }
   end
 

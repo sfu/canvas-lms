@@ -10942,7 +10942,7 @@ nn:
   last_export_899a04c5: "Siste eksport: "
   last_first_name_95a078f5: "Etter-, fornamn"
   last_item_79583712: "Siste element: "
-  last_length_graded_items_6db7374e: "SIste %{length} vurderte element"
+  last_length_graded_items_6db7374e: "Siste %{length} vurderte element"
   last_login_54565109: "Siste pålogging"
   last_login_b7bc0479: "Siste pålogging: "
   last_modified_by_ca4bb5e1: "Sist endra av"
@@ -13358,7 +13358,7 @@ nn:
   models_to_include_9fb154ca: "Modellar til inkludering"
   moderate_assignment_ccb00173: "Moderer %{assignment}"
   moderate_assignment_name_cf59e0a7: "Moderer %{assignment_name}"
-  moderate_d0c85e92: Moderer
+  moderate_d0c85e92: Moderat
   moderate_grades_4f43f85d: "Moderer karakterar"
   moderated_assignment_12873e87: "Moderert oppgåve"
   moderated_assignments_must_be_manually_posted_unti_39545855: "Modererte oppgåver må postast manuelt fram til vurderingsresultat er sendt ut."
