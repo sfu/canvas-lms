@@ -156,6 +156,7 @@ class ApplicationController < ActionController::Base
           k12: k12?,
           use_responsive_layout: use_responsive_layout?,
           use_rce_enhancements: @context.try(:feature_enabled?, :rce_enhancements),
+          rce_auto_save: @context.try(:feature_enabled?, :rce_auto_save),
           DIRECT_SHARE_ENABLED: @domain_root_account.try(:feature_enabled?, :direct_share),
           help_link_name: help_link_name,
           help_link_icon: help_link_icon,
@@ -185,7 +186,8 @@ class ApplicationController < ActionController::Base
         end
 
         @js_env[:lolcalize] = true if ENV['LOLCALIZE']
-
+        @js_env[:rce_auto_save_max_age_ms] = Setting.get('rce_auto_save_max_age_ms', 1.hour.to_i * 1000).to_i if @js_env[:rce_auto_save]
+        
         # SFU MOD: Add SFU entries to js_env
         @js_env[:APP_NODE] = Socket.gethostname().split('.')[0]
         # SFU MOD: Add the base Webpack URL to js_env
@@ -193,7 +195,7 @@ class ApplicationController < ActionController::Base
         @js_env[:RELEASE] = File.dirname(__FILE__)
         @js_env[:CANVAS_SPACES_ENABLED] = PluginSetting.find_by_name(:canvas_spaces).disabled.! rescue false
         # END SFU MOD
-       end
+      end
     end
 
     add_to_js_env(hash, @js_env, overwrite)

@@ -38,7 +38,7 @@ gem 'active_model_serializers', '0.9.0alpha1',
 gem 'authlogic', '5.0.4'
   gem 'scrypt', '3.0.7'
 gem 'active_model-better_errors', '1.6.7', require: 'active_model/better_errors'
-gem 'switchman', '1.14.7'
+gem 'switchman', '1.14.9'
   gem 'open4', '1.3.4', require: false
 gem 'folio-pagination', '0.0.12', require: 'folio/rails'
   # for folio, see the folio README
@@ -123,7 +123,7 @@ gem 'inst_statsd', '2.1.6'
   gem 'statsd-ruby', '1.4.0', require: false
   gem 'aroi', '0.0.7', require: false
   gem 'dogstatsd-ruby', '4.5.0'
-gem 'inst-jobs-statsd', '1.2.3'
+gem 'inst-jobs-statsd', '1.3.1'
 gem 'gepub', '1.0.4'
 gem 'imperium', '0.5.2', require: false
 gem 'academic_benchmarks', '0.0.11', require: false
