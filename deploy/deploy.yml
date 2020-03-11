@@ -58,3 +58,36 @@
         name: "{{ release_dir }}/public/dist/brandable_css"
         src: "/mnt/data/brandable_css/{{ release_name }}"
         state: link
+
+- name: Run predeploy migrations
+  hosts: management
+  when: primary_management == true
+  tasks:
+    - shell: bundle exec rake db:migrate:predeploy
+      args:
+        chdir: "{{ release_dir }}"
+      environment:
+        RAILS_ENV: production
+
+- name: Move current symlink
+  hosts: all
+  tasks:
+    - file:
+        path: /var/rails/canvas/current
+        state: absent
+    - file:
+        path: /var/rails/canvas/current
+        src: "{{ release_dir }}"
+        state: link
+
+- name: Restart jobs processors
+  hosts: management
+  service:
+    name: canvas-jobs
+    state: restarted
+
+- name: Restart app processes
+  hosts: all
+  tasks:
+    - shell: "passenger-config restart-app --rolling-restart /var/rails/canvas/current"
+
