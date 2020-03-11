@@ -36,7 +36,7 @@
 
 - name: Rebuild brand configs and copy
   hosts: management
-  when: primary == true
+  when: primary_management == true
   tasks:
     - shell: bundle exec rake brand_configs:generate_and_upload_all
       args:
