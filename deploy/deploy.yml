@@ -1,0 +1,10 @@
+---
+- name: Deploy Canvas
+  hosts: all
+  tasks:
+  
+  - name: Ansible date local
+    local_action: debug msg="{{ lookup('pipe','date +%Y%m%d%H%M%S') }}"
+  - name: Ansible date remote
+    debug:
+        msg: "{{ lookup('pipe','date +%Y%m%d%H%M%S') }}"
