@@ -27,8 +27,8 @@
   hosts: all
   tasks:
     - file:
-      path: "{{ release_dir }}/mnt/data"
-      state: directory
+        path: "{{ release_dir }}/mnt/data"
+        state: directory
     - file:
         path: "{{ release_dir }}/mnt/data/canvasfiles"
         src: /mnt/data/canvasfiles
