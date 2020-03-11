@@ -1,10 +1,60 @@
 ---
-- name: Deploy Canvas
+- hosts: all
+  tasks: 
+    - set_fact:
+        key_value: release_dir="/var/rails/canvas/releases/{{ release_name }}"
+
+- name: Create release directory
   hosts: all
   tasks:
+    - file:
+        path: "{{ release_dir }}"
+        state: directory
   
-  - name: Ansible date local
-    local_action: debug msg="{{ lookup('pipe','date +%Y%m%d%H%M%S') }}"
-  - name: Ansible date remote
-    debug:
-        msg: "{{ lookup('pipe','date +%Y%m%d%H%M%S') }}"
+- name: Extract release tarball to release directory
+  hosts: all
+  tasks:
+    - unarchive:
+        src: "/usr/local/canvas/deploy-release-{{ canvas_env }}/{{ release_name }}/canvas.tar"
+        dest: "{{ release_dir }}"
+
+- name: Copy config files from templates
+  hosts: all
+  tasks:
+    - shell: "/usr/local/canvas/bin/canvasconfig -r {{ release_name }}"
+
+- name: Symlink canvas data mount
+  hosts: all
+  tasks:
+    - file:
+      path: "{{ release_dir }}/mnt/data"
+      state: directory
+    - file:
+        path: "{{ release_dir }}/mnt/data/canvasfiles"
+        src: /mnt/data/canvasfiles
+        state: link
+
+- name: Rebuild brand configs and copy
+  hosts: management
+  when: primary == true
+  tasks:
+    - shell: bundle exec rake brand_configs:generate_and_upload_all
+      args:
+        chdir: "{{ release_dir }}"
+      environment:
+        RAILS_ENV: production
+    - copy:
+        src: "{{ release_dir }}/public/dist/brandable_css"
+        dest: "/mnt/data/brandable_css/{{ release_name }}"
+        remote_src: yes
+
+- name: Symlink brandable CSS
+  hosts: all
+  tasks:
+    - file:
+        path: "{{ release_dir }}/public/dist/brandable_css"
+        state: absent
+    - file:
+        name: "{{ release_dir }}/public/dist/brandable_css"
+        src: "/mnt/data/brandable_css/{{ release_name }}"
+        state: link
