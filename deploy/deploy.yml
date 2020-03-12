@@ -85,8 +85,8 @@
   hosts: management
   tasks:
     - service:
-      name: canvas-jobs
-      state: restarted
+        name: canvas-jobs
+        state: restarted
 
 - name: Restart app processes
   hosts: all
