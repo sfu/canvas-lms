@@ -64,7 +64,7 @@
   hosts: management
   tasks:
     - shell: bundle exec rake db:migrate:predeploy
-      when: primary_management == true
+      when: primary_management|bool == true
       args:
         chdir: "{{ release_dir }}"
       environment:
