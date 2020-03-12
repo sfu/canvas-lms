@@ -1,8 +1,7 @@
 ---
 - hosts: all
   tasks: 
-    - set_fact:
-        key_value: release_dir="/var/rails/canvas/releases/{{ release_name }}"
+    - set_fact: release_dir="/var/rails/canvas/releases/{{ release_name }}"
 
 - name: Create release directory
   hosts: all
