@@ -83,9 +83,10 @@
 
 - name: Restart jobs processors
   hosts: management
-  service:
-    name: canvas-jobs
-    state: restarted
+  tasks:
+    - service:
+      name: canvas-jobs
+      state: restarted
 
 - name: Restart app processes
   hosts: all
