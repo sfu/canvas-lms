@@ -1,6 +1,6 @@
 ---
 - hosts: all
-  tasks: 
+  tasks:
     - set_fact: release_dir="/var/rails/canvas/releases/{{ release_name }}"
 
 - name: Create release directory
@@ -9,7 +9,7 @@
     - file:
         path: "{{ release_dir }}"
         state: directory
-  
+
 - name: Extract release tarball to release directory
   hosts: all
   tasks:
@@ -26,36 +26,42 @@
 - name: Symlink canvas data mount
   hosts: all
   tasks:
-    - file:
+    - name: Create destination directory
+      file:
         path: "{{ release_dir }}/mnt/data"
         state: directory
-    - file:
+    - name: Create symlink
+      file:
         path: "{{ release_dir }}/mnt/data/canvasfiles"
         src: /mnt/data/canvasfiles
         state: link
 
-- name: Rebuild brand configs and copy
+- name: Rebuild brand configs and copy to NFS mount
   hosts: management
   tasks:
-    - shell: bundle exec rake brand_configs:generate_and_upload_all
-      when: primary_management == true
+    - name: Build brand configs
+      shell: bundle exec rake brand_configs:generate_and_upload_all
+      when: primary_management|bool == true
       args:
         chdir: "{{ release_dir }}"
       environment:
         RAILS_ENV: production
-    - copy:
-        when: primary_management == true
+    - name: Copy to NFS mount
+      copy:
         src: "{{ release_dir }}/public/dist/brandable_css"
         dest: "/mnt/data/brandable_css/{{ release_name }}"
         remote_src: yes
+      when: primary_management|bool == true
 
 - name: Symlink brandable CSS
   hosts: all
   tasks:
-    - file:
+    - name: Remove local brandable_css dir
+      file:
         path: "{{ release_dir }}/public/dist/brandable_css"
         state: absent
-    - file:
+    - name: Symlink brandable_css to NFS mount
+      file:
         name: "{{ release_dir }}/public/dist/brandable_css"
         src: "/mnt/data/brandable_css/{{ release_name }}"
         state: link
@@ -73,10 +79,12 @@
 - name: Move current symlink
   hosts: all
   tasks:
-    - file:
+    - name: Remove old symlink
+      file:
         path: /var/rails/canvas/current
         state: absent
-    - file:
+    - name: Create new symlink
+      file:
         path: /var/rails/canvas/current
         src: "{{ release_dir }}"
         state: link
@@ -85,6 +93,7 @@
   hosts: management
   tasks:
     - become: yes
+      service:
         name: canvas-jobs
         state: restarted
 
@@ -92,4 +101,3 @@
   hosts: all
   tasks:
     - shell: "passenger-config restart-app --rolling-restart /var/rails/canvas/current"
-
