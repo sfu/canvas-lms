@@ -84,7 +84,7 @@
 - name: Restart jobs processors
   hosts: management
   tasks:
-    - service:
+    - become: yes
         name: canvas-jobs
         state: restarted
 
