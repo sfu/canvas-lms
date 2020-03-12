@@ -36,14 +36,15 @@
 
 - name: Rebuild brand configs and copy
   hosts: management
-  when: primary_management == true
   tasks:
     - shell: bundle exec rake brand_configs:generate_and_upload_all
+      when: primary_management == true
       args:
         chdir: "{{ release_dir }}"
       environment:
         RAILS_ENV: production
     - copy:
+        when: primary_management == true
         src: "{{ release_dir }}/public/dist/brandable_css"
         dest: "/mnt/data/brandable_css/{{ release_name }}"
         remote_src: yes
@@ -61,9 +62,9 @@
 
 - name: Run predeploy migrations
   hosts: management
-  when: primary_management == true
   tasks:
     - shell: bundle exec rake db:migrate:predeploy
+      when: primary_management == true
       args:
         chdir: "{{ release_dir }}"
       environment:
