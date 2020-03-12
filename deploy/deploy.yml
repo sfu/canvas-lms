@@ -16,6 +16,7 @@
     - unarchive:
         src: "/usr/local/canvas/deploy-release-{{ canvas_env }}/{{ release_name }}/canvas.tar"
         dest: "{{ release_dir }}"
+        remote_src: yes
 
 - name: Copy config files from templates
   hosts: all
