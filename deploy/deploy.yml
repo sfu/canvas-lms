@@ -49,7 +49,7 @@
     - name: Copy to NFS mount
       copy:
         src: "{{ release_dir }}/public/dist/brandable_css"
-        dest: "/mnt/data/brandable_css/{{ release_name }}"
+        dest: "/mnt/data/brandable_css/{{ release_name }}/brandable_css"
         remote_src: yes
       when: primary_management|bool == true
 
