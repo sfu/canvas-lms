@@ -190,6 +190,10 @@
   utils.onPage(/^\/courses\/\d+\/discussion_topics\//, () => {
     loadMathjax()
   })
+  utils.onPage(/^\/courses\/\d+\/?$/, () => {
+    loadMathjax()
+  })
+
 })(jQuery)
 
 // google analytics
