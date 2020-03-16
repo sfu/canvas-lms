@@ -18,6 +18,15 @@
         dest: "{{ release_dir }}"
         remote_src: yes
 
+- name: Fix permissions on release directory and contents
+  hosts: all
+  become: yes
+  file:
+    dest: "{{ release_dir }}"
+    owner: canvasuser
+    group: apache
+    recurse: yes
+
 - name: Copy config files from templates
   hosts: all
   tasks:
