@@ -49,7 +49,7 @@
     - name: Copy to NFS mount
       copy:
         src: "{{ release_dir }}/public/dist/brandable_css"
-        dest: "/mnt/data/brandable_css/{{ release_name }}/brandable_css"
+        dest: "/mnt/data/brandable_css/{{ release_name }}"
         remote_src: yes
       when: primary_management|bool == true
 
@@ -63,7 +63,7 @@
     - name: Symlink brandable_css to NFS mount
       file:
         name: "{{ release_dir }}/public/dist/brandable_css"
-        src: "/mnt/data/brandable_css/{{ release_name }}"
+        src: "/mnt/data/brandable_css/{{ release_name }}/brandable_css"
         state: link
 
 - name: Run predeploy migrations
