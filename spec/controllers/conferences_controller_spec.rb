@@ -97,6 +97,58 @@ describe ConferencesController do
       get 'index', params: {:course_id => @course.id}
       expect(assigns[:new_conferences]).to be_empty
     end
+
+    it "should preload recordings for BBB conferences" do
+      PluginSetting.create!(name: 'big_blue_button',
+        :settings => {
+          :domain => "bbb.totallyanexampleplzdontcallthis.com",
+          :secret_dec => "secret",
+        })
+      allow(BigBlueButtonConference).to receive(:send_request).and_return('')
+
+      user_session(@teacher)
+      @bbb = BigBlueButtonConference.create!(:title => "my conference", :user => @teacher, :context => @course)
+      @other = @course.web_conferences.create!(:conference_type => 'Wimba', :duration => 60, :user => @teacher)
+
+      expect(BigBlueButtonConference).to receive(:preload_recordings).with([@bbb])
+      get 'index', params: {:course_id => @course.id}
+      expect(response).to be_success
+    end
+
+    context "sets render_alternatives variable" do
+      it "should set to false by default" do
+        user_session(@teacher)
+        get 'index', params: { course_id: @course.id }
+        expect(assigns[:js_env][:render_alternatives]).to be_falsey
+      end
+
+      it "should set to true if plugins are set to replace_with_alternatives" do
+        user_session(@teacher)
+        @plugin.update_attribute(:settings, @plugin.settings.merge(replace_with_alternatives: true))
+        get 'index', params: { course_id: @course.id }
+        expect(assigns[:js_env][:render_alternatives]).to be_truthy
+      end
+
+      context "should set to true if course setting show_conference_alternatives is set" do
+        before do
+          @course.update! settings: @course.settings.merge(show_conference_alternatives: true)
+        end
+
+        it "when context is a group" do
+          user_session(@student)
+          @group = @course.groups.create!(:name => "some group")
+          @group.add_user(@student)
+          get 'index', params: { group_id: @group.id }
+          expect(assigns[:js_env][:render_alternatives]).to be_truthy
+        end
+
+        it "when context is a course" do
+          user_session(@teacher)
+          get 'index', params: { course_id: @course.id }
+          expect(assigns[:js_env][:render_alternatives]).to be_truthy
+        end
+      end
+    end
   end
 
   describe "POST 'create'" do

@@ -174,24 +174,32 @@ class ConferencesController < ApplicationController
   def api_index(conferences)
     route = polymorphic_url([:api_v1, @context, :conferences])
     web_conferences = Api.paginate(conferences, self, route)
+    preload_recordings(web_conferences)
     render json: api_conferences_json(web_conferences, @current_user, session)
   end
   protected :api_index
 
   def web_index(conferences)
+    conferences = conferences.to_a
+    preload_recordings(conferences)
     @new_conferences, @concluded_conferences = conferences.partition { |conference|
       conference.ended_at.nil?
     }
     log_asset_access([ "conferences", @context ], "conferences", "other")
+
+    @render_alternatives = WebConference.conference_types.all? { |ct| ct[:replace_with_alternatives] }
     case @context
     when Course
       @users = User.where(:id => @context.current_enrollments.not_fake.active_by_date.where.not(:user_id => @current_user).select(:user_id)).
         order(User.sortable_name_order_by_clause).to_a
+      @render_alternatives ||= @context.settings[:show_conference_alternatives].present?
     when Group
       @users = @context.participating_users_in_context.where("users.id<>?", @current_user).order(User.sortable_name_order_by_clause).to_a.uniq
+      @render_alternatives ||= @context.context.settings[:show_conference_alternatives].present?
     else
       @users = @context.users.where("users.id<>?", @current_user).order(User.sortable_name_order_by_clause).to_a.uniq
     end
+
     # exposing the initial data as json embedded on page.
     js_env(
       current_conferences: ui_conferences_json(@new_conferences, @context, @current_user, session),
@@ -199,6 +207,8 @@ class ConferencesController < ApplicationController
       default_conference: default_conference_json(@context, @current_user, session),
       conference_type_details: conference_types_json(WebConference.conference_types),
       users: @users.map { |u| {:id => u.id, :name => u.last_name_first} },
+      can_create_conferences: @context.grants_right?(@current_user, session, :create_conferences),
+      render_alternatives: @render_alternatives
     )
     set_tutorial_js_env
     flash[:error] = t('Some conferences on this page are hidden because of errors while retrieving their status') if @errors
@@ -407,5 +417,13 @@ class ConferencesController < ApplicationController
   def conference_params
     params.require(:web_conference).
       permit(:title, :duration, :description, :conference_type, :user_settings => strong_anything)
+  end
+
+  def preload_recordings(conferences)
+    conferences.group_by(&:class).each do |klass, klass_conferences|
+      if klass.respond_to?(:preload_recordings) # should only be BigBlueButton for now
+        klass.preload_recordings(klass_conferences)
+      end
+    end
   end
 end
