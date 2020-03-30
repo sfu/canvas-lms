@@ -99,7 +99,7 @@ namespace :canvas do
   task :symlink_brandable_css do
     on roles(:all) do
       local_path = fetch(:local_brandable_css_path)
-      execute "rm -rf #{local_path} && ln -s #{fetch(:shared_brandable_css_path)} #{local_path} && chown -R 755 #{local_path} && chown -R 755 #{release_path}/public"
+      execute "rm -rf #{local_path} && ln -s #{fetch(:shared_brandable_css_path)} #{local_path} && chmod -R 755 #{local_path} && chmod -R 755 #{release_path}/public"
     end
   end
 
