@@ -14,6 +14,7 @@ namespace :canvas do
     on roles(:all) do
       user = fetch :user
       execute :chown, '-R', "#{user}:#{user}", "#{release_path}"
+      execute :chmod, '-R', "755" "#{release_path}"
     end
   end
 
