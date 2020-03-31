@@ -14,6 +14,7 @@ namespace :canvas do
     on roles(:all) do
       user = fetch :user
       execute :chown, '-R', "#{user}:#{user}", "#{release_path}"
+      execute :chmod, '-R', "755", "#{release_path}"
     end
   end
 
@@ -99,7 +100,7 @@ namespace :canvas do
   task :symlink_brandable_css do
     on roles(:all) do
       local_path = fetch(:local_brandable_css_path)
-      execute "rm -rf #{local_path} && ln -s #{fetch(:shared_brandable_css_path)} #{local_path}"
+      execute "rm -rf #{local_path} && ln -s #{fetch(:shared_brandable_css_path)} #{local_path} && chmod -R 755 #{local_path} && chmod -R 755 #{release_path}/public"
     end
   end
 

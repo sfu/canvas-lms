@@ -104,7 +104,7 @@ class Message < ActiveRecord::Base
     state :created do
       event :stage, :transitions_to => :staged do
         self.dispatch_at = Time.now.utc + self.delay_for
-        if self.to != 'dashboard' && !@stage_without_dispatch
+        if self.to != 'dashboard'
           MessageDispatcher.dispatch(self)
         end
       end
@@ -188,6 +188,7 @@ class Message < ActiveRecord::Base
   scope :for, lambda { |context| where(:context_type => context.class.base_class.to_s, :context_id => context) }
 
   scope :after, lambda { |date| where("messages.created_at>?", date) }
+  scope :more_recent_than, lambda { |date| where("messages.created_at>? AND messages.dispatch_at>?", date, date) }
 
   scope :to_dispatch, -> {
     where("messages.workflow_state='staged' AND messages.dispatch_at<=? AND 'messages.to'<>'dashboard'", Time.now.utc)
@@ -362,7 +363,8 @@ class Message < ActiveRecord::Base
   #
   # Returns nothing.
   def stage_without_dispatch!
-    @stage_without_dispatch = true
+    self.dispatch_at = Time.now.utc + self.delay_for
+    self.workflow_state = 'staged'
   end
 
   # Public: Stage the message during the dispatch process. Messages travel
@@ -677,7 +679,7 @@ class Message < ActiveRecord::Base
   def notification_targets
     case path_type
     when "push"
-      self.user.notification_endpoints.map(&:arn)
+      self.user.notification_endpoints.pluck(:arn)
     when "twitter"
       twitter_service = user.user_services.where(service: 'twitter').first
       [
