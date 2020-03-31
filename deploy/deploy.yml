@@ -23,10 +23,10 @@
   become: yes
   tasks:
     - file:
-      dest: "{{ release_dir }}"
-      owner: canvasuser
-      group: apache
-      recurse: yes
+        dest: "{{ release_dir }}"
+        owner: canvasuser
+        group: apache
+        recurse: yes
 
 - name: Copy config files from templates
   hosts: all
