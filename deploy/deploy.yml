@@ -28,6 +28,17 @@
         group: apache
         recurse: yes
 
+- name: Symlink tmp and log dirs to shared
+  hosts: all
+  tasks:
+    - file:
+        state: link
+        src: "/var/rails/canvas/shared/{{ item }}"
+        dest: "{{ release_dir }}/{{ item }}"
+      with_items:
+        - log
+        - tmp
+
 - name: Copy config files from templates
   hosts: all
   tasks:
