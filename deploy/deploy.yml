@@ -110,4 +110,4 @@
 - name: Restart app processes
   hosts: all
   tasks:
-    - shell: "passenger-config restart-app --rolling-restart /var/rails/canvas/current"
+    - shell: "/usr/local/canvas/bin/restart-passenger-and-wait"
