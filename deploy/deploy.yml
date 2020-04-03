@@ -32,6 +32,12 @@
   hosts: all
   tasks:
     - file:
+        state: absent
+        dest: "{{ item }}"
+      with_items:
+        - log
+        - tmp
+    - file:
         state: link
         src: "/var/rails/canvas/shared/{{ item }}"
         dest: "{{ release_dir }}/{{ item }}"
