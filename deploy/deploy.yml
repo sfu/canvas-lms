@@ -1,0 +1,130 @@
+---
+- hosts: all
+  tasks:
+    - set_fact: release_dir="/var/rails/canvas/releases/{{ release_name }}"
+
+- name: Create release directory
+  hosts: all
+  tasks:
+    - file:
+        path: "{{ release_dir }}"
+        state: directory
+
+- name: Extract release tarball to release directory
+  hosts: all
+  tasks:
+    - unarchive:
+        src: "/usr/local/canvas/deploy-release-{{ canvas_env }}/{{ release_name }}/canvas.tar"
+        dest: "{{ release_dir }}"
+        remote_src: yes
+
+- name: Fix permissions on release directory and contents
+  hosts: all
+  become: yes
+  tasks:
+    - file:
+        dest: "{{ release_dir }}"
+        owner: canvasuser
+        group: apache
+        recurse: yes
+
+- name: Symlink tmp and log dirs to shared
+  hosts: all
+  tasks:
+    - file:
+        state: absent
+        dest: "{{ item }}"
+      with_items:
+        - log
+        - tmp
+    - file:
+        state: link
+        src: "/var/rails/canvas/shared/{{ item }}"
+        dest: "{{ release_dir }}/{{ item }}"
+      with_items:
+        - log
+        - tmp
+
+- name: Copy config files from templates
+  hosts: all
+  tasks:
+    - shell: "/usr/local/canvas/bin/canvasconfig -r {{ release_name }}"
+
+- name: Symlink canvas data mount
+  hosts: all
+  tasks:
+    - name: Create destination directory
+      file:
+        path: "{{ release_dir }}/mnt/data"
+        state: directory
+    - name: Create symlink
+      file:
+        path: "{{ release_dir }}/mnt/data/canvasfiles"
+        src: /mnt/data/canvasfiles
+        state: link
+
+- name: Rebuild brand configs and copy to NFS mount
+  hosts: management
+  tasks:
+    - name: Build brand configs
+      shell: bundle exec rake brand_configs:generate_and_upload_all
+      when: primary_management|bool == true
+      args:
+        chdir: "{{ release_dir }}"
+      environment:
+        RAILS_ENV: production
+    - name: Copy to NFS mount
+      copy:
+        src: "{{ release_dir }}/public/dist/brandable_css"
+        dest: "/mnt/data/brandable_css/{{ release_name }}"
+        remote_src: yes
+      when: primary_management|bool == true
+
+- name: Symlink brandable CSS
+  hosts: all
+  tasks:
+    - name: Remove local brandable_css dir
+      file:
+        path: "{{ release_dir }}/public/dist/brandable_css"
+        state: absent
+    - name: Symlink brandable_css to NFS mount
+      file:
+        name: "{{ release_dir }}/public/dist/brandable_css"
+        src: "/mnt/data/brandable_css/{{ release_name }}/brandable_css"
+        state: link
+
+- name: Run predeploy migrations
+  hosts: management
+  tasks:
+    - shell: bundle exec rake db:migrate:predeploy
+      when: primary_management|bool == true
+      args:
+        chdir: "{{ release_dir }}"
+      environment:
+        RAILS_ENV: production
+
+- name: Move current symlink
+  hosts: all
+  tasks:
+    - name: Remove old symlink
+      file:
+        path: /var/rails/canvas/current
+        state: absent
+    - name: Create new symlink
+      file:
+        path: /var/rails/canvas/current
+        src: "{{ release_dir }}"
+        state: link
+
+- name: Restart jobs processors
+  hosts: management
+  tasks:
+    - become: yes
+      service:
+        name: canvas-jobs
+        state: restarted
+
+- name: Restart app processes
+  hosts: all
+  tasks:
+    - shell: "/usr/local/canvas/bin/restart-passenger-and-wait"

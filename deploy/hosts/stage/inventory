@@ -1,0 +1,5 @@
+[management]
+lcp-canvas-ms01.dc.sfu.ca primary_management=true
+
+[app]
+lcp-canvas-as[01:03].dc.sfu.ca
