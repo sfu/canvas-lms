@@ -140,3 +140,23 @@
   hosts: all
   tasks:
     - shell: "/usr/local/canvas/bin/restart-passenger-and-wait"
+
+- name: Run database migrations
+  hosts: management
+  tasks:
+    - shell: bundle exec rake db:migrate
+      when: primary_management|bool == true
+      args:
+        chdir: "{{ release_dir }}"
+      environment:
+        RAILS_ENV: production
+
+- name: Run load notifications task
+  hosts: management
+  tasks:
+    - shell: bundle exec rake canvas:load_notifications
+      when: primary_management|bool == true
+      args:
+        chdir: "{{ release_dir }}"
+      environment:
+        RAILS_ENV: production
