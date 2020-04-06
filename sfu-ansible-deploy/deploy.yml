@@ -154,7 +154,7 @@
 - name: Run load notifications task
   hosts: management
   tasks:
-    - shell: bundle exec rake canvas:load_notifications
+    - shell: bundle exec rake db:load_notifications
       when: primary_management|bool == true
       args:
         chdir: "{{ release_dir }}"
