@@ -1010,6 +1010,8 @@ CanvasRails::Application.routes.draw do
       get  'users/:user_id/courses', action: :user_index, as: 'user_courses'
       get 'courses/:course_id/effective_due_dates', action: :effective_due_dates, as: 'course_effective_due_dates'
       get 'courses/:course_id/permissions', action: :permissions
+
+      get 'courses/:course_id/student_view_student', action: :student_view_student
     end
 
     scope(controller: :account_notifications) do
@@ -1111,6 +1113,7 @@ CanvasRails::Application.routes.draw do
 
     scope(controller: :course_audit_api) do
       get 'audit/course/courses/:course_id', action: :for_course, as: 'audit_course_for_course'
+      get 'audit/course/accounts/:account_id', action: :for_account, as: 'audit_course_for_account'
     end
 
     scope(controller: :assignment_overrides) do
@@ -1131,6 +1134,7 @@ CanvasRails::Application.routes.draw do
       get 'courses/:course_id/assignments', action: :index, as: 'course_assignments'
       get 'courses/:course_id/assignment_groups/:assignment_group_id/assignments', action: :index, as: 'course_assignment_group_assignments'
       get 'users/:user_id/courses/:course_id/assignments', action: :user_index, as: 'user_course_assignments'
+      put 'courses/:course_id/assignments/bulk_update', action: :bulk_update
       get 'courses/:course_id/assignments/:id', action: :show, as: 'course_assignment'
       post 'courses/:course_id/assignments', action: :create
       put 'courses/:course_id/assignments/:id', action: :update
@@ -2014,6 +2018,8 @@ CanvasRails::Application.routes.draw do
         get prefix, action: :index, as: "#{context}_conferences"
         post "#{prefix}/:conference_id/recording_ready", action: :recording_ready, as: "#{context}_conferences_recording_ready"
       end
+
+      get "conferences", action: :for_user, as: "conferences"
     end
 
     scope(controller: :custom_gradebook_columns_api) do

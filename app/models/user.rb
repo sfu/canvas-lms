@@ -273,8 +273,10 @@ class User < ActiveRecord::Base
 
   def assignment_and_quiz_visibilities(context)
     RequestCache.cache("assignment_and_quiz_visibilities", self, context) do
-      {assignment_ids: DifferentiableAssignment.scope_filter(context.assignments, self, context).pluck(:id),
-        quiz_ids: DifferentiableAssignment.scope_filter(context.quizzes, self, context).pluck(:id)}
+      Shackles.activate(:slave) do
+        {assignment_ids: DifferentiableAssignment.scope_filter(context.assignments, self, context).pluck(:id),
+          quiz_ids: DifferentiableAssignment.scope_filter(context.quizzes, self, context).pluck(:id)}
+      end
     end
   end
 
@@ -1530,7 +1532,7 @@ class User < ActiveRecord::Base
   end
 
   def close_announcement(announcement)
-    closed = get_preference(:closed_notifications) || []
+    closed = get_preference(:closed_notifications).dup || []
     # serialize ids relative to the user
     self.shard.activate do
       closed << announcement.id
@@ -1643,35 +1645,37 @@ class User < ActiveRecord::Base
   # made a tree, it would be the chain between the root and the first branching
   # point.
   def common_account_chain(in_root_account)
-    rid = in_root_account.id
-    accts = self.associated_accounts.where("accounts.id = ? OR accounts.root_account_id = ?", rid, rid)
-    return [] if accts.blank?
-    children = accts.inject({}) do |hash,acct|
-      pid = acct.parent_account_id
-      if pid.present?
-        hash[pid] ||= []
-        hash[pid] << acct
+    Shackles.activate(:slave) do
+      rid = in_root_account.id
+      accts = self.associated_accounts.where("accounts.id = ? OR accounts.root_account_id = ?", rid, rid)
+      return [] if accts.blank?
+      children = accts.inject({}) do |hash,acct|
+        pid = acct.parent_account_id
+        if pid.present?
+          hash[pid] ||= []
+          hash[pid] << acct
+        end
+        hash
       end
-      hash
+
+      enrollment_account_ids = in_root_account.
+        all_enrollments.
+        current_and_concluded.
+        where(user_id: self).
+        joins(:course).
+        distinct.
+        pluck(:account_id)
+
+      longest_chain = [in_root_account]
+      while true
+        break if enrollment_account_ids.include?(longest_chain.last.id)
+
+        next_children = children[longest_chain.last.id]
+        break unless next_children.present? && next_children.count == 1
+        longest_chain << next_children.first
+      end
+      longest_chain
     end
-
-    enrollment_account_ids = in_root_account.
-      all_enrollments.
-      current_and_concluded.
-      where(user_id: self).
-      joins(:course).
-      distinct.
-      pluck(:account_id)
-
-    longest_chain = [in_root_account]
-    while true
-      break if enrollment_account_ids.include?(longest_chain.last.id)
-
-      next_children = children[longest_chain.last.id]
-      break unless next_children.present? && next_children.count == 1
-      longest_chain << next_children.first
-    end
-    longest_chain
   end
 
   def courses_with_primary_enrollment(association = :current_and_invited_courses, enrollment_uuid = nil, options = {})
@@ -1702,9 +1706,11 @@ class User < ActiveRecord::Base
               where("enrollment_states.state IN ('active', 'invited', 'pending_invited', 'pending_active')")
           end
 
-          scope.select("courses.*, enrollments.id AS primary_enrollment_id, enrollments.type AS primary_enrollment_type, enrollments.role_id AS primary_enrollment_role_id, #{Enrollment.type_rank_sql} AS primary_enrollment_rank, enrollments.workflow_state AS primary_enrollment_state, enrollments.created_at AS primary_enrollment_date").
-              order(Arel.sql("courses.id, #{Enrollment.type_rank_sql}, #{Enrollment.state_rank_sql}")).
-              distinct_on(:id).shard(shards).to_a
+          Shackles.activate(:slave) do
+            scope.select("courses.*, enrollments.id AS primary_enrollment_id, enrollments.type AS primary_enrollment_type, enrollments.role_id AS primary_enrollment_role_id, #{Enrollment.type_rank_sql} AS primary_enrollment_rank, enrollments.workflow_state AS primary_enrollment_state, enrollments.created_at AS primary_enrollment_date").
+                order(Arel.sql("courses.id, #{Enrollment.type_rank_sql}, #{Enrollment.state_rank_sql}")).
+                distinct_on(:id).shard(shards).to_a
+          end
         end
         result.dup
       end

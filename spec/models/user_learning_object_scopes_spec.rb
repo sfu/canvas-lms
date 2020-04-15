@@ -593,6 +593,7 @@ describe UserLearningObjectScopes do
       Timecop.travel(1.week) do
         EnrollmentState.recalculate_expired_states # runs periodically in background
         expect(@teacher.reload.assignments_needing_grading.size).to be 0
+
       end
     end
 
@@ -716,9 +717,21 @@ describe UserLearningObjectScopes do
         end
       end
 
+      after :each do
+        [Shard.default, @shard1, @shard2].each do |shard|
+          shard.activate do
+            Setting.remove('assignments_needing_grading_b')
+          end
+        end
+      end
+
       it "should find assignments from all shards" do
         [Shard.default, @shard1, @shard2].each do |shard|
           shard.activate do
+            expect(@teacher.assignments_needing_grading.sort_by(&:id)).to eq(
+              [@course1.assignments.first, @course2.assignments.first, @assignment3].sort_by(&:id)
+            )
+            Setting.set('assignments_needing_grading_b', 'false')
             expect(@teacher.assignments_needing_grading.sort_by(&:id)).to eq(
               [@course1.assignments.first, @course2.assignments.first, @assignment3].sort_by(&:id)
             )
@@ -741,6 +754,16 @@ describe UserLearningObjectScopes do
 
       it "should apply a global limit" do
         expect(@teacher.assignments_needing_grading(:limit => 1).length).to eq 1
+      end
+
+      it 'should not fail with the dynamic setting turned off' do
+        [Shard.default, @shard1, @shard2].each do |shard|
+          shard.activate do
+            override_dynamic_settings(private: { canvas: { disable_needs_grading_queries: true } }) do
+              expect(@teacher.assignments_needing_grading).to eq []
+            end
+          end
+        end
       end
     end
 

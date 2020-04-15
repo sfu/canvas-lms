@@ -138,6 +138,7 @@ class Account < ActiveRecord::Base
   validates :workflow_state, presence: true
   validate :no_active_courses, if: lambda { |a| a.workflow_state_changed? && !a.active? }
   validate :no_active_sub_accounts, if: lambda { |a| a.workflow_state_changed? && !a.active? }
+  validate :validate_help_links, if: lambda { |a| a.settings_changed? }
 
   include StickySisFields
   are_sis_sticky :name, :parent_account_id
@@ -888,8 +889,11 @@ class Account < ActiveRecord::Base
 
   def self.sub_account_ids_recursive(parent_account_id)
     if connection.adapter_name == 'PostgreSQL'
-      sql = Account.sub_account_ids_recursive_sql(parent_account_id)
-      Account.find_by_sql(sql).map(&:id)
+      shackles_env = Account.connection.open_transactions == 0 ? :slave : Shackles.environment
+      Shackles.activate(shackles_env) do
+        sql = Account.sub_account_ids_recursive_sql(parent_account_id)
+        Account.find_by_sql(sql).map(&:id)
+      end
     else
       account_descendants = lambda do |ids|
         as = Account.where(:parent_account_id => ids).active.pluck(:id)
@@ -1224,6 +1228,15 @@ class Account < ActiveRecord::Base
       self.auth_discovery_url = value
     rescue URI::Error, ArgumentError
       errors.add(:discovery_url, t('errors.invalid_discovery_url', "The discovery URL is not valid" ))
+    end
+  end
+
+  def validate_help_links
+    links = self.settings[:custom_help_links]
+    return if links.blank?
+    link_errors = HelpLinks.validate_links(links)
+    link_errors.each do |link_error|
+      errors.add(:custom_help_links, link_error)
     end
   end
 
@@ -1570,7 +1583,8 @@ class Account < ActiveRecord::Base
     else
       help_links_builder.default_links + (links || [])
     end
-    help_links_builder.instantiate_links(result)
+    filtered_result = help_links_builder.filtered_links(result)
+    help_links_builder.instantiate_links(filtered_result)
   end
 
   def help_links_builder
@@ -1766,6 +1780,10 @@ class Account < ActiveRecord::Base
 
   def parent_registration_aac
     authentication_providers.where(parent_registration: true).first
+  end
+
+  def require_email_for_registration?
+    Canvas::Plugin.value_to_boolean(settings[:require_email_for_registration]) || false
   end
 
   def to_param
