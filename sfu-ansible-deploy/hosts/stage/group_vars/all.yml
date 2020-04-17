@@ -1,4 +1,0 @@
----
-canvas_root: /var/rails/canvas/releases
-tarball: canvas.tar
-canvas_env: stage

@@ -1,6 +1,0 @@
-[management]
-lcp-canvas-mp01.dc.sfu.ca primary_management=true
-lcp-canvas-mp02.dc.sfu.ca primary_management=false
-
-[app]
-lcp-canvas-ap[01:20].dc.sfu.ca
