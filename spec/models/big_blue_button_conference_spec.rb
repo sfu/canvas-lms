@@ -164,6 +164,17 @@ describe BigBlueButtonConference do
       end
     end
 
+    it "should include whether to show to students (and be true for everything but statistics)" do
+      allow(@bbb).to receive(:conference_key).and_return('12345')
+      response = JSON.parse(get_recordings_fixture, {symbolize_names: true})
+      allow(@bbb).to receive(:send_request).and_return(response)
+      @bbb.recordings.each do |recording|
+        recording[:playback_formats].each do |format|
+          expect(format[:show_to_students]).to eq(format[:type] != "statistics")
+        end
+      end
+    end
+
     describe "looking for recordings based on user setting" do
       before(:once) do
         @bbb = BigBlueButtonConference.new(user: user_factory, context: course_factory)
@@ -258,6 +269,36 @@ describe BigBlueButtonConference do
         BigBlueButtonConference.preload_recordings([@bbb, @bbb2])
         [@bbb, @bbb2].each{|c| expect(c).to_not receive(:send_request)} # shouldn't need to send individual requests anymore
         expect(@bbb.recordings.map{|r| r[:recording_id]}).to match_array(["somerecordingidformeeting1a", "somerecordingidformeeting1b"])
+        expect(@bbb2.recordings.map{|r| r[:recording_id]}).to match_array(["somerecordingidformeeting2"])
+      end
+
+      it "should not make a call for conferences without keys" do
+        allow(@bbb).to receive(:conference_key).and_return(nil)
+        expect(BigBlueButtonConference).to receive(:send_request).never
+
+        BigBlueButtonConference.preload_recordings([@bbb])
+      end
+
+      it "should make not make an empty call when preloading for old conferences" do
+        old_config = {
+          :domain => "bbb_old.instructure.com",
+          :secret_dec => "old_secret",
+        }.with_indifferent_access
+        allow(Canvas::Plugin.find(:big_blue_button_fallback)).to receive(:settings).and_return(old_config)
+
+        @bbb2 = BigBlueButtonConference.create!(:context => @bbb.context, :user => @bbb.user, :user_settings => @bbb.user_settings)
+        @bbb2.settings[:domain] = "bbb.instructure.com" # use the current config
+        allow(@bbb).to receive(:conference_key).and_return(nil)
+        allow(@bbb2).to receive(:conference_key).and_return('instructure_web_conference_somemeetingkey2')
+
+        response = JSON.parse(get_recordings_bulk_fixture, {symbolize_names: true})
+        # don't make an empty call for the old fallback config because the conference didn't have a key
+        expect(BigBlueButtonConference).to receive(:send_request).
+          with(:getRecordings, {:meetingID => 'instructure_web_conference_somemeetingkey2'}, use_fallback_config: false).
+          and_return(response)
+
+        BigBlueButtonConference.preload_recordings([@bbb, @bbb2])
+        expect(@bbb2).to_not receive(:send_request)
         expect(@bbb2.recordings.map{|r| r[:recording_id]}).to match_array(["somerecordingidformeeting2"])
       end
     end

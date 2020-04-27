@@ -102,3 +102,15 @@
 #syllabus_links {
   @include clearfix;
 }
+
+@include mobile-only {
+  .responsive_awareness {
+    #syllabus {
+      tr.date {
+        .day_date {
+          white-space: inherit;
+        }
+      }
+    }
+  }
+}

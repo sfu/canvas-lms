@@ -173,15 +173,21 @@ class ApplicationController < ActionController::Base
             show_feedback_link: show_feedback_link?
           },
           FEATURES: {
-            assignment_bulk_edit: Account.site_admin.feature_enabled?(:assignment_bulk_edit),
+            assignment_bulk_edit: @domain_root_account&.feature_enabled?(:assignment_bulk_edit),
             la_620_old_rce_init_fix: Account.site_admin.feature_enabled?(:la_620_old_rce_init_fix),
             cc_in_rce_video_tray: Account.site_admin.feature_enabled?(:cc_in_rce_video_tray),
-            show_qr_login: Object.const_defined?("InstructureMiscPlugin") && !!@domain_root_account&.feature_enabled?(:mobile_qr_login),
-            responsive_2020_03: !!@domain_root_account&.feature_enabled?(:responsive_2020_03),
             featured_help_links: Account.site_admin.feature_enabled?(:featured_help_links),
+            responsive_2020_03: !!@domain_root_account&.feature_enabled?(:responsive_2020_03), #TODO: Romove once all references have been appropriately chaged
+            responsive_2020_04: !!@domain_root_account&.feature_enabled?(:responsive_2020_04), #TODO: Romove once all references have been appropriately chaged
+            responsive_admin_settings: !!@domain_root_account&.feature_enabled?(:responsive_admin_settings),
+            responsive_awareness: !!@domain_root_account&.feature_enabled?(:responsive_awareness),
+            responsive_misc: !!@domain_root_account&.feature_enabled?(:responsive_misc),
             product_tours: !!@domain_root_account&.feature_enabled?(:product_tours),
-            module_dnd: !!@domain_root_account&.feature_enabled?(:module_dnd)
-          }
+            module_dnd: !!@domain_root_account&.feature_enabled?(:module_dnd),
+            files_dnd: !!@domain_root_account&.feature_enabled?(:files_dnd),
+            unpublished_courses: !!@domain_root_account&.feature_enabled?(:unpublished_courses)
+          },
+          KILL_JOY: Setting.get('kill_joy', false)
         }
         @js_env[:current_user] = @current_user ? Rails.cache.fetch(['user_display_json', @current_user].cache_key, :expires_in => 1.hour) { user_display_json(@current_user, :profile, [:avatar_is_fallback]) } : {}
         @js_env[:page_view_update_url] = page_view_path(@page_view.id, page_view_token: @page_view.token) if @page_view
@@ -1628,16 +1634,18 @@ class ApplicationController < ActionController::Base
   # Retrieving wiki pages needs to search either using the id or
   # the page title.
   def get_wiki_page
-    @wiki = @context.wiki
+    Shackles.activate(params[:action] == "edit" ? :master : :slave) do
+      @wiki = @context.wiki
 
-    @page_name = params[:wiki_page_id] || params[:id] || (params[:wiki_page] && params[:wiki_page][:title])
-    if(params[:format] && !['json', 'html'].include?(params[:format]))
-      @page_name += ".#{params[:format]}"
-      params[:format] = 'html'
+      @page_name = params[:wiki_page_id] || params[:id] || (params[:wiki_page] && params[:wiki_page][:title])
+      if(params[:format] && !['json', 'html'].include?(params[:format]))
+        @page_name += ".#{params[:format]}"
+        params[:format] = 'html'
+      end
+      return if @page || !@page_name
+
+      @page = @wiki.find_page(@page_name) if params[:action] != 'create'
     end
-    return if @page || !@page_name
-
-    @page = @wiki.find_page(@page_name) if params[:action] != 'create'
 
     unless @page
       if params[:titleize].present? && !value_to_boolean(params[:titleize])
@@ -1798,12 +1806,16 @@ class ApplicationController < ActionController::Base
     # but we still use the assignment#new page to create the quiz.
     # also handles launch from existing quiz on quizzes page.
     if ref.present? && @assignment&.quiz_lti?
-      if (ref.include?('assignments/new') || ref =~ /courses\/[0-9]+\/quizzes/i) && @context.root_account.feature_enabled?(:newquizzes_on_quiz_page)
+      if (ref.include?('assignments/new') || ref =~ /courses\/\d+\/quizzes/i) && @context.root_account.feature_enabled?(:newquizzes_on_quiz_page)
         return polymorphic_url([@context, :quizzes])
       end
 
-      if ref =~ /courses\/[0-9]+\/gradebook/i
+      if ref =~ /courses\/\d+\/gradebook/i
         return polymorphic_url([@context, :gradebook])
+      end
+
+      if ref =~ /courses\/\d+$/i
+        return polymorphic_url([@context])
       end
     end
     named_context_url(@context, :context_external_content_success_url, 'external_tool_redirect', include_host: true)
@@ -1988,6 +2000,7 @@ class ApplicationController < ActionController::Base
     else
       return false unless authorized_action(@context, @current_user, :manage_account_settings)
     end
+    true
   end
 
   def require_root_account_management
@@ -2503,7 +2516,15 @@ class ApplicationController < ActionController::Base
   end
 
   def user_has_google_drive
-    @user_has_google_drive ||= google_drive_connection.authorized?
+    @user_has_google_drive ||= begin
+      if logged_in_user
+        Rails.cache.fetch_with_batched_keys('user_has_google_drive', batch_object: logged_in_user, batched_keys: :user_services) do
+          google_drive_connection.authorized?
+        end
+      else
+        google_drive_connection.authorized?
+      end
+    end
   end
 
   def self.instance_id
@@ -2511,10 +2532,6 @@ class ApplicationController < ActionController::Base
   end
 
   def self.region
-    nil
-  end
-
-  def self.cluster
     nil
   end
 

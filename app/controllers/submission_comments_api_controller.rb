@@ -44,4 +44,93 @@ class SubmissionCommentsApiController < ApplicationController
       api_attachment_preflight(@assignment, request, check_quota: false)
     end
   end
+
+  # Internal: annotation_notification
+  #
+  # Send notification of annotation to other users of the submission
+  # Must have permission to send_messages on Site Admin account.
+  # annotation notifications go to all users on the submission and the observers for those users.
+  # annotation notifications also go to the instructors unless it is sent from an instructor.
+  # annotation notifications from instructors go to students if assignment is set to post automatically or if the assignment is posted.
+  #
+  # @argument author_id [Required, String]
+  #   The user that created the annotation
+  #
+  # @example_request
+  #    curl https://<canvas>/api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id/annotation_notification
+  #      -H 'Authorization: Bearer <token>' \
+  #      -X POST \
+  #      -F "author_id": "1"
+  #
+  # returns {}, status 200
+  def annotation_notification
+    Shackles.activate(:slave) do
+      if authorized_action?(Account.site_admin, @current_user, :send_messages)
+        assignment = api_find(@context.assignments.active, params[:assignment_id])
+        author = api_find(@context.all_current_users, params[:author_id])
+        user = api_find(@context.all_current_users, params[:user_id])
+        submission = assignment.submissions.where(user_id: user).take
+        return render json: {error: "Couldn't find Submission for user with API id #{params[:user_id]}"}, status: :bad_request unless submission
+        instructors = @context.instructors_in_charge_of(user)
+
+        # If the author is an instructor, check post_policies to see if we should notify others.
+        # Don't notify other instructors if author is an instructor
+        #
+        if author_is_instructor?(author, instructors)
+          # author is instructors, so check post_policies, if submission is not posted
+          # and not set to automatically post, don't notify anyone.
+          if assignment.post_manually? && !submission.posted?
+            return render json: {}, status: 200
+          end
+        else # author is a student
+          # always notify instructor
+          broadcast_annotation_notification(submission: submission, to_list: instructors, data: broadcast_data(author))
+        end
+
+        submissions_by_user_id = if submission.group_id
+                                   Submission.where(user_id: submission.group.users.select(:id)).index_by(&:user_id)
+                                 else
+                                   # if the user is the author there are no more people to notify.
+                                   return render json: {}, status: 200 if author == user
+                                   { user.id => submission }
+                                 end
+
+        # either an instructor made the annotation, and it should go to users and observers,
+        # or this is a group assignment, and other users + observers should be notified.
+        observers_by_user = User.observing_students_in_course(submissions_by_user_id.keys - [author.id], @context).
+          select("users.id, associated_user_id").group_by(&:associated_user_id)
+        submissions_by_user_id.each_value do |sub|
+          to_list = Array(observers_by_user[sub.user_id]) + ["user_#{sub.user_id}"] - ["user_#{author.id}"]
+          broadcast_annotation_notification(submission: sub, to_list: to_list, data: broadcast_data(author), teacher: false)
+        end
+
+        render json: {}, status: 200
+      end
+
+    end
+  end
+
+  private
+
+  def author_is_instructor?(author, instructors)
+    !!instructors.include?(author)
+  end
+
+  def broadcast_data(author)
+    data = @context.broadcast_data
+    data.merge({ author_name: author.name, author_id: author.id })
+  end
+
+  def broadcast_annotation_notification(submission:, to_list:, data:, teacher: true)
+    return if to_list.empty?
+    return unless submission
+
+    notification_type = teacher ? "Annotation Teacher Notification" : "Annotation Notification"
+    notification = BroadcastPolicy.notification_finder.by_name(notification_type)
+
+    Shackles.activate(:master) do
+      BroadcastPolicy.notifier.send_notification(submission, notification_type, notification, to_list, data)
+    end
+  end
+
 end

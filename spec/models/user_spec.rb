@@ -525,11 +525,7 @@ describe User do
   end
 
   describe "#recent_feedback" do
-    let_once(:post_policies_course) do
-      course = Course.create!(workflow_state: :available)
-      PostPolicy.enable_feature!
-      course
-    end
+    let_once(:post_policies_course) { Course.create!(workflow_state: :available) }
     let_once(:auto_posted_assignment) { post_policies_course.assignments.create!(points_possible: 10) }
     let_once(:manual_posted_assignment) do
       assignment = post_policies_course.assignments.create!(points_possible: 10)
@@ -772,6 +768,19 @@ describe User do
         end
         @user.favorites.create!(:context => @course)
         expect(@user.courses_with_primary_enrollment(:favorite_courses)).to eq [@course]
+      end
+
+      it "loads the roles correctly" do
+        @user = User.create!(:name => 'user')
+        @shard1.activate do
+          account = Account.create!
+          @course = account.courses.create!(:workflow_state => 'available')
+          @role = account.roles.create!(:name => "custom student", :base_role_type => "StudentEnrollment")
+          StudentEnrollment.create!(:course => @course, :user => @user, :workflow_state => 'active', :role => @role)
+        end
+        fetched_courses = @user.courses_with_primary_enrollment(:current_and_invited_courses, nil, :include_completed_courses => true)
+        expect(fetched_courses.count).to eq 1
+        expect(fetched_courses.first.primary_enrollment_role).to eq @role
       end
     end
   end

@@ -782,19 +782,15 @@ class Submission < ActiveRecord::Base
 
   # Preload OriginalityReport before using this method
   def originality_report_url(asset_string, user, attempt=nil)
-    if attempt
-      version = versions.find{ |v| v.model&.attempt&.to_s == attempt.to_s }
-      return nil unless version
-      report = originality_reports.find_by(submission_time: version.model.submitted_at)
-      report&.report_launch_path
-    elsif asset_string == self.asset_string
-      originality_reports.where(attachment_id: nil).first&.report_launch_path
-    elsif self.grants_right?(user, :view_turnitin_report)
-      requested_attachment = all_versioned_attachments.find_by_asset_string(asset_string)
-      scope = association(:originality_reports).loaded? ? versioned_originality_reports : originality_reports
-      report = scope.find_by(attachment: requested_attachment)
-      report&.report_launch_path
-    end
+    return unless self.grants_right?(user, :view_turnitin_report)
+    version_sub = if attempt.present?
+                    attempt.to_i == self.attempt ? self : versions.find{|v| v.model&.attempt == attempt.to_i}&.model
+                  end
+    requested_attachment = all_versioned_attachments.find_by_asset_string(asset_string) unless asset_string == self.asset_string
+    scope = association(:originality_reports).loaded? ? versioned_originality_reports : originality_reports
+    scope = scope.where(submission_time: version_sub.submitted_at) if version_sub
+    report = scope.find_by(attachment: requested_attachment)
+    report&.report_launch_path
   end
 
   def has_originality_report?
@@ -1337,6 +1333,7 @@ class Submission < ActiveRecord::Base
   def infer_values
     if assignment
       self.context_code = assignment.context_code
+      self.course_id = assignment.context_id
     end
 
     self.seconds_late_override = nil unless late_policy_status == 'late'
@@ -1679,7 +1676,7 @@ class Submission < ActiveRecord::Base
   # use this method to pre-load the versioned_attachments for a bunch of
   # submissions (avoids having O(N) attachment queries)
   # NOTE: all submissions must belong to the same shard
-  def self.bulk_load_versioned_attachments(submissions, preloads: [:thumbnail, :media_object])
+  def self.bulk_load_versioned_attachments(submissions, preloads: [:thumbnail, :media_object, :folder, :attachment_upload_statuses])
     attachment_ids_by_submission_and_index = group_attachment_ids_by_submission_and_index(submissions)
     bulk_attachment_ids = attachment_ids_by_submission_and_index.values.flatten
 
@@ -2324,9 +2321,6 @@ class Submission < ActiveRecord::Base
       end
     end
     res
-  end
-
-  def course_id=(val)
   end
 
   def to_param
