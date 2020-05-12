@@ -75,7 +75,8 @@ describe('contentInsertion', () => {
         getBoundingClientRect: () => {
           return {left: 0, top: 0, bottom: 0, right: 0}
         }
-      }
+      },
+      execCommand: jest.fn()
     }
   })
 
@@ -115,12 +116,23 @@ describe('contentInsertion', () => {
       )
     })
 
+    it('includes attributes', () => {
+      link['data-canvas-previewable'] = true
+      link.class = 'instructure_file_link foo'
+      contentInsertion.insertLink(editor, link)
+      expect(editor.content).toEqual(
+        '<a href="/some/path" title="Here Be Links" data-canvas-previewable="true" class="instructure_file_link foo">Click On Me</a>'
+      )
+    })
+
     it('respects the current selection building the link by delegating to tinymce', () => {
       editor.execCommand = jest.fn()
       editor.selection.setContent('link me')
       contentInsertion.insertLink(editor, link)
       expect(editor.execCommand).toHaveBeenCalled()
       expect(editor.execCommand.mock.calls[0][0]).toBe('mceInsertLink')
+      // this isn't really a very good test, but w/o a real tinymce editor
+      // it's the best we can do. Will cover this case with a selenium spec
     })
 
     it('cleans a url with no protocol when linking the current selection', () => {
@@ -143,10 +155,10 @@ describe('contentInsertion', () => {
       editor.selection.getNode = () => textNode
       editor.dom.getParent = () => anchor
       editor.selection.select = () => {}
-      editor.dom.setAttribs = jest.fn()
       contentInsertion.insertLink(editor, link)
-      expect(editor.dom.setAttribs).toHaveBeenCalledWith(
-        anchor,
+      expect(editor.execCommand).toHaveBeenCalledWith(
+        'mceInsertLink',
+        null,
         expect.objectContaining({href: 'http://www.google.com'})
       )
     })

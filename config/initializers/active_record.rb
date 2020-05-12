@@ -66,6 +66,12 @@ class ActiveRecord::Base
     def default_scope(*)
       raise "please don't ever use default_scope. it may seem like a great solution, but I promise, it isn't"
     end
+
+    def vacuum
+      Shackles.activate(:deploy) do
+        connection.execute("VACUUM ANALYZE #{quoted_table_name}")
+      end
+    end
   end
 
   def read_or_initialize_attribute(attr_name, default_value)
@@ -947,7 +953,7 @@ ActiveRecord::Relation.class_eval do
 
             ActiveRecord::Associations::Preloader.new.preload(batch, includes) if includes
             yield batch
-            break if batch.size < batch_size
+            break if rows <= 0 || batch.size < batch_size
 
             if pluck
               last_value = pluck.length == 1 ? batch.last : batch.last[pluck.index(index)]
