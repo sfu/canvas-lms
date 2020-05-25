@@ -80,6 +80,24 @@ class Account < ActiveRecord::Base
   has_many :sis_batch_errors, foreign_key: :root_account_id, inverse_of: :root_account
   has_one :outcome_proficiency, dependent: :destroy
 
+  has_many :auditor_authentication_records,
+    class_name: "Auditors::ActiveRecord::AuthenticationRecord",
+    dependent: :destroy,
+    inverse_of: :account
+  has_many :auditor_course_records,
+    class_name: "Auditors::ActiveRecord::CourseRecord",
+    dependent: :destroy,
+    inverse_of: :account
+  has_many :auditor_grade_change_records,
+    class_name: "Auditors::ActiveRecord::GradeChangeRecord",
+    dependent: :destroy,
+    inverse_of: :account
+  has_many :auditor_root_grade_change_records,
+    foreign_key: 'root_account_id',
+    class_name: "Auditors::ActiveRecord::GradeChangeRecord",
+    dependent: :destroy,
+    inverse_of: :root_account
+
   def inherited_assessment_question_banks(include_self = false, *additional_contexts)
     sql, conds = [], []
     contexts = additional_contexts + account_chain
@@ -489,6 +507,10 @@ class Account < ActiveRecord::Base
   def root_account
     return self if root_account?
     super
+  end
+
+  def resolved_root_account_id
+    root_account_id || id
   end
 
   def sub_accounts_as_options(indent = 0, preloaded_accounts = nil)

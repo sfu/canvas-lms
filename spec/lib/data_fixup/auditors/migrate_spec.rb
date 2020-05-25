@@ -28,45 +28,75 @@ module DataFixup::Auditors::Migrate
 
     let(:account){ Account.default }
 
-    it "writes authentication data to postgres that's in cassandra" do
-      ::Auditors::ActiveRecord::AuthenticationRecord.delete_all
-      user_with_pseudonym(active_all: true)
-      20.times { ::Auditors::Authentication.record(@pseudonym, 'login') }
-      date = Time.zone.today
-      expect(::Auditors::ActiveRecord::AuthenticationRecord.count).to eq(0)
-      worker = AuthenticationWorker.new(account.id, date)
-      missing_uuids = worker.audit
-      expect(missing_uuids.size).to eq(20)
-      worker.perform
-      expect(::Auditors::ActiveRecord::AuthenticationRecord.count).to eq(20)
-      missing_uuids = worker.audit
-      expect(missing_uuids.size).to eq(0)
-    end
-
-    it "recovers if user has been hard deleted" do
-      # simulates when a user has been hard-deleted
-      ::Auditors::ActiveRecord::AuthenticationRecord.delete_all
-      u1 = user_with_pseudonym(active_all: true)
-      p1 = @pseudonym
-      ::Auditors::Authentication.record(p1, 'login')
-      u2 = user_with_pseudonym(active_all: true)
-      p2 = @pseudonym
-      expect(p1).to_not eq(p2)
-      ::Auditors::Authentication.record(p2, 'login')
-      [CommunicationChannel, UserAccountAssociation].each do |klass|
-        klass.where(user_id: u2.id).delete_all
+    context "authentication data" do
+      before(:each) do
+        ::Auditors::ActiveRecord::AuthenticationRecord.delete_all
       end
-      Pseudonym.where(id: p2.id).delete_all
-      User.where(id: p2.user_id).delete_all
-      date = Time.zone.today
-      worker = AuthenticationWorker.new(account.id, date)
-      allow(::Auditors::ActiveRecord::AuthenticationRecord).to receive(:bulk_insert) do |recs|
-        # should only migrate the existing user, so the second time is only one rec
-        if recs.find{|r| r['user_id'] == p2.user_id}
-          raise ActiveRecord::InvalidForeignKey
+
+      context "with 20 auth records" do
+        before(:each) do
+          user_with_pseudonym(active_all: true)
+          20.times { ::Auditors::Authentication.record(@pseudonym, 'login') }
+        end
+
+        it "writes authentication data to postgres that's in cassandra" do
+          date = Time.zone.today
+          expect(::Auditors::ActiveRecord::AuthenticationRecord.count).to eq(0)
+          worker = AuthenticationWorker.new(account.id, date)
+          missing_uuids = worker.audit
+          expect(missing_uuids.size).to eq(20)
+          worker.perform
+          expect(::Auditors::ActiveRecord::AuthenticationRecord.count).to eq(20)
+          missing_uuids = worker.audit
+          expect(missing_uuids.size).to eq(0)
+        end
+
+        it "gets the same OUTCOME with a repair pass" do
+          date = Time.zone.today
+          expect(::Auditors::ActiveRecord::AuthenticationRecord.count).to eq(0)
+          worker = AuthenticationWorker.new(account.id, date, operation_type: :repair)
+          missing_uuids = worker.audit
+          expect(missing_uuids.size).to eq(20)
+          worker.perform
+          expect(::Auditors::ActiveRecord::AuthenticationRecord.count).to eq(20)
+          missing_uuids = worker.audit
+          expect(missing_uuids.size).to eq(0)
+        end
+
+        it "depends on paginated data from cassandra being the same by ID" do
+          pseud_collection = ::Auditors::Authentication.for_pseudonym(@pseudonym)
+          pseud_ids_collection = ::Auditors::Authentication::Stream.ids_for_pseudonym(@pseudonym)
+          records = pseud_collection.paginate(per_page: 3)
+          ids = pseud_ids_collection.paginate(per_page: 3)
+          rec_ids = records.map(&:id)
+          ids.each{|id| expect(rec_ids).to include(id['id'])}
         end
       end
-      expect { worker.perform }.to_not raise_exception
+
+      it "recovers if user has been hard deleted" do
+        # simulates when a user has been hard-deleted
+        u1 = user_with_pseudonym(active_all: true)
+        p1 = @pseudonym
+        ::Auditors::Authentication.record(p1, 'login')
+        u2 = user_with_pseudonym(active_all: true)
+        p2 = @pseudonym
+        expect(p1).to_not eq(p2)
+        ::Auditors::Authentication.record(p2, 'login')
+        [CommunicationChannel, UserAccountAssociation].each do |klass|
+          klass.where(user_id: u2.id).delete_all
+        end
+        Pseudonym.where(id: p2.id).delete_all
+        User.where(id: p2.user_id).delete_all
+        date = Time.zone.today
+        worker = AuthenticationWorker.new(account.id, date)
+        allow(::Auditors::ActiveRecord::AuthenticationRecord).to receive(:bulk_insert) do |recs|
+          # should only migrate the existing user, so the second time is only one rec
+          if recs.find{|r| r['user_id'] == p2.user_id}
+            raise ActiveRecord::InvalidForeignKey
+          end
+        end
+        expect { worker.perform }.to_not raise_exception
+      end
     end
 
     it "handles missing submissions" do
@@ -104,6 +134,27 @@ module DataFixup::Auditors::Migrate
       expect(missing_uuids.size).to eq(0)
     end
 
+    it "writes the same result for courses from a REPAIR pass" do
+      ::Auditors::ActiveRecord::CourseRecord.delete_all
+      user_with_pseudonym(active_all: true)
+      sub_account = Account.create!(parent_account: account)
+      sub_sub_account = Account.create!(parent_account: sub_account)
+      course_with_teacher(course_name: "Course 1", account: sub_sub_account)
+      @course.name = "Course 2"
+      @course.start_at = Time.zone.today
+      @course.conclude_at = Time.zone.today + 7.days
+      10.times { ::Auditors::Course.record_updated(@course, @teacher, @course.changes) }
+      date = Time.zone.today
+      expect(::Auditors::ActiveRecord::CourseRecord.count).to eq(0)
+      worker = CourseWorker.new(sub_sub_account.id, date, operation_type: :repair)
+      missing_uuids = worker.audit
+      expect(missing_uuids.size).to eq(10)
+      worker.perform
+      expect(::Auditors::ActiveRecord::CourseRecord.count).to eq(10)
+      missing_uuids = worker.audit
+      expect(missing_uuids.size).to eq(0)
+    end
+
     it "writes grade change data to postgres that's in cassandra" do
       ::Auditors::ActiveRecord::GradeChangeRecord.delete_all
       sub_account = Account.create!(parent_account: account)
@@ -117,6 +168,27 @@ module DataFixup::Auditors::Migrate
       expect(::Auditors::ActiveRecord::GradeChangeRecord.count).to eq(0)
       expect(::Auditors::GradeChange.for_assignment(assignment).paginate(per_page: 10).size).to eq(1)
       worker = GradeChangeWorker.new(sub_sub_account.id, date)
+      missing_uuids = worker.audit
+      expect(missing_uuids.size).to eq(1)
+      worker.perform
+      expect(::Auditors::ActiveRecord::GradeChangeRecord.count).to eq(1)
+      missing_uuids = worker.audit
+      expect(missing_uuids.size).to eq(0)
+    end
+
+    it "writes grade change data to postgres that's in cassandra from a REPAIR operation" do
+      ::Auditors::ActiveRecord::GradeChangeRecord.delete_all
+      sub_account = Account.create!(parent_account: account)
+      sub_sub_account = Account.create!(parent_account: sub_account)
+      course_with_teacher(account: sub_sub_account)
+      student_in_course
+      assignment = @course.assignments.create!(title: 'Assignment', points_possible: 10)
+      assignment.grade_student(@student, grade: 8, grader: @teacher).first
+      # no need to call anything, THIS invokes an auditor record^
+      date = Time.zone.today
+      expect(::Auditors::ActiveRecord::GradeChangeRecord.count).to eq(0)
+      expect(::Auditors::GradeChange.for_assignment(assignment).paginate(per_page: 10).size).to eq(1)
+      worker = GradeChangeWorker.new(sub_sub_account.id, date, operation_type: :repair)
       missing_uuids = worker.audit
       expect(missing_uuids.size).to eq(1)
       worker.perform
@@ -167,15 +239,45 @@ module DataFixup::Auditors::Migrate
           expect(worker.currently_queueable?).to eq(true)
           worker.migration_cell.update_attribute(:completed, true)
           expect(worker.currently_queueable?).to eq(false)
+          worker.migration_cell.update_attribute(:failed, false)
+          worker.migration_cell.update_attribute(:completed, false)
+          id = worker.migration_cell.id
+          ::Auditors::ActiveRecord::MigrationCell.connection.execute("""
+          UPDATE #{::Auditors::ActiveRecord::MigrationCell.quoted_table_name}
+            SET updated_at = now() - interval '10 days'
+            WHERE id = #{id};
+          """)
+          worker.migration_cell.reload
+          expect(worker.currently_queueable?).to eq(true)
+        end
+      end
+
+      describe "mark_cell_queued!" do
+        it "holds state for the whole week it will traverse" do
+          worker = GradeChangeWorker.new(Account.default.id, Time.zone.today)
+          worker.mark_cell_queued!
+          expect(::Auditors::ActiveRecord::MigrationCell.count).to eq(7)
         end
       end
     end
 
+    describe "AuditorWorker" do
+      it "selects a date range of a week around target date" do
+        # aligns sunday to sunday
+        date = Date.civil(2020, 5, 15)
+        worker = AuthenticationWorker.new(Account.default.id, date)
+        cassandra_args = worker.cassandra_query_options
+        expect(cassandra_args[:oldest].strftime("%Y-%m-%d %H:%M:%S")).to eq("2020-05-10 00:00:00")
+        expect(cassandra_args[:newest].strftime("%Y-%m-%d %H:%M:%S")).to eq("2020-05-17 00:00:00")
+      end
+    end
+
     describe "GradeChangeWorker" do
-      it "pulls courses for an account only if they have enrollments" do
+      it "pulls courses for an account only if they have enrollments and assignments" do
         course1 = course_model(account_id: Account.default.id)
         course2 = course_model(account_id: Account.default.id)
-        enrollment1 = student_in_course(course: course1)
+        student_in_course(course: course1)
+        assignment_model(course: course1)
         worker = GradeChangeWorker.new(Account.default.id, Time.zone.today)
         cids = worker.migrateable_course_ids
         expect(cids.include?(course1.id)).to eq(true)
@@ -198,6 +300,9 @@ module DataFixup::Auditors::Migrate
         cell = worker.migration_cell
         expect(cell).to be_nil
         worker.perform
+        expect(::Auditors::ActiveRecord::MigrationCell.count).to eq(7)
+        expect(::Auditors::ActiveRecord::MigrationCell.all.pluck(:completed)).to eq([true] * 7)
+        expect(::Auditors::ActiveRecord::MigrationCell.all.pluck(:failed)).to eq([false] * 7)
         cell = worker.migration_cell
         expect(cell.id).to_not be_nil
         expect(cell.auditor_type).to eq("authentication")
@@ -232,6 +337,84 @@ module DataFixup::Auditors::Migrate
         # worker reconciles which ones are already in the table and which are not
         worker.perform
         expect(::Auditors::ActiveRecord::AuthenticationRecord.count).to eq(13)
+      end
+
+      it "writes to multiple partitions smoothly" do
+        events = [
+          {
+            "account_id"=>@pseudonym.account_id,
+            "created_at"=>DateTime.civil(2020,5,2,13,1),
+            "event_type"=>"login",
+            "pseudonym_id"=>@pseudonym.id,
+            "request_id"=>"MISSING",
+            "user_id"=>@pseudonym.user_id,
+            "uuid"=>"5b7b58dc-0629-4e3f-81e9-4d2a98f2541d"
+          },{
+            "account_id"=>@pseudonym.account_id,
+            "created_at"=>DateTime.civil(2020,4,29,13,1),
+            "event_type"=>"login",
+            "pseudonym_id"=>@pseudonym.id,
+            "request_id"=>"MISSING",
+            "user_id"=>@pseudonym.user_id,
+            "uuid"=>"522e2e1f-59b7-4973-8064-fc988bb45f39"
+          }
+        ]
+        worker = AuthenticationWorker.new(account.id, date)
+        p1_name = Auditors::ActiveRecord::AuthenticationRecord.quoted_table_name.gsub(/"$/, "_2020_5\"")
+        p2_name = Auditors::ActiveRecord::AuthenticationRecord.quoted_table_name.gsub(/"$/, "_2020_4\"")
+        p3_name = Auditors::ActiveRecord::AuthenticationRecord.quoted_table_name.gsub(/"$/, "_2020_3\"")
+        p1_count = User.connection.execute("SELECT count(*) from #{p1_name}")
+        p2_count = User.connection.execute("SELECT count(*) from #{p2_name}")
+        p3_count = User.connection.execute("SELECT count(*) from #{p3_name}")
+        expect(p1_count[0]["count"]).to eq(0)
+        expect(p2_count[0]["count"]).to eq(0)
+        expect(p3_count[0]["count"]).to eq(0)
+        worker.bulk_insert_auditor_recs(Auditors::ActiveRecord::AuthenticationRecord, events)
+        p1_count = User.connection.execute("SELECT count(*) from #{p1_name}")
+        p2_count = User.connection.execute("SELECT count(*) from #{p2_name}")
+        p3_count = User.connection.execute("SELECT count(*) from #{p3_name}")
+        expect(p1_count[0]["count"]).to eq(1)
+        expect(p2_count[0]["count"]).to eq(1)
+        expect(p3_count[0]["count"]).to eq(0)
+      end
+
+      it "can migrate partitions" do
+        events = [
+          {
+            "account_id"=>@pseudonym.account_id,
+            "created_at"=>DateTime.civil(2020,5,2,13,1),
+            "event_type"=>"login",
+            "pseudonym_id"=>@pseudonym.id,
+            "request_id"=>"MISSING",
+            "user_id"=>@pseudonym.user_id,
+            "uuid"=>"5b7b58dc-0629-4e3f-81e9-4d2a98f2541d"
+          },{
+            "account_id"=>@pseudonym.account_id,
+            "created_at"=>DateTime.civil(2020,4,29,13,1),
+            "event_type"=>"login",
+            "pseudonym_id"=>@pseudonym.id,
+            "request_id"=>"MISSING",
+            "user_id"=>@pseudonym.user_id,
+            "uuid"=>"522e2e1f-59b7-4973-8064-fc988bb45f39"
+          }
+        ]
+        ::Auditors::ActiveRecord::AuthenticationRecord.bulk_insert(events)
+        p1_name = Auditors::ActiveRecord::AuthenticationRecord.quoted_table_name.gsub(/"$/, "_2020_5\"")
+        p2_name = Auditors::ActiveRecord::AuthenticationRecord.quoted_table_name.gsub(/"$/, "_2020_4\"")
+        p3_name = ::Auditors::ActiveRecord::AuthenticationRecord.quoted_table_name
+        p1_count = User.connection.execute("SELECT count(*) from #{p1_name}")
+        p2_count = User.connection.execute("SELECT count(*) from #{p2_name}")
+        p3_count = User.connection.execute("SELECT count(*) from ONLY #{p3_name}")
+        expect(p1_count[0]["count"]).to eq(0)
+        expect(p2_count[0]["count"]).to eq(0)
+        expect(p3_count[0]["count"]).to eq(2)
+        ::DataFixup::Auditors::MigrateAuthToPartitions.run
+        p1_count = User.connection.execute("SELECT count(*) from #{p1_name}")
+        p2_count = User.connection.execute("SELECT count(*) from #{p2_name}")
+        p3_count = User.connection.execute("SELECT count(*) from ONLY #{p3_name}")
+        expect(p1_count[0]["count"]).to eq(1)
+        expect(p2_count[0]["count"]).to eq(1)
+        expect(p3_count[0]["count"]).to eq(0)
       end
     end
 
@@ -276,10 +459,9 @@ module DataFixup::Auditors::Migrate
         expect(output).to_not be_empty
       end
 
-      it "buckets settings by JOB cluster" do
+      it "buckets settings uniformly" do
         pk = BackfillEngine.parallelism_key("grade_changes")
-        # because default shard has a nil job id
-        expect(pk).to eq("auditors_migration_grade_changes/#{Shard.current.database_server.id}_num_strands")
+        expect(pk).to eq("auditors_migration_num_strands")
       end
 
       it "wont enqueue complete jobs" do
@@ -296,11 +478,28 @@ module DataFixup::Auditors::Migrate
         expect(Delayed::Job.count).to eq(1)
       end
 
+      it "defaults to the :schedule operation and offsets by a week" do
+        start_date = Time.zone.today
+        end_date = start_date - 1.year
+        engine = BackfillEngine.new(start_date, end_date, operation_type: nil)
+        expect(engine.operation).to eq(:schedule)
+        expect(engine.next_schedule_date(start_date)).to eq(start_date - 7.days)
+        worker = engine.generate_worker(AuthenticationWorker, Account.default, start_date)
+        expect(worker.operation).to eq(:backfill)
+        engine = BackfillEngine.new(start_date, end_date, operation_type: :repair)
+        expect(engine.operation).to eq(:repair)
+        expect(engine.next_schedule_date(start_date)).to eq(start_date - 1.day)
+        worker = engine.generate_worker(AuthenticationWorker, Account.default, start_date)
+        expect(worker.operation).to eq(:repair)
+      end
+
       context "when enqueued" do
+        let(:start_date) { Time.zone.today }
+        let(:end_date) { start_date - 1.year }
+        let(:engine) { BackfillEngine.new(start_date, end_date) }
+        let(:sched_job){ Delayed::Job.first }
+
         before(:each) do
-          start_date = Time.zone.today
-          end_date = start_date - 1.year
-          engine = BackfillEngine.new(start_date, end_date)
           Delayed::Job.enqueue(engine)
           Setting.set(engine.class.queue_setting_key, -1)
         end
@@ -310,9 +509,22 @@ module DataFixup::Auditors::Migrate
           expect(Delayed::Job.first.tag).to eq(BackfillEngine::SCHEDULAR_TAG)
         end
 
-        context "rescheduling" do
-          let(:sched_job){ Delayed::Job.first }
+        context "filling queue" do
+          it "schedules multiple jobs a week apart" do
+            Setting.set(engine.class.queue_setting_key, 10)
+            Delayed::Job.first.update(locked_by: 'test_run', locked_at: Time.now.utc)
+            d_worker = Delayed::Worker.new
+            d_worker.perform(sched_job)
+            expect(Delayed::Job.count).to eq(10)
+            dates = engine.class.backfill_jobs.pluck(:handler).map{|h| YAML.unsafe_load(h).instance_variable_get(:@date) }.uniq
+            sorted = dates.sort
+            expect(sorted.size).to eq(3)
+            expect((sorted[1] - sorted[0]).to_i.days).to eq(7.days)
+            expect((sorted[2] - sorted[1]).to_i.days).to eq(7.days)
+          end
+        end
 
+        context "rescheduling" do
           before(:each) do
             d_worker = Delayed::Worker.new
             sched_job.update(locked_by: 'test_run', locked_at: Time.now.utc)

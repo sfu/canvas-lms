@@ -19,22 +19,46 @@ require 'set'
 
 module DataFixup::Auditors
   module Migrate
-    DEFAULT_BATCH_SIZE = 1000
+    DEFAULT_BATCH_SIZE = 100
 
     module AuditorWorker
-      def initialize(account_id, date)
+      def initialize(account_id, date, operation_type: :backfill)
         @account_id = account_id
         @date = date
+        @_operation = operation_type
+      end
+
+      def operation
+        @_operation ||= :backfill
       end
 
       def account
         @_account ||= Account.find(@account_id)
       end
 
+      def previous_sunday
+        date_time - date_time.wday.days
+      end
+
+      def next_sunday
+        previous_sunday + 7.days
+      end
+
+      def date_time
+        @_dt ||= CanvasTime.try_parse("#{@date.strftime('%Y-%m-%d')} 00:00:00 -0000")
+      end
+
       def cassandra_query_options
+        # auditors cassandra partitions span one week.
+        # querying a week at a time is more efficient
+        # than separately for each day.
+        # this query will usually span 2 partitions
+        # because the alignment of the partitions is
+        # to number of second from epoch % seconds_in_week
         {
-          oldest: CanvasTime.try_parse("#{@date.strftime('%Y-%m-%d')} 00:00:00 -0000"),
-          newest: CanvasTime.try_parse("#{(@date + 1.day).strftime('%Y-%m-%d')} 00:00:00 -0000")
+          oldest: previous_sunday,
+          newest: next_sunday,
+          fetch_strategy: :serial
         }
       end
 
@@ -61,23 +85,67 @@ module DataFixup::Auditors
         ar_attributes_list.reject{|h| existing_uuids.include?(h['uuid']) }
       end
 
+      def bulk_insert_auditor_recs(auditor_ar_type, attrs_lists)
+        partition_groups = attrs_lists.group_by{|a| auditor_ar_type.infer_partition_table_name(a) }
+        partition_groups.each do |partition_name, partition_attrs|
+          auditor_ar_type.transaction do
+            auditor_ar_type.connection.bulk_insert(partition_name, partition_attrs)
+          end
+        end
+      end
+
       def migrate_in_pages(collection, auditor_ar_type, batch_size=DEFAULT_BATCH_SIZE)
         next_page = 1
         until next_page.nil?
-          page_args = { page: next_page, per_page: batch_size }
+          page_args = { page: next_page, per_page: batch_size}
           auditor_recs = get_cassandra_records_resiliantly(collection, page_args)
           ar_attributes_list = auditor_recs.map do |rec|
             auditor_ar_type.ar_attributes_from_event_stream(rec)
           end
           begin
-            auditor_ar_type.bulk_insert(ar_attributes_list)
+            bulk_insert_auditor_recs(auditor_ar_type, ar_attributes_list)
           rescue ActiveRecord::RecordNotUnique, ActiveRecord::InvalidForeignKey
             # this gets messy if we act specifically; let's just apply both remedies
             new_attrs_list = filter_for_idempotency(ar_attributes_list, auditor_ar_type)
             new_attrs_list = filter_dead_foreign_keys(new_attrs_list)
-            auditor_ar_type.bulk_insert(new_attrs_list) if new_attrs_list.size > 0
+            bulk_insert_auditor_recs(auditor_ar_type, new_attrs_list) if new_attrs_list.size > 0
           end
           next_page = auditor_recs.next_page
+        end
+      end
+
+      # repairing is run after a scheduling pass.  In most cases this means some records
+      # made it over and then the scheduled migration job failed, usually due to
+      # repeated cassandra timeouts.  For this reason, we don't wish to load ALL
+      # scanned records from cassandra, only those that are not yet in the database.
+      # therefore "repair" is much more careful.  It scans each batch of IDs from the cassandra
+      # index, sees which ones aren't currently in postgres, and then only loads attributes for
+      # that subset to insert.  This makes it much faster for traversing a large dataset
+      # when some or most of the records are filled in already.  Obviously it would be somewhat
+      # slower than the migrate pass if there were NO records migrated.
+      def repair_in_pages(ids_collection, stream_type, auditor_ar_type, batch_size=DEFAULT_BATCH_SIZE)
+        next_page = 1
+        until next_page.nil?
+          page_args = { page: next_page, per_page: batch_size}
+          auditor_id_recs = get_cassandra_records_resiliantly(ids_collection, page_args)
+          collect_propsed_ids = auditor_id_recs.map{|rec| rec['id']}
+          existing_ids = auditor_ar_type.where(uuid: collect_propsed_ids).pluck(:uuid)
+          insertable_ids = collect_propsed_ids - existing_ids
+          if insertable_ids.size > 0
+            auditor_recs = stream_type.fetch(insertable_ids, strategy: :serial)
+            ar_attributes_list = auditor_recs.map do |rec|
+              auditor_ar_type.ar_attributes_from_event_stream(rec)
+            end
+            begin
+              bulk_insert_auditor_recs(auditor_ar_type, ar_attributes_list)
+            rescue ActiveRecord::RecordNotUnique, ActiveRecord::InvalidForeignKey
+              # this gets messy if we act specifically; let's just apply both remedies
+              new_attrs_list = filter_for_idempotency(ar_attributes_list, auditor_ar_type)
+              new_attrs_list = filter_dead_foreign_keys(new_attrs_list)
+              bulk_insert_auditor_recs(auditor_ar_type, new_attrs_list) if new_attrs_list.size > 0
+            end
+          end
+          next_page = auditor_id_recs.next_page
         end
       end
 
@@ -85,7 +153,7 @@ module DataFixup::Auditors
         @audit_failure_uuids ||= []
         next_page = 1
         until next_page.nil?
-          page_args = { page: next_page, per_page: batch_size }
+          page_args = { page: next_page, per_page: batch_size}
           auditor_recs = get_cassandra_records_resiliantly(collection, page_args)
           uuids = auditor_recs.map(&:id)
           existing_uuids = auditor_ar_type.where(uuid: uuids).pluck(:uuid)
@@ -94,30 +162,33 @@ module DataFixup::Auditors
         end
       end
 
-      def cell_attributes
+      def cell_attributes(target_date: nil)
+        target_date = @date if target_date.nil?
         {
           auditor_type: auditor_type,
           account_id: account.id,
-          year: @date.year,
-          month: @date.month,
-          day: @date.day
+          year: target_date.year,
+          month: target_date.month,
+          day: target_date.day
         }
       end
 
-      def find_migration_cell
-        ::Auditors::ActiveRecord::MigrationCell.find_by(cell_attributes)
+      def find_migration_cell(attributes: cell_attributes)
+        attributes = cell_attributes if attributes.nil?
+        ::Auditors::ActiveRecord::MigrationCell.find_by(attributes)
       end
 
       def migration_cell
         @_cell ||= find_migration_cell
       end
 
-      def create_cell!
-        @_cell = ::Auditors::ActiveRecord::MigrationCell.create!(cell_attributes.merge({ completed: false }))
+      def create_cell!(attributes: nil)
+        attributes = cell_attributes if attributes.nil?
+        ::Auditors::ActiveRecord::MigrationCell.create!(attributes.merge({ completed: false }))
       rescue ActiveRecord::RecordNotUnique, PG::UniqueViolation
-        @_cell = find_migration_cell
-        raise "unresolvable auditors migration state #{cell_attributes}" if @_cell.nil?
-        @_cell
+        created_cell = find_migration_cell(attributes: attributes)
+        raise "unresolvable auditors migration state #{attributes}" if created_cell.nil?
+        created_cell
       end
 
       def reset_cell!
@@ -126,8 +197,18 @@ module DataFixup::Auditors
       end
 
       def mark_cell_queued!
-        create_cell! if migration_cell.nil?
+        (@_cell = create_cell!) if migration_cell.nil?
         migration_cell.update_attribute(:failed, false) if migration_cell.failed
+        # queueing will take care of a week, so let's make sure we don't get
+        # other jobs vying for the same slot
+        current_date = previous_sunday
+        while current_date < next_sunday do
+          cur_cell_attrs =  cell_attributes(target_date: current_date)
+          current_cell = find_migration_cell(attributes: cur_cell_attrs)
+          current_cell = create_cell!(attributes: cur_cell_attrs) if current_cell.nil?
+          current_cell.update(completed: false, failed: false)
+          current_date += 1.day
+        end
       end
 
       def auditors_cassandra_db_lambda
@@ -144,7 +225,27 @@ module DataFixup::Auditors
 
       def currently_queueable?
         return false if migration_cell&.completed
-        (migration_cell.nil? || migration_cell.failed)
+        return true if migration_cell.nil?
+        return true if migration_cell.failed
+        # this cell is not failed, but also not complete.
+        # that means it was queued, but not updated later.
+        # If that update happened more than a few
+        # days ago, it's likely dead, and should
+        # get rescheduled.  Worst case
+        # it scans and fails to find anything to do,
+        # and marks the cell complete.
+        return migration_cell.updated_at < 3.days.ago
+      end
+
+      def mark_week_complete!
+        current_date = previous_sunday
+        while current_date < next_sunday do
+          cur_cell_attrs =  cell_attributes(target_date: current_date)
+          current_cell = find_migration_cell(attributes: cur_cell_attrs)
+          current_cell = create_cell!(attributes: cur_cell_attrs) if current_cell.nil?
+          current_cell.update(completed: true, failed: false)
+          current_date += 1.day
+        end
       end
 
       def perform
@@ -157,10 +258,27 @@ module DataFixup::Auditors
           # waste time migrating
           return cell.update_attribute(:completed, true)
         end
-        perform_migration
-        cell.update_attribute(:completed, true)
+        if operation == :repair
+          perform_repair
+        elsif operation == :backfill
+          perform_migration
+        else
+          raise "Unknown Auditor Backfill Operation: #{operation}"
+        end
+        # the reason this works is the rescheduling plan.
+        # if the job passes, the whole week gets marked "complete".
+        # If it fails, the target cell for this one job will get rescheduled
+        # later in the reconciliation pass.
+        # at that time it will again run for this whole week.
+        # any failed day results in a job spanning a week.
+        # If a job for another day in the SAME week runs,
+        # and this one is done already, it will quickly short circuit because this
+        # day is marked complete.
+        # If two jobs from the same week happened to run at the same time,
+        # they would contend over Uniqueness violations, which we catch and handle.
+        mark_week_complete!
       ensure
-        cell.update_attribute(:failed, true) unless cell.completed
+        cell.update_attribute(:failed, true) unless cell.reload.completed
         clear_cassandra_stream_timeout!
       end
 
@@ -202,6 +320,10 @@ module DataFixup::Auditors
         raise "NOT IMPLEMENTED"
       end
 
+      def perform_repair
+        raise "NOT IMPLEMENTED"
+      end
+
       def perform_audit
         raise "NOT IMPLEMENTED"
       end
@@ -228,8 +350,16 @@ module DataFixup::Auditors
         Auditors::Authentication.for_account(account, cassandra_query_options)
       end
 
+      def cassandra_id_collection
+        Auditors::Authentication::Stream.ids_for_account(account, cassandra_query_options)
+      end
+
       def perform_migration
         migrate_in_pages(cassandra_collection, Auditors::ActiveRecord::AuthenticationRecord)
+      end
+
+      def perform_repair
+        repair_in_pages(cassandra_id_collection, Auditors::Authentication::Stream, Auditors::ActiveRecord::AuthenticationRecord)
       end
 
       def perform_audit
@@ -259,8 +389,16 @@ module DataFixup::Auditors
         Auditors::Course.for_account(account, cassandra_query_options)
       end
 
+      def cassandra_id_collection
+        Auditors::Course::Stream.ids_for_account(account, cassandra_query_options)
+      end
+
       def perform_migration
         migrate_in_pages(cassandra_collection, Auditors::ActiveRecord::CourseRecord)
+      end
+
+      def perform_repair
+        repair_in_pages(cassandra_id_collection, Auditors::Course::Stream, Auditors::ActiveRecord::CourseRecord)
       end
 
       def perform_audit
@@ -286,10 +424,15 @@ module DataFixup::Auditors
         Auditors::GradeChange.for_course(course, cassandra_query_options)
       end
 
+      def cassandra_id_collection_for(course)
+        Auditors::GradeChange::Stream.ids_for_course(course, cassandra_query_options)
+      end
+
       def migrateable_course_ids
-        account.courses.where("EXISTS (?)",
-          Enrollment.where("course_id=courses.id").where(type: ['StudentEnrollment', 'StudentViewEnrollment']))
-          .where("courses.created_at <= ?", @date + 2.days).pluck(:id)
+        s_scope = Submission.where("course_id=courses.id").where("updated_at > ?", @date - 7.days)
+        account.courses.active.where(
+          "EXISTS (?)", s_scope).where(
+          "courses.created_at <= ?", @date + 2.days).pluck(:id)
       end
 
       def perform_migration
@@ -297,6 +440,15 @@ module DataFixup::Auditors
         all_course_ids.in_groups_of(1000) do |course_ids|
           Course.where(id: course_ids).each do |course|
             migrate_in_pages(cassandra_collection_for(course), Auditors::ActiveRecord::GradeChangeRecord)
+          end
+        end
+      end
+
+      def perform_repair
+        all_course_ids = migrateable_course_ids.to_a
+        all_course_ids.in_groups_of(1000) do |course_ids|
+          Course.where(id: course_ids).each do |course|
+            repair_in_pages(cassandra_id_collection_for(course), Auditors::GradeChange::Stream, Auditors::ActiveRecord::GradeChangeRecord)
           end
         end
       end
@@ -441,7 +593,7 @@ module DataFixup::Auditors
         end
 
         def parallelism_key(auditor_type)
-          "auditors_migration_#{auditor_type}/#{cluster_name}_num_strands"
+          "auditors_migration_num_strands"
         end
 
         def check_parallelism
@@ -582,12 +734,17 @@ module DataFixup::Auditors
         end
       end
 
-      def initialize(start_date, end_date)
+      def initialize(start_date, end_date, operation_type: :schedule)
         if start_date < end_date
           raise "You probably didn't read the comment on this job..."
         end
         @start_date = start_date
         @end_date = end_date
+        @_operation = operation_type
+      end
+
+      def operation
+        @_operation ||= :schedule
       end
 
       def log(message)
@@ -625,18 +782,23 @@ module DataFixup::Auditors
         end
       end
 
+      def generate_worker(worker_type, account, current_date)
+        worker_operation = (operation == :repair) ? :repair : :backfill
+        worker_type.new(account.id, current_date, operation_type: worker_operation)
+      end
+
       def enqueue_one_day_for_account(account, current_date)
         if account.root_account?
           # auth records are stored at the root account level,
           # we only need to enqueue these jobs for root accounts
-          auth_worker = AuthenticationWorker.new(account.id, current_date)
-          conditionally_enqueue_worker(auth_worker, ["auditors_migration_authentications", cluster_name])
+          auth_worker = generate_worker(AuthenticationWorker, account, current_date)
+          conditionally_enqueue_worker(auth_worker, "auditors_migration")
         end
 
-        course_worker = CourseWorker.new(account.id, current_date)
-        conditionally_enqueue_worker(course_worker, ["auditors_migration_courses", cluster_name])
-        grade_change_worker = GradeChangeWorker.new(account.id, current_date)
-        conditionally_enqueue_worker(grade_change_worker, ["auditors_migration_grade_changes", cluster_name])
+        course_worker = generate_worker(CourseWorker, account, current_date)
+        conditionally_enqueue_worker(course_worker, "auditors_migration")
+        grade_change_worker = generate_worker(GradeChangeWorker, account, current_date)
+        conditionally_enqueue_worker(grade_change_worker, "auditors_migration")
       end
 
       def enqueue_one_day(current_date)
@@ -647,6 +809,26 @@ module DataFixup::Auditors
 
       def schedular_strand_tag
         "AuditorsBackfillEngine::Job_Shard_#{self.class.jobs_id}"
+      end
+
+      def next_schedule_date(current_date)
+        # each job spans a week, so when we're scheduling
+        # the initial job we can schedule one week at a time.
+        # In a repair pass, we want to make sure we hit every
+        # cell that failed, or that never got queued (just in case),
+        # so we actually line up jobs for each day that is
+        # missing/failed.  It's possible to schedule multiple jobs
+        # for the same week.  If one completes before the next one starts,
+        # they will bail immediately.  If two from the same week are running
+        # at the same time the uniqueness-constraint-and-conflict-handling
+        # prevents them from creating duplicates
+        if operation == :schedule
+          current_date - 7.days
+        elsif operation == :repair
+          current_date - 1.day
+        else
+          raise "Unknown backfill operation: #{operation}"
+        end
       end
 
       def perform
@@ -660,7 +842,8 @@ module DataFixup::Auditors
           end
           enqueue_one_day(current_date)
           log("Scheduled Backfill for #{current_date} on #{Shard.current.id}")
-          current_date -= 1.day
+          # jobs span a week now, we can schedule them at week intervals arbitrarily
+          current_date = next_schedule_date(current_date)
         end
         if current_date >= @end_date
           schedule_worker = BackfillEngine.new(current_date, @end_date)
