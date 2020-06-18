@@ -134,7 +134,7 @@ class Course < ActiveRecord::Base
   has_many :assignment_groups, -> { order('assignment_groups.position', AssignmentGroup.best_unicode_collation_key('assignment_groups.name')) }, as: :context, inverse_of: :context, dependent: :destroy
   has_many :assignments, -> { order('assignments.created_at') }, as: :context, inverse_of: :context, dependent: :destroy
   has_many :calendar_events, -> { where("calendar_events.workflow_state<>'cancelled'") }, as: :context, inverse_of: :context, dependent: :destroy
-  has_many :submissions, -> { active.order('submissions.updated_at DESC') }, through: :assignments, dependent: :destroy
+  has_many :submissions, -> { active.order('submissions.updated_at DESC') }, inverse_of: :course, dependent: :destroy
   has_many :submission_comments, -> { published }, as: :context, inverse_of: :context
   has_many :discussion_topics, -> { where("discussion_topics.workflow_state<>'deleted'").preload(:user).order('discussion_topics.position DESC, discussion_topics.created_at DESC') }, as: :context, inverse_of: :context, dependent: :destroy
   has_many :active_discussion_topics, -> { where("discussion_topics.workflow_state<>'deleted'").preload(:user) }, as: :context, inverse_of: :context, class_name: 'DiscussionTopic'
@@ -1200,18 +1200,18 @@ class Course < ActiveRecord::Base
   end
 
   def recompute_student_scores_without_send_later(student_ids = nil, opts = {})
-    if student_ids.present?
+    visible_student_ids = if student_ids.present?
       # We were given student_ids.  Let's see how many of those students can even see this assignment
-      student_ids = admin_visible_student_enrollments.where(user_id: student_ids).pluck(:user_id)
+      admin_visible_student_enrollments.where(user_id: student_ids).pluck(:user_id)
+    else
+      # We were not given any student_ids
+      # Let's get them all!
+      admin_visible_student_enrollments.pluck(:user_id)
     end
 
-    # We were either not given any student_ids or none of those students could see this assignment.
-    # Let's get them all!
-    student_ids = admin_visible_student_enrollments.pluck(:user_id) unless student_ids.present?
-
-    Rails.logger.debug "GRADES: recomputing scores in course=#{global_id} students=#{student_ids.inspect}"
+    Rails.logger.debug "GRADES: recomputing scores in course=#{global_id} students=#{visible_student_ids.inspect}"
     Enrollment.recompute_final_score(
-      student_ids,
+      visible_student_ids,
       self.id,
       grading_period_id: opts[:grading_period_id],
       update_all_grading_period_scores: opts.fetch(:update_all_grading_period_scores, true)
@@ -2658,7 +2658,7 @@ class Course < ActiveRecord::Base
     if account_id.present? && feature_enabled?(:canvas_k6_theme) && super.nil?
       return canvas_k6_tab_configuration.map(&:with_indifferent_access)
     end
-    super.map(&:with_indifferent_access) rescue []
+    super.compact.map(&:with_indifferent_access) rescue []
   end
 
   TAB_HOME = 0

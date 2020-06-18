@@ -333,10 +333,11 @@ describe Course do
       @course.recompute_student_scores
     end
 
-    it "should not use student ids for deleted enrollments, even if they are explicitly passed" do
+    it "recomputes nothing if no students are visible" do
       @course.save!
       enrollment = course_with_student(course: @course, active_all: true)
       enrollment.destroy
+      3.times{ enrollment_model(workflow_state: 'registered', course: @course, user: user_model) }
       expect(Enrollment).to receive(:recompute_final_score).with([], any_args)
       @course.recompute_student_scores([enrollment.user_id])
     end
@@ -2397,6 +2398,12 @@ describe Course, "tabs_available" do
 
       expect(available_tabs).to        eq (custom_tabs + default_tabs).uniq
       expect(available_tabs.length).to eq default_tabs.length
+    end
+
+    it "should not blow up if somehow nils got in there" do
+      course = Course.new
+      course.tab_configuration = [{'id' => 1}, nil]
+      expect(course.tab_configuration).to eq [{'id' => 1}]
     end
 
     it "should not omit the target attribute for an external tool tab that is part of the tab configuration list" do
