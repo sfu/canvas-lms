@@ -63,14 +63,8 @@ class Mutations::UpdateAssignment < Mutations::AssignmentBase
     # modifies input_hash
     prepare_input_params!(input_hash, update_proxy)
 
-    # This is here because update_api_assignment no longer respects `muted` as
-    # a param. It is also being deprecated from the AssignmentBase mutation.
-    muted = input_hash.delete(:muted)
-    unless muted.nil?
-      if muted != @working_assignment.muted?
-        @working_assignment.update!(muted: muted)
-      end
-    end
+    # temporarily added back, but always ignored
+    input_hash.delete(:muted)
 
     module_ids = prepare_module_ids!(input_hash)
 
