@@ -33,11 +33,11 @@ class CourseFormController < ApplicationController
   def create
     req_user = User.find(@current_user.id).pseudonym.unique_id
     selected_courses = []
-    account_id = Account.default.id
+    account = Account.default
     teacher_username = params[:username]
     teacher2_username = params[:enroll_me]
-    teacher_sis_user_id = sis_user_id(teacher_username, account_id)
-    teacher2_sis_user_id = sis_user_id(teacher2_username, account_id) unless teacher2_username.nil?
+    teacher_sis_user_id = sis_user_id(teacher_username, account.id)
+    teacher2_sis_user_id = sis_user_id(teacher2_username, account.id) unless teacher2_username.nil?
     teacher2_role = sanitize_role(params[:enroll_me_as])
     cross_list = params[:cross_list]
 
@@ -48,7 +48,7 @@ class CourseFormController < ApplicationController
     end
 
     begin
-      course_csv, section_csv, enrollment_csv = SFU::CourseForm::CSVBuilder.build(req_user, selected_courses.compact.uniq, account_id, teacher_username, teacher_sis_user_id, teacher2_sis_user_id, teacher2_role, cross_list)
+      course_csv, section_csv, enrollment_csv = SFU::CourseForm::CSVBuilder.build(req_user, selected_courses.compact.uniq, account.sis_source_id, teacher_username, teacher_sis_user_id, teacher2_sis_user_id, teacher2_role, cross_list)
 
       logger.info "[SFU Course Form] course_csv: #{course_csv.inspect}"
       SFU::Canvas.sis_import course_csv
