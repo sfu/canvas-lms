@@ -88,12 +88,8 @@ class NotificationMessageCreator
       end
     end
     [delayed_messages, dashboard_messages, immediate_messages].each(&:compact!)
-
     delayed_messages.each(&:save!)
-    dispatch_dashboard_messages(dashboard_messages)
-    dispatch_immediate_messages(immediate_messages)
-
-    immediate_messages + dashboard_messages
+    dispatch_immediate_messages(immediate_messages) + dispatch_dashboard_messages(dashboard_messages)
   end
 
   private
@@ -120,10 +116,12 @@ class NotificationMessageCreator
   # have sent too many immediate messages to a user in a day.
   # returns delayed_message or nil
   def build_fallback_for(user, channel)
-    # if the notification is summarizable? it will be picked up in delayed_messages.
-    # if it's not an email we won't send a delayed_message.
-    # and this is only used when there were too_many_messages for a user.
-    return unless @notification.summarizable? && channel.path_type == 'email' && too_many_messages_for?(user)
+    # delayed_messages are only sent to email channels.
+    # some types of notifications are only for immediate.
+    return unless @notification.summarizable? && channel.path_type == 'email'
+    # we only send fallback when we did not send an immediate message, ie.
+    # when the channel is bouncing or there have been too_many_messages
+    return unless channel.bouncing? || too_many_messages_for?(user)
     fallback_policy = nil
     NotificationPolicy.unique_constraint_retry do
       fallback_policy = channel.notification_policies.by_frequency('daily').where(:notification_id => nil).first
@@ -137,9 +135,8 @@ class NotificationMessageCreator
   # returns delayed_message or nil
   def build_delayed_message_for(user, channel)
     # delayed_messages are only sent to email channels.
-    return unless channel.path_type == 'email'
     # some types of notifications are only for immediate.
-    return if @notification.registration? || @notification.migration?
+    return unless @notification.summarizable? && channel.path_type == 'email'
     policy = effective_policy_for(user, channel)
     # if the policy is not daily or weekly, it is either immediate which was
     # picked up before in build_immediate_message_for, or it's never.
@@ -175,10 +172,10 @@ class NotificationMessageCreator
     # if we have already created a fallback message, we don't want to make an
     # immediate message.
     return if @notification.summarizable? && too_many_messages_for?(user) && ['email', 'sms'].include?(channel.path_type)
-    return if channel.bouncing?
     message_options = message_options_for(user)
     message = user.messages.build(message_options.merge(communication_channel: channel, to: channel.path))
     message&.parse!
+    message.workflow_state = 'bounced' if channel.bouncing?
     message
   end
 
@@ -191,8 +188,9 @@ class NotificationMessageCreator
         message.save!
       end
     end
+    # we filter out bounced messages now that they have been saved.
+    messages = messages.select(&:staged?)
     MessageDispatcher.batch_dispatch(messages)
-
     messages
   end
 
@@ -337,14 +335,39 @@ class NotificationMessageCreator
   end
 
   def cancel_pending_duplicate_messages
-    # doesn't include dashboard messages. should it?
-    Message.where(:notification_id => @notification).
-      for(@asset).
-      by_name(@notification.name).
-      for_user(@to_user_channels.keys).
-      cancellable.
-      where("created_at BETWEEN ? AND ?", Setting.get("pending_duplicate_message_window_hours", "6").to_i.hours.ago, Time.now.utc).
-      update_all(:workflow_state => 'cancelled')
+    first_start_time = start_time = Setting.get("pending_duplicate_message_window_hours", "6").to_i.hours.ago
+    final_end_time = Time.now.utc
+    first_partition = Message.infer_partition_table_name('created_at' => first_start_time)
+
+    loop do
+      end_time = start_time + 7.days
+      end_time = final_end_time if end_time > final_end_time
+      scope = Message.
+        in_partition('created_at' => start_time).
+        where(:notification_id => @notification).
+        for(@asset).
+        by_name(@notification.name).
+        for_user(@to_user_channels.keys).
+        cancellable
+      start_partition = Message.infer_partition_table_name('created_at' => start_time)
+      end_partition = Message.infer_partition_table_name('created_at' => end_time)
+      if first_partition == start_partition &&
+        start_partition == end_partition
+        Message.infer_partition_table_name('created_at' => end_time)
+        scope = scope.where(created_at: start_time..end_time)
+        break_this_loop = true
+      elsif start_time == first_start_time
+        scope = scope.where("created_at>=?", start_time)
+      elsif start_partition == end_partition
+        scope = scope.where("created_at<=?", end_time)
+        break_this_loop = true
+      # else <no conditions; we're addressing the entire partition>
+      end
+      scope.update_all(:workflow_state => 'cancelled')
+
+      break if break_this_loop
+      start_time = end_time
+    end
   end
 
   def too_many_messages_for?(user)

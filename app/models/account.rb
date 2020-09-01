@@ -79,7 +79,7 @@ class Account < ActiveRecord::Base
   has_many :progresses, :as => :context, :inverse_of => :context
   has_many :content_migrations, :as => :context, :inverse_of => :context
   has_many :sis_batch_errors, foreign_key: :root_account_id, inverse_of: :root_account
-  has_one :outcome_proficiency, dependent: :destroy
+  has_one :outcome_proficiency, as: :context, inverse_of: :context, dependent: :destroy
   has_one :outcome_calculation_method, as: :context, inverse_of: :context, dependent: :destroy
 
   has_many :auditor_authentication_records,
@@ -166,6 +166,41 @@ class Account < ActiveRecord::Base
   include FeatureFlags
   def feature_flag_cache
     MultiCache.cache
+  end
+
+  def redis_for_root_account_cache_register
+    return unless MultiCache.cache.respond_to?(:redis)
+    redis = MultiCache.cache.redis
+    return if redis.respond_to?(:node_for)
+    redis
+  end
+
+  def root_account_cache_key
+    base_key = self.class.base_cache_register_key_for(self)
+    "#{base_key}/feature_flags"
+  end
+
+  def cache_key(key_type = nil)
+    return super if new_record?
+    return super unless root_account? && key_type == :feature_flags
+    return super unless (redis = redis_for_root_account_cache_register)
+
+    # partially taken from CacheRegister.cache_key_for_id, but modified to
+    # target HACache
+    full_key = root_account_cache_key
+    RequestCache.cache(full_key) do
+      now = Time.now.utc.to_s(self.cache_timestamp_format)
+      # try to get the timestamp for the type, set it to now if it doesn't exist
+      ts = Canvas::CacheRegister.lua.run(:get_key, [full_key], [now], redis)
+      "#{self.model_name.cache_key}/#{global_id}-#{ts}"
+    end
+  end
+
+  def clear_cache_key(*key_types)
+    return super unless root_account? && key_types == [:feature_flags]
+    return super unless redis_for_root_account_cache_register
+
+    MultiCache.delete(root_account_cache_key)
   end
 
   def default_locale(recurse = false)
@@ -268,6 +303,7 @@ class Account < ActiveRecord::Base
   add_setting :trusted_referers, root_only: true
   add_setting :app_center_access_token
   add_setting :enable_offline_web_export, boolean: true, default: false, inheritable: true
+  add_setting :disable_rce_media_uploads, boolean: true, default: false, inheritable: true
 
   add_setting :strict_sis_check, :boolean => true, :root_only => true, :default => false
   add_setting :lock_all_announcements, default: false, boolean: true, inheritable: true
@@ -382,6 +418,10 @@ class Account < ActiveRecord::Base
     enable_offline_web_export[:value]
   end
 
+  def disable_rce_media_uploads?
+    disable_rce_media_uploads[:value]
+  end
+
   def open_registration?
     !!settings[:open_registration] && canvas_authentication?
   end
@@ -453,7 +493,7 @@ class Account < ActiveRecord::Base
     self.root_account_id ||= self.parent_account.root_account_id if self.parent_account
     self.root_account_id ||= self.parent_account_id
     self.parent_account_id ||= self.root_account_id
-    Account.invalidate_cache(self.id) if self.id
+    Account.invalidate_cache(self.id) if self.id && self.root_account?
     true
   end
 
@@ -1369,6 +1409,7 @@ class Account < ActiveRecord::Base
         rescue ActiveRecord::RecordNotFound => e
           raise ::Canvas::AccountCacheError, e.message
         end
+        raise "Account.find_cached should only be used with root accounts" if !account.root_account? && !Rails.env.production?
         account.precache
         account
       end
@@ -1904,10 +1945,10 @@ class Account < ActiveRecord::Base
   end
   handle_asynchronously :update_user_dashboards, :priority => Delayed::LOW_PRIORITY, :max_attempts => 1
 
-  def process_external_integration_keys(params_keys, current_user)
+  def process_external_integration_keys(params_keys, current_user, keys = ExternalIntegrationKey.indexed_keys_for(self))
     return unless params_keys
 
-    ExternalIntegrationKey.indexed_keys_for(self).each do |key_type, key|
+    keys.each do |key_type, key|
       next unless params_keys.key?(key_type)
       next unless key.grants_right?(current_user, :write)
       unless params_keys[key_type].blank?
@@ -1933,4 +1974,31 @@ class Account < ActiveRecord::Base
 
     Account.site_admin.feature_enabled?(:new_sis_integrations)
   end
+
+  class << self
+    attr_accessor :current_domain_root_account
+  end
+
+  module DomainRootAccountCache
+    def find_one(id)
+      return Account.current_domain_root_account if Account.current_domain_root_account &&
+        Account.current_domain_root_account.shard == shard_value &&
+        Account.current_domain_root_account.local_id == id
+      super
+    end
+
+    def find_take
+      return super unless where_clause.send(:predicates).length == 1
+      predicates = where_clause.to_h
+      return super unless predicates.length == 1
+      return super unless predicates.keys.first == "id"
+      return Account.current_domain_root_account if Account.current_domain_root_account &&
+        Account.current_domain_root_account.shard == shard_value &&
+        Account.current_domain_root_account.local_id == predicates.values.first
+      super
+    end
+  end
+
+  relation_delegate_class(ActiveRecord::Relation).prepend(DomainRootAccountCache)
+  relation_delegate_class(ActiveRecord::AssociationRelation).prepend(DomainRootAccountCache)
 end

@@ -24,7 +24,7 @@
 require_relative '../helpers/wiki_and_tiny_common'
 require_relative 'pages/rce_next_page'
 
-describe 'RCE next tests' do
+describe 'RCE next tests', ignore_js_errors: true do
   include_context 'in-process server selenium tests'
   include WikiAndTinyCommon
   include RCENextPage
@@ -224,6 +224,47 @@ describe 'RCE next tests' do
           # f('body').send_keys(:delete) --> didn't work
           f('#lnk').send_keys(:delete)
           expect(f('#para').text).to eql ''
+        end
+      end
+
+      it 'does not delete the <a> on change when content is non-text' do
+        @course.wiki_pages.create!(
+          title: 'title',
+          body:
+            "<p id='para'><a id='lnk' href='http://example.com/'><img src='some/image'/></a></p>"
+        )
+        visit_existing_wiki_edit(@course, 'title')
+        wait_for_tiny(edit_wiki_css)
+
+        click_link_for_options
+        click_link_options_button
+
+        expect(link_options_tray).to be_displayed
+
+        link_text_textbox = f('input[type="text"][value="http://example.com/"]')
+        link_text_textbox.send_keys([:end, 'x'])
+        click_link_options_done_button
+
+        in_frame rce_page_body_ifr_id do
+          expect(wiki_body_anchor).to be_displayed
+        end
+      end
+
+      it 'should not magically create youtube video preview on a link', ignore_js_errors: true do
+        title = 'test_page'
+        unpublished = false
+        edit_roles = 'public'
+
+        create_wiki_page(title, unpublished, edit_roles)
+
+        visit_front_page_edit(@course)
+        wait_for_tiny(edit_wiki_css)
+
+        create_external_link('youtube', 'https://youtu.be/17oCQakzIl8')
+
+        in_frame rce_page_body_ifr_id do
+          expect(wiki_body_anchor.attribute('class')).not_to include 'youtube_link_to_box'
+          expect(wiki_body_anchor.attribute('class')).to include 'inline_disabled'
         end
       end
     end
@@ -470,8 +511,37 @@ describe 'RCE next tests' do
       end
     end
 
-    it 'should open tray when clicking options button on existing image' do
-      page_title = 'Page1'
+    it "should link image to selected text" do
+      title = "email.png"
+      @root_folder = Folder.root_folders(@course).first
+      @image = @root_folder.attachments.build(:context => @course)
+      path = File.expand_path(File.dirname(__FILE__) + '/../../../public/images/email.png')
+      @image.uploaded_data = Rack::Test::UploadedFile.new(path, Attachment.mimetype(path))
+      @image.save!
+
+      @course.wiki_pages.create!(
+        title: 'title',
+        body: "<p id='para'>select me</p>"
+      )
+      visit_existing_wiki_edit(@course, 'title')
+      wait_for_tiny(edit_wiki_css)
+
+      f("##{rce_page_body_ifr_id}").click
+      select_text_of_element_by_id("para")
+
+      click_images_toolbar_button
+      click_course_images
+
+      click_image_link(title)
+
+      in_frame tiny_rce_ifr_id do
+        expect(wiki_body).not_to contain_css('img')
+        expect(wiki_body_anchor.attribute('href')).to include course_file_id_path(@image)
+      end
+    end
+
+    it "should open tray when clicking options button on existing image" do
+      page_title = "Page1"
       create_wiki_page_with_embedded_image(page_title)
 
       visit_existing_wiki_edit(@course, page_title)

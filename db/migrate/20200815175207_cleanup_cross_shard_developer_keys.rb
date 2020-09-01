@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2018 - present Instructure, Inc.
+# Copyright (C) 2020 - present Instructure, Inc.
 #
 # This file is part of Canvas.
 #
@@ -14,20 +14,22 @@
 #
 # You should have received a copy of the GNU Affero General Public License along
 # with this program. If not, see <http://www.gnu.org/licenses/>.
-#
 
-require File.expand_path(File.dirname(__FILE__) + '/../../spec_helper')
+# We will merge this only when we're ready for a batch of backfills to start
+# otherwise, we can keep collecting. After we've merged once, when we have new models
+# to run we can just copy this with a new migration ID and run it again
 
-describe Lti::RSAKeyPair do
-  describe "initialize" do
-    it 'generates a public key of default size 2048' do
-      keys = Lti::RSAKeyPair.new
-      expect(/\d+/.match(keys.public_key.to_text())[0]).to eq "2048"
-    end
+class CleanupCrossShardDeveloperKeys < ActiveRecord::Migration[5.2]
+  tag :postdeploy
+  disable_ddl_transaction!
 
-    it 'generates a private key of default size 2048' do
-      keys = Lti::RSAKeyPair.new
-      expect(/\d+/.match(keys.private_key.to_text())[0]).to eq "2048"
-    end
+  def up
+    DataFixup::CleanupCrossShardDeveloperKeys.send_later_if_production_enqueue_args(
+      :run,
+      {priority: Delayed::LOWER_PRIORITY}
+    )
+  end
+
+  def down
   end
 end

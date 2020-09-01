@@ -107,4 +107,47 @@ class PseudonymSession < Authlogic::Session::Base
   def too_many_attempts?
     too_many_attempts == true
   end
+
+  # This block is pulled from Authlogic::Session::Base.find,
+  # which does all this same stuff but logs nothing making it hard
+  # to know why your user that was previously logged in is now not
+  # logged in.
+  def self.find_with_validation
+    self.with_scope(find_options: Pseudonym.eager_load(:user)) do
+      sess = self.new({ priority_record: nil }, nil)
+      if sess.nil?
+        Rails.logger.info "[AUTH] Failed to create pseudonym session"
+        return false
+      end
+      sess.priority_record = nil
+      if sess.persisting?
+        Rails.logger.info "[AUTH] Approved Authlogic session"
+        return sess
+      end
+      sess.errors.full_messages.each {|msg| Rails.logger.warn "[AUTH] Authlogic Validation Error: #{msg}" }
+      Rails.logger.warn "[AUTH] Authlogic Failed Find" if sess.attempted_record.nil?
+      # established AuthLogic behavior is to return false if the session is not valid
+      false
+    end
+  end
+
+  def persist_by_session_search(persistence_token, record_id)
+    return super unless record_id
+    Shard.shard_for(record_id).activate do
+      Rails.cache.fetch(["pseudonym_session", record_id].cache_key, expires_in: Setting.get("pseudonym_session_cache_ttl", 5).to_f.seconds) do
+        super
+      end
+    end
+  end
+
+  # this block is pulled from Authlogic::Session::Base.save_record, and does an update_columns in
+  # order to avoid a transaction and its associated db roundtrips
+  def save_record(alternate_record = nil)
+    r = alternate_record || record
+    if r != priority_record
+      if r&.has_changes_to_save? && !r.readonly?
+        r.save_without_transaction
+      end
+    end
+  end
 end
