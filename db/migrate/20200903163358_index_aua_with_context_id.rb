@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2014 - present Instructure, Inc.
+# Copyright (C) 2020 - present Instructure, Inc.
 #
 # This file is part of Canvas.
 #
@@ -14,15 +14,12 @@
 #
 # You should have received a copy of the GNU Affero General Public License along
 # with this program. If not, see <http://www.gnu.org/licenses/>.
+class IndexAuaWithContextId < ActiveRecord::Migration[5.2]
+  tag :postdeploy
+  disable_ddl_transaction!
 
-class EnsureBuiltInRoles < ActiveRecord::Migration[4.2]
-  tag :predeploy
-
-  def up
-    Role.ensure_built_in_roles!
-  end
-
-  def down
-    Role.where(:workflow_state => "built_in").delete_all
+  def change
+    add_index :asset_user_accesses, [:user_id, :context_id, :asset_code, :id], name: "index_asset_user_accesses_on_user_id_context_id_asset_code",
+              algorithm: :concurrently, if_not_exists: true
   end
 end

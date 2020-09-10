@@ -250,6 +250,10 @@ Rails.configuration.after_initialize do
     Lti::KeyStorage.rotate_keys
   end
 
+  Delayed::Periodic.cron 'Canvas::Oauth::KeyStorage.rotate_keys', '0 0 1 * *', priority: Delayed::LOW_PRIORITY do
+    Canvas::Oauth::KeyStorage.rotate_keys
+  end
+
   Delayed::Periodic.cron 'abandoned job cleanup', '*/10 * * * *' do
     Delayed::Worker::HealthCheck.reschedule_abandoned_jobs
   end
@@ -268,5 +272,13 @@ Rails.configuration.after_initialize do
 
   Delayed::Periodic.cron 'ScheduledSmartAlert.queue_current_jobs', '5 * * * *' do
     with_each_shard_by_database(ScheduledSmartAlert, :queue_current_jobs)
+  end
+
+  # the default is hourly, and we picked a weird minute just to avoid
+  # synchronizing with other periodic jobs.
+  Delayed::Periodic.cron 'AssetUserAccessLog.compact', '42 * * * *' do
+    # using jitter should help spread out multiple shards on the same cluster doing these
+    # write-heavy updates so that they don't all hit at the same time and run immediately back to back.
+    with_each_shard_by_database(AssetUserAccessLog, :compact, jitter: 15.minutes)
   end
 end
