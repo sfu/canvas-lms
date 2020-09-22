@@ -623,6 +623,7 @@ class DiscussionTopicsController < ApplicationController
     @context.require_assignment_group rescue nil
     add_discussion_or_announcement_crumb
     add_crumb(@topic.title, named_context_url(@context, :context_discussion_topic_url, @topic.id))
+
     if @topic.deleted?
       flash[:notice] = t :deleted_topic_notice, "That topic has been deleted"
       redirect_to named_context_url(@context, :context_discussion_topics_url)

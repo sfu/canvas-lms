@@ -43,6 +43,48 @@ module Canvas
       end
     end
 
+    describe 'with inferred context' do
+      around(:each) do |example|
+        prev_context = Thread.current[:context]
+        example.run
+      ensure
+        Thread.current[:context] = prev_context
+      end
+
+      it "attaches current job context to error hashes" do
+        fake_job_class = Class.new do
+          def perform; end
+        end
+        exception = details = nil
+        Canvas::Errors.register!(:test_thing) do |e, d|
+          exception = e
+          details = d
+        end
+        job = Delayed::Job.enqueue(fake_job_class.new)
+        allow(Delayed::Worker).to receive(:current_job).and_return(job)
+        Canvas::Errors.capture(RuntimeError.new, { my_tag: "my_value"})
+
+        expect(details[:extra][:my_tag]).to eq("my_value")
+        expect(details[:tags][:job_tag]).to match('#perform')
+      end
+
+      it "attaches request context to error hashes collected manually" do
+        Thread.current[:context] = {
+          request_id: '1234request1234',
+          session_id: '1234session1234'
+        }
+        exception = details = nil
+        Canvas::Errors.register!(:test_thing) do |e, d|
+          exception = e
+          details = d
+        end
+        Canvas::Errors.capture(RuntimeError.new, { my_tag: "custom_value"})
+        expect(details[:extra][:my_tag]).to eq("custom_value")
+        expect(details[:extra][:request_id]).to eq("1234request1234")
+        expect(details[:extra][:session_id]).to match('1234session1234')
+      end
+    end
+
     it 'fires callbacks when it handles an exception' do
       called_with = nil
       Canvas::Errors.register!(:test_thing) do |exception|

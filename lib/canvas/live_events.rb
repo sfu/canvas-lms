@@ -238,6 +238,8 @@ module Canvas::LiveEvents
     }
     actl = assignment.assignment_configuration_tool_lookups.take
     event[:associated_integration_id] = "#{actl.tool_vendor_code}-#{actl.tool_product_code}" if actl
+    domain = assignment.root_account&.domain
+    event[:domain] = domain if domain
     event
   end
 
@@ -608,7 +610,7 @@ module Canvas::LiveEvents
     context = content_migration.context
     import_quizzes_next =
       content_migration.migration_settings&.[](:import_quizzes_next) == true
-    {
+    payload = {
       content_migration_id: content_migration.global_id,
       context_id: context.global_id,
       context_type: context.class.to_s,
@@ -616,6 +618,12 @@ module Canvas::LiveEvents
       context_uuid: context.uuid,
       import_quizzes_next: import_quizzes_next
     }
+
+    if context.respond_to?(:root_account)
+      payload[:domain] = context.root_account&.domain
+    end
+
+    payload
   end
 
   def self.course_section_created(section)

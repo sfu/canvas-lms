@@ -867,7 +867,8 @@ describe Canvas::LiveEvents do
           lti_assignment_id: @assignment.lti_context_id,
           lti_resource_link_id: @assignment.lti_resource_link_id,
           lti_resource_link_id_duplicated_from: @assignment.duplicate_of&.lti_resource_link_id,
-          submission_types: @assignment.submission_types
+          submission_types: @assignment.submission_types,
+          domain: @assignment.root_account.domain
         }.compact!)).once
 
       Canvas::LiveEvents.assignment_created(@assignment)
@@ -907,7 +908,8 @@ describe Canvas::LiveEvents do
           lti_assignment_id: @assignment.lti_context_id,
           lti_resource_link_id: @assignment.lti_resource_link_id,
           lti_resource_link_id_duplicated_from: @assignment.duplicate_of&.lti_resource_link_id,
-          submission_types: @assignment.submission_types
+          submission_types: @assignment.submission_types,
+          domain: @assignment.root_account.domain
         }.compact!)).once
 
       Canvas::LiveEvents.assignment_updated(@assignment)
@@ -1073,7 +1075,8 @@ describe Canvas::LiveEvents do
           context_id: course.global_id.to_s,
           context_type: course.class.to_s,
           context_uuid: course.uuid,
-          import_quizzes_next: true
+          import_quizzes_next: true,
+          domain: course.root_account.domain
         ),
         hash_including(
           context_type: course.class.to_s,
@@ -1175,7 +1178,8 @@ describe Canvas::LiveEvents do
         original_course_id: '1234',
         new_course_id: '5678',
         original_resource_link_id: 'abc123',
-        new_resource_link_id: 'def456'
+        new_resource_link_id: 'def456',
+        domain: 'canvas.instructure.com'
       }
 
       expect_event('quizzes_next_quiz_duplicated', event_payload).once

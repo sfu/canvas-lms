@@ -167,6 +167,7 @@ class ApplicationController < ActionController::Base
           help_link_icon: help_link_icon,
           use_high_contrast: @current_user.try(:prefers_high_contrast?),
           disable_celebrations: @current_user.try(:prefers_no_celebrations?),
+          disable_keyboard_shortcuts: @current_user.try(:prefers_no_keyboard_shortcuts?),
           LTI_LAUNCH_FRAME_ALLOWANCES: Lti::Launch.iframe_allowances(request.user_agent),
           DEEP_LINKING_POST_MESSAGE_ORIGIN: request.base_url,
           DEEP_LINKING_LOGGING: Setting.get('deep_linking_logging', nil),
@@ -2710,5 +2711,9 @@ class ApplicationController < ActionController::Base
       ::Canvas::DynamicSettings.find(tree: :private)["enable_template_streaming"] &&
         Setting.get("disable_template_streaming_for_#{controller_name}/#{action_name}", "false") != "true"
     end
+  end
+
+  def recaptcha_enabled?
+    Canvas::DynamicSettings.find(tree: :private)['recaptcha_server_key'].present? && @domain_root_account.self_registration_captcha?
   end
 end
