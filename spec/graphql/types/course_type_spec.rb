@@ -156,19 +156,21 @@ describe Types::CourseType do
     end
   end
 
+  describe "outcomeProficiency" do
+    it 'resolves to the account proficiency' do
+      outcome_proficiency_model(course.account)
+      expect(
+        course_type.resolve('outcomeProficiency { _id }', current_user: @teacher)
+      ).to eq course.account.outcome_proficiency.id.to_s
+    end
+  end
+
   describe "outcomeCalculationMethod" do
-    it 'works' do
+    it 'resolves to the account calculation method' do
       outcome_calculation_method_model(course.account)
       expect(
         course_type.resolve('outcomeCalculationMethod { _id }', current_user: @teacher)
       ).to eq course.account.outcome_calculation_method.id.to_s
-    end
-
-    it "requires read permission" do
-      outcome_calculation_method_model(course.account)
-      expect(
-        course_type.resolve('outcomeCalculationMethod { _id }', current_user: user_model)
-      ).to be_nil
     end
   end
 

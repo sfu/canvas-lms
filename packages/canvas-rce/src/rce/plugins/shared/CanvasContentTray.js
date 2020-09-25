@@ -32,14 +32,16 @@ import {StoreProvider} from './StoreContext'
 
 /**
  * Returns the translated tray label
- * @param {Object} filterSettings
- * @param {string} filterSettings.contentSubtype - The current subtype of
- * content loaded in the tray
+ * @param {string} contentType - The type of content showing on tray
+ * @param {string} contentSubtype - The current subtype of content loaded in the tray
+ * @param {string} contextType - The user's context
  * @returns {string}
  */
-function getTrayLabel({contentType, contentSubtype}) {
-  if (contentType === 'links') {
+function getTrayLabel(contentType, contentSubtype, contextType) {
+  if (contentType === 'links' && contextType === 'course') {
     return formatMessage('Course Links')
+  } else if (contentType === 'links' && contextType === 'group') {
+    return formatMessage('Group Links')
   }
 
   switch (contentSubtype) {
@@ -133,8 +135,15 @@ const FILTER_SETTINGS_BY_PLUGIN = {
     sortValue: 'date_added',
     sortDir: 'desc'
   },
-  links: {
+  course_links: {
     contextType: 'course',
+    contentType: 'links',
+    contentSubtype: 'all',
+    sortValue: 'date_added',
+    sortDir: 'desc'
+  },
+  group_links: {
+    contextType: 'group',
     contentType: 'links',
     contentSubtype: 'all',
     sortValue: 'date_added',
@@ -218,20 +227,27 @@ export default function CanvasContentTray(props) {
           break
         case 'course_files':
         case 'links':
-          contextType = 'course'
+          contextType = props.contextType
           contextId = props.containingContext.contextId
       }
       onChangeContext({contextType, contextId})
     }
   }
-
   return (
-    <StoreProvider {...props} key={openCount}>
+    <StoreProvider
+      {...props}
+      key={openCount}
+      contextType={filterSettings.contextType || props.contextType}
+    >
       {contentProps => (
         <Tray
           data-mce-component
           data-testid="CanvasContentTray"
-          label={getTrayLabel(filterSettings, contentProps.contextType)}
+          label={getTrayLabel(
+            filterSettings.contentType,
+            filterSettings.contentSubtype,
+            contentProps.contextType
+          )}
           open={isOpen}
           placement="end"
           size="regular"
@@ -255,7 +271,12 @@ export default function CanvasContentTray(props) {
                   </Flex.Item>
 
                   <Flex.Item>
-                    <CloseButton placement="static" variant="icon" onClick={handleDismissTray}>
+                    <CloseButton
+                      placement="static"
+                      variant="icon"
+                      onClick={handleDismissTray}
+                      data-testid="CloseButton_ContentTray"
+                    >
                       {formatMessage('Close')}
                     </CloseButton>
                   </Flex.Item>

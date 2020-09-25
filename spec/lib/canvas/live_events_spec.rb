@@ -16,7 +16,8 @@
 # with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-require 'spec_helper.rb'
+require 'spec_helper'
+require 'lti2_spec_helper'
 
 describe Canvas::LiveEvents do
   # The only methods tested in here are ones that have any sort of logic happening.
@@ -574,14 +575,40 @@ describe Canvas::LiveEvents do
         Canvas::LiveEvents.submission_created(submission)
       end
 
-      it 'should include the associated_integration_id if the assignment has an assignment configuration tool lookup' do
-        submission.assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
-          tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
-        expect_event('submission_created',
-          hash_including(
-            associated_integration_id: "turnitin.com-turnitin-lti"
-          ))
-        Canvas::LiveEvents.submission_created(submission)
+      context 'with assignment configuration tool lookup' do
+        include_context 'lti2_spec_helper'
+        let(:product_family) do
+          Lti::ProductFamily.create!(
+            vendor_code: 'turnitin.com',
+            product_code: 'turnitin-lti',
+            vendor_name: 'TurnItIn',
+            root_account: account,
+            developer_key: developer_key
+          )
+        end
+
+        it 'should include the associated_integration_id if there is an installed tool proxy with that id' do
+          submission.assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
+            tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
+          create_tool_proxy(submission.assignment.course)
+
+          expect_event('submission_created',
+            hash_including(
+              associated_integration_id: "turnitin.com-turnitin-lti"
+            ))
+          Canvas::LiveEvents.submission_created(submission)
+        end
+
+        it 'should not include the associated_integration_id if there is no longer an installed tool with that id' do
+          submission.assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
+            tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
+
+          expect_event('submission_created',
+            hash_not_including(
+              associated_integration_id: "turnitin.com-turnitin-lti"
+            ))
+          Canvas::LiveEvents.submission_created(submission)
+        end
       end
     end
 
@@ -618,14 +645,51 @@ describe Canvas::LiveEvents do
         Canvas::LiveEvents.submission_updated(submission)
       end
 
-      it 'should include the associated_integration_id if the assignment has an assignment configuration tool lookup' do
-        submission.assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
-          tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
+      it 'should include posted_at' do
+        post_time = Time.zone.now
+        submission.update_attributes(posted_at: post_time)
+
         expect_event('submission_updated',
           hash_including(
-            associated_integration_id: "turnitin.com-turnitin-lti"
+            posted_at: post_time,
           ))
         Canvas::LiveEvents.submission_updated(submission)
+      end
+
+      context 'with assignment configuration tool lookup' do
+        include_context 'lti2_spec_helper'
+        let(:product_family) do
+          Lti::ProductFamily.create!(
+            vendor_code: 'turnitin.com',
+            product_code: 'turnitin-lti',
+            vendor_name: 'TurnItIn',
+            root_account: account,
+            developer_key: developer_key
+          )
+        end
+
+        it 'should include the associated_integration_id if there is an installed tool proxy with that id' do
+          submission.assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
+            tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
+          create_tool_proxy(submission.assignment.course)
+
+          expect_event('submission_updated',
+            hash_including(
+              associated_integration_id: "turnitin.com-turnitin-lti"
+            ))
+          Canvas::LiveEvents.submission_updated(submission)
+        end
+
+        it 'should not include the associated_integration_id if there is no longer an installed tool with that id' do
+          submission.assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
+            tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
+
+          expect_event('submission_updated',
+            hash_not_including(
+              associated_integration_id: "turnitin.com-turnitin-lti"
+            ))
+          Canvas::LiveEvents.submission_updated(submission)
+        end
       end
     end
 
@@ -709,14 +773,40 @@ describe Canvas::LiveEvents do
         Canvas::LiveEvents.plagiarism_resubmit(submission)
       end
 
-      it 'should include the associated_integration_id if the assignment has an assignment configuration tool lookup' do
-        submission.assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
-          tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
-        expect_event('plagiarism_resubmit',
-          hash_including(
-            associated_integration_id: "turnitin.com-turnitin-lti"
-          ))
-        Canvas::LiveEvents.plagiarism_resubmit(submission)
+      context 'with assignment configuration tool lookup' do
+        include_context 'lti2_spec_helper'
+        let(:product_family) do
+          Lti::ProductFamily.create!(
+            vendor_code: 'turnitin.com',
+            product_code: 'turnitin-lti',
+            vendor_name: 'TurnItIn',
+            root_account: account,
+            developer_key: developer_key
+          )
+        end
+
+        it 'should include the associated_integration_id if there is an installed tool proxy with that id' do
+          submission.assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
+            tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
+          create_tool_proxy(submission.assignment.course)
+
+          expect_event('plagiarism_resubmit',
+            hash_including(
+              associated_integration_id: "turnitin.com-turnitin-lti"
+            ))
+          Canvas::LiveEvents.plagiarism_resubmit(submission)
+        end
+
+        it 'should not include the associated_integration_id if there is no longer an installed tool with that id' do
+          submission.assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
+            tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
+
+          expect_event('plagiarism_resubmit',
+            hash_not_including(
+              associated_integration_id: "turnitin.com-turnitin-lti"
+            ))
+          Canvas::LiveEvents.plagiarism_resubmit(submission)
+        end
       end
     end
   end
@@ -856,20 +946,47 @@ describe Canvas::LiveEvents do
           lti_assignment_id: @assignment.lti_context_id,
           lti_resource_link_id: @assignment.lti_resource_link_id,
           lti_resource_link_id_duplicated_from: @assignment.duplicate_of&.lti_resource_link_id,
-          submission_types: @assignment.submission_types
+          submission_types: @assignment.submission_types,
+          domain: @assignment.root_account.domain
         }.compact!)).once
 
       Canvas::LiveEvents.assignment_created(@assignment)
     end
 
-    it 'should include the associated_integration_id if the assignment has an assignment configuration tool lookup' do
-      @assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
-        tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
-      expect_event('assignment_created',
-        hash_including(
-          associated_integration_id: "turnitin.com-turnitin-lti"
-        ))
-      Canvas::LiveEvents.assignment_created(@assignment)
+    context 'with assignment configuration tool lookup' do
+      include_context 'lti2_spec_helper'
+      let(:product_family) do
+        Lti::ProductFamily.create!(
+          vendor_code: 'turnitin.com',
+          product_code: 'turnitin-lti',
+          vendor_name: 'TurnItIn',
+          root_account: account,
+          developer_key: developer_key
+        )
+      end
+
+      it 'should include the associated_integration_id if there is an installed tool proxy with that id' do
+        @assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
+          tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
+        create_tool_proxy(@assignment.course)
+
+        expect_event('assignment_created',
+          hash_including(
+            associated_integration_id: "turnitin.com-turnitin-lti"
+          ))
+        Canvas::LiveEvents.assignment_created(@assignment)
+      end
+
+      it 'should not include the associated_integration_id if there is no longer an installed tool with that id' do
+        @assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
+          tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
+
+        expect_event('assignment_created',
+          hash_not_including(
+            associated_integration_id: "turnitin.com-turnitin-lti"
+          ))
+        Canvas::LiveEvents.assignment_created(@assignment)
+      end
     end
   end
 
@@ -896,20 +1013,47 @@ describe Canvas::LiveEvents do
           lti_assignment_id: @assignment.lti_context_id,
           lti_resource_link_id: @assignment.lti_resource_link_id,
           lti_resource_link_id_duplicated_from: @assignment.duplicate_of&.lti_resource_link_id,
-          submission_types: @assignment.submission_types
+          submission_types: @assignment.submission_types,
+          domain: @assignment.root_account.domain
         }.compact!)).once
 
       Canvas::LiveEvents.assignment_updated(@assignment)
     end
 
-    it 'should include the associated_integration_id if the assignment has an assignment configuration tool lookup' do
-      @assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
-        tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
-      expect_event('assignment_updated',
-        hash_including(
-          associated_integration_id: "turnitin.com-turnitin-lti"
-        ))
-      Canvas::LiveEvents.assignment_updated(@assignment)
+    context 'with assignment configuration tool lookup' do
+      include_context 'lti2_spec_helper'
+      let(:product_family) do
+        Lti::ProductFamily.create!(
+          vendor_code: 'turnitin.com',
+          product_code: 'turnitin-lti',
+          vendor_name: 'TurnItIn',
+          root_account: account,
+          developer_key: developer_key
+        )
+      end
+
+      it 'should include the associated_integration_id if there is an installed tool proxy with that id' do
+        @assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
+          tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
+        create_tool_proxy(@assignment.course)
+
+        expect_event('assignment_updated',
+          hash_including(
+            associated_integration_id: "turnitin.com-turnitin-lti"
+          ))
+        Canvas::LiveEvents.assignment_updated(@assignment)
+      end
+
+      it 'should not include the associated_integration_id if there is no longer an installed tool with that id' do
+        @assignment.assignment_configuration_tool_lookups.create!(tool_product_code: 'turnitin-lti',
+          tool_vendor_code: 'turnitin.com', tool_type: 'Lti::MessageHandler')
+
+        expect_event('assignment_updated',
+          hash_not_including(
+            associated_integration_id: "turnitin.com-turnitin-lti"
+          ))
+        Canvas::LiveEvents.assignment_updated(@assignment)
+      end
     end
   end
 
@@ -1062,7 +1206,8 @@ describe Canvas::LiveEvents do
           context_id: course.global_id.to_s,
           context_type: course.class.to_s,
           context_uuid: course.uuid,
-          import_quizzes_next: true
+          import_quizzes_next: true,
+          domain: course.root_account.domain
         ),
         hash_including(
           context_type: course.class.to_s,
@@ -1164,7 +1309,8 @@ describe Canvas::LiveEvents do
         original_course_id: '1234',
         new_course_id: '5678',
         original_resource_link_id: 'abc123',
-        new_resource_link_id: 'def456'
+        new_resource_link_id: 'def456',
+        domain: 'canvas.instructure.com'
       }
 
       expect_event('quizzes_next_quiz_duplicated', event_payload).once
@@ -1651,6 +1797,56 @@ describe Canvas::LiveEvents do
         }.compact).once
 
         Canvas::LiveEvents.learning_outcome_link_updated(link)
+      end
+    end
+  end
+
+  describe 'outcome_proficiency' do
+    before do
+      @account = account_model
+      @rating1 = OutcomeProficiencyRating.new(description: 'best', points: 10, mastery: true, color: '00ff00')
+      rating2 = OutcomeProficiencyRating.new(description: 'worst', points: 0, mastery: false, color: 'ff0000')
+      @proficiency = OutcomeProficiency.create!(outcome_proficiency_ratings: [@rating1, rating2], context: @account)
+    end
+
+    def rating_event(rating)
+      {
+        outcome_proficiency_rating_id: rating.id.to_s,
+        description: rating.description,
+        points: rating.points,
+        mastery: rating.mastery,
+        color: rating.color,
+        workflow_state: rating.workflow_state
+      }
+    end
+
+    context 'created' do
+      it 'should trigger an outcome_proficiency_created live event' do
+        expect_event('outcome_proficiency_created', {
+          outcome_proficiency_id: @proficiency.id.to_s,
+          context_id: @proficiency.context_id.to_s,
+          context_type: @proficiency.context_type,
+          workflow_state: @proficiency.workflow_state,
+          outcome_proficiency_ratings: @proficiency.outcome_proficiency_ratings.map {|rating| rating_event(rating)}
+        }.compact).once
+
+        Canvas::LiveEvents.outcome_proficiency_created(@proficiency)
+      end
+    end
+
+    context 'updated' do
+      it 'should trigger an outcome_proficiency_updated live event' do
+        @proficiency.outcome_proficiency_ratings = [@rating1]
+        @proficiency.save!
+        expect_event('outcome_proficiency_updated', {
+          outcome_proficiency_id: @proficiency.id.to_s,
+          context_id: @proficiency.context_id.to_s,
+          context_type: @proficiency.context_type,
+          workflow_state: @proficiency.workflow_state,
+          updated_at: @proficiency.updated_at,
+          outcome_proficiency_ratings: @proficiency.outcome_proficiency_ratings.map {|rating| rating_event(rating)}
+        }.compact).once
+        Canvas::LiveEvents.outcome_proficiency_updated(@proficiency)
       end
     end
   end

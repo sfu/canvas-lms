@@ -15,10 +15,13 @@
  * You should have received a copy of the GNU Affero General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-import React, {useState, useEffect} from 'react'
+import React, {useState, useEffect, useMemo} from 'react'
 import I18n from 'i18n!OutcomeManagement'
 import {Tabs} from '@instructure/ui-tabs'
-import ProficiencyTable from 'jsx/outcomes/MasteryScale/ProficiencyTable'
+import MasteryScale from 'jsx/outcomes/MasteryScale'
+import MasteryCalculation from 'jsx/outcomes/MasteryCalculation'
+
+import {ApolloProvider, createClient} from 'jsx/canvas-apollo'
 
 export const OutcomePanel = () => {
   useEffect(() => {
@@ -37,22 +40,32 @@ export const OutcomePanel = () => {
 }
 
 const OutcomeManagement = () => {
-  const [selectedIndex, setSelectedIndex] = useState(0)
+  const [selectedIndex, setSelectedIndex] = useState(() => {
+    const tabs = {'#mastery_scale': 1, '#mastery_calculation': 2}
+    return window.location.hash in tabs ? tabs[window.location.hash] : 0
+  })
 
   const handleTabChange = (_, {index}) => {
     setSelectedIndex(index)
   }
 
+  const client = useMemo(() => createClient(), [])
+
   const contextId = ENV.context_asset_string.split('_')[1]
   return (
-    <Tabs onRequestTabChange={handleTabChange}>
-      <Tabs.Panel renderTitle={I18n.t('Manage')} isSelected={selectedIndex === 0}>
-        <OutcomePanel />
-      </Tabs.Panel>
-      <Tabs.Panel renderTitle={I18n.t('Mastery Scale')} isSelected={selectedIndex === 1}>
-        <ProficiencyTable accountId={contextId} />
-      </Tabs.Panel>
-    </Tabs>
+    <ApolloProvider client={client}>
+      <Tabs onRequestTabChange={handleTabChange}>
+        <Tabs.Panel renderTitle={I18n.t('Manage')} isSelected={selectedIndex === 0}>
+          <OutcomePanel />
+        </Tabs.Panel>
+        <Tabs.Panel renderTitle={I18n.t('Mastery')} isSelected={selectedIndex === 1}>
+          <MasteryScale contextType="Account" contextId={contextId} />
+        </Tabs.Panel>
+        <Tabs.Panel renderTitle={I18n.t('Calculation')} isSelected={selectedIndex === 2}>
+          <MasteryCalculation contextType="Account" contextId={contextId} />
+        </Tabs.Panel>
+      </Tabs>
+    </ApolloProvider>
   )
 }
 

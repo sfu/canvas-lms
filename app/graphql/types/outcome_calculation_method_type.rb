@@ -20,17 +20,14 @@ module Types
   class OutcomeCalculationMethodType < ApplicationObjectType
     description 'Customized calculation method'
 
+    implements GraphQL::Types::Relay::Node
     implements Interfaces::LegacyIDInterface
+
+    global_id_field :id
 
     field :calculation_method, String, null: false
     field :calculation_int, Integer, null: true
     field :context_type, String, null: false
     field :context_id, Integer, null: false
-
-    field :locked, Boolean, null: false
-    def locked
-      context = object.context
-      (context.is_a?(Account) ? context : context.account).lock_proficiency_calculation[:locked]
-    end
   end
 end

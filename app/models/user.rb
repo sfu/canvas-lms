@@ -106,9 +106,9 @@ class User < ActiveRecord::Base
   has_many :associated_root_accounts, -> { order("user_account_associations.depth").
     where(accounts: { parent_account_id: nil }) }, source: :account, through: :user_account_associations
   has_many :developer_keys
-  has_many :access_tokens, -> { where(:workflow_state => "active").preload(:developer_key) }, inverse_of: :user
+  has_many :access_tokens, -> { where(:workflow_state => "active").preload(:developer_key) }, inverse_of: :user, multishard: true
   has_many :masquerade_tokens, -> { where(:workflow_state => "active").preload(:developer_key) }, class_name: 'AccessToken', inverse_of: :real_user
-  has_many :notification_endpoints, :through => :access_tokens
+  has_many :notification_endpoints, :through => :access_tokens, multishard: true
   has_many :context_external_tools, -> { order(:name) }, as: :context, inverse_of: :context, dependent: :destroy
   has_many :lti_results, inverse_of: :user, class_name: 'Lti::Result', dependent: :destroy
 
@@ -358,7 +358,7 @@ class User < ActiveRecord::Base
     select_clause = "users.*, #{select_clause}" if select_values.blank?
     scope = select(select_clause).
       # left outer join ensures we get the user even if they don't have a pseudonym
-      joins(sanitize_sql([<<-SQL, root_account_id])).where(:enrollments => { :course_id => course })
+      joins(sanitize_sql([<<~SQL, root_account_id])).where(:enrollments => { :course_id => course })
         LEFT OUTER JOIN #{Pseudonym.quoted_table_name} ON pseudonyms.user_id = users.id AND pseudonyms.account_id = ?
         INNER JOIN #{Enrollment.quoted_table_name} ON enrollments.user_id = users.id
       SQL
@@ -1644,6 +1644,10 @@ class User < ActiveRecord::Base
 
   def prefers_no_celebrations?
     !!feature_enabled?(:disable_celebrations)
+  end
+
+  def prefers_no_keyboard_shortcuts?
+    !!feature_enabled?(:disable_keyboard_shortcuts)
   end
 
   def manual_mark_as_read?

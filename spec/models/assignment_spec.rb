@@ -2588,6 +2588,8 @@ describe Assignment do
   end
 
   context "needs_grading_count" do
+    specs_require_cache(:redis_cache_store)
+
     before :once do
       setup_assignment_with_homework
     end
@@ -2602,35 +2604,44 @@ describe Assignment do
     it "should update when section (and its enrollments) are moved" do
       @assignment.update_attribute(:updated_at, 1.minute.ago)
       expect(@assignment.needs_grading_count).to eql(1)
-      enable_cache do
-        expect(Assignments::NeedsGradingCountQuery.new(@assignment, nil).manual_count).to be(1)
-        course2 = @course.account.courses.create!
-        e = @course.enrollments.where(user_id: @user.id).first.course_section
-        e.move_to_course(course2)
-        @assignment.reload
-        expect(Assignments::NeedsGradingCountQuery.new(@assignment, nil).manual_count).to be(0)
-      end
+      expect(Assignments::NeedsGradingCountQuery.new(@assignment, nil).manual_count).to be(1)
+      course2 = @course.account.courses.create!
+      e = @course.enrollments.where(user_id: @user.id).first.course_section
+      e.move_to_course(course2)
+      @assignment.reload
+      expect(Assignments::NeedsGradingCountQuery.new(@assignment, nil).manual_count).to be(0)
       expect(@assignment.needs_grading_count).to eql(0)
     end
 
     it "updated_at should be set when needs_grading_count changes due to a submission" do
+      @assignment.update_attribute(:muted, false) # otherwise this gets saved by another callback because it thinks all the submissions are posted
       expect(@assignment.needs_grading_count).to eql(1)
       old_timestamp = Time.now.utc - 1.minute
       Assignment.where(:id => @assignment).update_all(:updated_at => old_timestamp)
+      old_cache_key = @assignment.cache_key(:needs_grading)
+
       @assignment.grade_student(@user, grade: "0", grader: @teacher)
-      @assignment.reload
-      expect(@assignment.needs_grading_count).to eql(0)
-      expect(@assignment.updated_at).to be > old_timestamp
+      Timecop.freeze(1.minute.from_now) do
+        @assignment.reload
+        expect(@assignment.needs_grading_count).to eql(0)
+        expect(@assignment.updated_at).to eq old_timestamp
+        expect(@assignment.cache_key(:needs_grading)).to be > old_cache_key
+      end
     end
 
-    it "updated_at should be set when needs_grading_count changes due to an enrollment change" do
-      old_timestamp = Time.now.utc - 1.minute
+    it "needs_grading cache_key should be reset when needs_grading_count changes due to an enrollment change" do
       expect(@assignment.needs_grading_count).to eql(1)
+      old_timestamp = Time.now.utc - 1.minute
       Assignment.where(:id => @assignment).update_all(:updated_at => old_timestamp)
+      old_cache_key = @assignment.cache_key(:needs_grading)
+
       @course.enrollments.where(user_id: @user).first.destroy
-      @assignment.reload
-      expect(@assignment.needs_grading_count).to eql(0)
-      expect(@assignment.updated_at).to be > old_timestamp
+      Timecop.freeze(1.minute.from_now) do
+        @assignment.reload
+        expect(@assignment.needs_grading_count).to eql(0)
+        expect(@assignment.updated_at).to eq old_timestamp
+        expect(@assignment.cache_key(:needs_grading)).to be > old_cache_key
+      end
     end
   end
 
@@ -6460,7 +6471,7 @@ describe Assignment do
       zip.open
     end
 
-    def generate_comments(user)
+    def generate_comments(user, attachment_id = nil)
       tempfile = zip_submissions
 
       # create an uploaded file with the zipped submissions, as would be uploaded by the user
@@ -6468,7 +6479,8 @@ describe Assignment do
 
       @assignment.generate_comments_from_files_later(
         {uploaded_data: uploaded_data},
-        user
+        user,
+        attachment_id
       )
 
       # invoke the job that was created by the previous step
@@ -6485,6 +6497,26 @@ describe Assignment do
 
       expect(results[:comments].map { |c| c[:submission][:user_id] }).to eq [s1.id]
       expect(results[:ignored_files]).to be_empty
+    end
+
+    it "accepts an optional attachment ID to fetch an existing attachment instead of generating a new one" do
+      student = @students.first
+      submit_homework(student)
+
+      uploaded_data = ActionDispatch::Http::UploadedFile.new(tempfile: zip_submissions, filename: "submissions.zip")
+      attachment = @teacher.attachments.create!(uploaded_data: uploaded_data)
+      generate_comments(@teacher, attachment.id)
+      submission = @assignment.submission_reupload_progress.results.dig(:comments, 0, :submission)
+      expect(submission[:user_id]).to eq student.id
+    end
+
+    it "assigns an anonymous_id for each submission" do
+      student = @students.first
+      submit_homework(student)
+
+      generate_comments(@teacher)
+      submission = @assignment.submission_reupload_progress.results.dig(:comments, 0, :submission)
+      expect(submission).to have_key :anonymous_id
     end
 
     it "should work for groups" do
@@ -8841,6 +8873,76 @@ describe Assignment do
               expect(subject.line_items.first.resource_link).not_to eq resource_link
             end
           end
+
+          describe '#prepare_for_ags_if_needed!' do
+            subject { assignment }
+
+            context 'when the assignment is not AGS ready' do
+              before do
+                # assignments configured with LTI 1.1 will not have
+                # LineItem or ResouceLink records prior to the LTI 1.3
+                # launch.
+                assignment.line_items.destroy_all
+
+                Lti::ResourceLink.where(
+                  resource_link_id: assignment.lti_context_id
+                ).destroy_all
+
+                assignment.update!(lti_context_id: SecureRandom.uuid)
+
+                assignment.prepare_for_ags_if_needed!(tool)
+              end
+
+              it 'creates the default line item' do
+                expect(subject.line_items).to be_present
+              end
+
+              it 'creates the LTI resource link' do
+                expect(
+                  Lti::ResourceLink.where(
+                    resource_link_id: subject.lti_context_id
+                  )
+                ).to be_present
+              end
+            end
+
+            shared_examples_for 'a method that does not change AGS columns' do
+              it 'does not recreate the default line item' do
+                expect {
+                  assignment.prepare_for_ags_if_needed!(tool)
+                }.not_to change { assignment.line_items.first.id }
+              end
+
+              it 'does not recreate the LTI resource link' do
+                expect {
+                  assignment.prepare_for_ags_if_needed!(tool)
+                }.not_to change {
+                  Lti::ResourceLink.where(resource_link_id: subject.lti_context_id).
+                    first.
+                    id
+                }
+              end
+            end
+
+            context 'when the tool does not use 1.3' do
+              before do
+                tool.use_1_3 = false
+                tool.save!
+              end
+
+              it_behaves_like 'a method that does not change AGS columns'
+            end
+
+            context 'when the tool does not have a developer key' do
+              before { tool.update!(developer_key: nil) }
+
+              it_behaves_like 'a method that does not change AGS columns'
+            end
+
+            context 'when the assignment already has line items' do
+              it_behaves_like 'a method that does not change AGS columns'
+            end
+          end
         end
 
         context 'and resource link and line item exist' do
@@ -8959,12 +9061,31 @@ describe Assignment do
           expect(assignment.line_items).to be_empty
         end
 
-        context 'but when a LTI 1.3 tool is subsequently added' do
+        context 'but when a LTI 1.3 tool is subsequently added with an ID' do
           before do
             assignment.update!(external_tool_tag_attributes: { content: tool })
           end
 
           it_behaves_like 'line item and resource link existence check'
+        end
+
+        context 'but when an LTI 1.3 tool is added with a URL' do
+          before do
+            assignment.update!(external_tool_tag_attributes: { url: tool.url })
+            assignment.external_tool_tag.update_attribute(:content_id, nil)
+            assignment.external_tool_tag.update_attribute(:content_type, nil)
+            assignment.save!
+          end
+
+          context 'and an LTI 1.1 and LTI 1.3 tool exist with the same URL' do
+            before do
+              lti_1_1_tool = tool.dup
+              lti_1_1_tool.use_1_3 = false
+              lti_1_1_tool.save!
+            end
+
+            it_behaves_like 'line item and resource link existence check'
+          end
         end
       end
     end

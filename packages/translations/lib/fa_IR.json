@@ -35,8 +35,14 @@
     "assignments_1e02582c": {
         "message": "تکلیف ها"
     },
+    "attributes_963ba262": {
+        "message": "ویژگی ها"
+    },
     "available_folders_694d0436": {
         "message": "پوشه های موجود"
+    },
+    "c_2001_acme_inc_283f7f80": {
+        "message": "(c) 2001 Acme Inc."
     },
     "calendar_a8563bb2": {
         "message": "تقویم:"
@@ -47,8 +53,8 @@
     "cancel_caeb1e68": {
         "message": "لغو"
     },
-    "canvas_plugins_705a5016": {
-        "message": "افزونه های کانواس"
+    "choose_usage_rights_33683854": {
+        "message": "انتخاب حقوق استفاده..."
     },
     "clear_selected_file_82388e50": {
         "message": "پاک کردن فایل انتخاب شده"
@@ -68,8 +74,14 @@
     "computer_1d7dfa6f": {
         "message": "کامپیوتر"
     },
+    "content_1440204b": {
+        "message": "محتوا"
+    },
     "content_type_2cf90d95": {
         "message": "نوع محتوا"
+    },
+    "copyright_holder_66ee111": {
+        "message": "دارنده حق نشر:"
     },
     "count_plural_one_item_loaded_other_items_loaded_857023b7": {
         "message": "{ count, plural,\n    one {}\n  other {}\n}"
@@ -88,6 +100,12 @@
     },
     "course_navigation_dd035109": {
         "message": "پیمایش درس"
+    },
+    "creative_commons_license_725584ae": {
+        "message": "مجوز کریتیو کامنز:"
+    },
+    "current_volume_level_c55ab825": {
+        "message": "سطح حجم فعلی"
     },
     "custom_6979cd81": {
         "message": "سفارشی"
@@ -128,6 +146,9 @@
     "drag_a_file_here_39357b48": {
         "message": "کشیدن فایل اینجا"
     },
+    "drag_and_drop_or_click_to_browse_your_computer_60772d6d": {
+        "message": "بکشید و رها کنید، یا برای مرور رایانه کلیک کنید"
+    },
     "due_5d7267be": {
         "message": "مهلت:"
     },
@@ -152,6 +173,12 @@
     "excused_cf8792eb": {
         "message": "معاف شد"
     },
+    "external_tools_6e77821": {
+        "message": "ابزارهای بیرونی"
+    },
+    "file_name_8fd421ff": {
+        "message": "نام فایل"
+    },
     "file_upload_failed_af22dd91": {
         "message": "آپلود پرونده انجام نشد"
     },
@@ -163,6 +190,9 @@
     },
     "files_index_af7c662b": {
         "message": "فهرست فایل ها"
+    },
+    "finish_bc343002": {
+        "message": "پایان"
     },
     "folder_tree_fbab0726": {
         "message": "درخت پوشه"
@@ -184,6 +214,12 @@
     },
     "group_navigation_99f191a": {
         "message": "پیمایش گروه"
+    },
+    "i_have_obtained_permission_to_use_this_file_6386f087": {
+        "message": "مجوز استفاده از این فایل را به دست آورده ام."
+    },
+    "i_hold_the_copyright_71ee91b1": {
+        "message": "حق نشر دارم"
     },
     "image_8ad06": {
         "message": "تصویر"
@@ -263,6 +299,9 @@
     "media_af190855": {
         "message": "رسانه"
     },
+    "mic_a7f3d311": {
+        "message": "میکروفون"
+    },
     "missing_1a256b3b": {
         "message": "جا افتاده"
     },
@@ -287,6 +326,9 @@
     "no_results_940393cf": {
         "message": "No results."
     },
+    "no_video_1ed00b26": {
+        "message": "بدون تصویر"
+    },
     "nothing_for_now_e3e3ce2a": {
         "message": "چیزی در حال حاضر موجود نیست"
     },
@@ -302,17 +344,29 @@
     "pages_e5414c2c": {
         "message": "صفحه ها"
     },
+    "pause_12af3bb4": {
+        "message": "مکث"
+    },
     "peer_review_74f26a13": {
         "message": "بازبینی گروهی"
     },
     "people_b4ebb13c": {
         "message": "افراد"
     },
+    "play_1a47eaa7": {
+        "message": "نمایش"
+    },
+    "please_allow_canvas_to_access_your_microphone_and__dc2c3079": {
+        "message": "لطفاً به Canvas اجازه دهید تا به میکروفون و وب کم شما دسترسی پیدا کند."
+    },
     "points_bceb5005": {
         "message": "امتیازها"
     },
     "preview_53003fd2": {
         "message": "پیش‌نمایش"
+    },
+    "preview_a3f8f854": {
+        "message": "پیش نمایش"
     },
     "previous_month_bb1e3c84": {
         "message": "ماه قبل"
@@ -359,6 +413,9 @@
     "something_went_wrong_89195131": {
         "message": "اشکالی رخ داده است."
     },
+    "something_went_wrong_accessing_your_mic_or_webcam_6e3cad12": {
+        "message": "در دسترسی به میکروفون یا وب کم مشکلی پیش آمد."
+    },
     "something_went_wrong_d238c551": {
         "message": "مشکلی پیش آمد"
     },
@@ -367,6 +424,9 @@
     },
     "start_over_f7552aa9": {
         "message": "شروع دوباره"
+    },
+    "start_recording_9a65141a": {
+        "message": "شروع ضبط"
     },
     "submit_a3cc6859": {
         "message": "ارسال"
@@ -382,6 +442,12 @@
     },
     "text_7f4593da": {
         "message": "متن"
+    },
+    "the_material_is_in_the_public_domain_279c39a3": {
+        "message": "مطلب در دامنه عمومی است"
+    },
+    "the_material_is_licensed_under_creative_commons_3242cb5e": {
+        "message": "مطلب تحت مجوز کریتیو کامنز است"
     },
     "time_2b5aac58": {
         "message": "زمان"
@@ -404,6 +470,9 @@
     "unpublished_dfd8801": {
         "message": "منتشر نشده"
     },
+    "untitled_16aa4f2b": {
+        "message": "بدون عنوان"
+    },
     "upload_file_fd2361b8": {
         "message": "بارگذاری فایل"
     },
@@ -416,11 +485,17 @@
     "url_22a5f3b8": {
         "message": "نشانی اینترنتی"
     },
+    "usage_right_ff96f3e2": {
+        "message": "حق استفاده:"
+    },
     "use_arrow_keys_to_navigate_options_2021cc50": {
         "message": "برای حرکت به گزینه ها از کلیدهای جهت دار استفاده کنید."
     },
     "video_player_b371005": {
         "message": "پخش کننده فیلم"
+    },
+    "webcam_fe91b20f": {
+        "message": "دوربین"
     },
     "wiki_home_9cd54d0": {
         "message": "صفحه اصلی ویکی"
@@ -430,5 +505,8 @@
     },
     "yesterday_c6bd6abf": {
         "message": "دیروز"
+    },
+    "your_webcam_may_already_be_in_use_6cd64c25": {
+        "message": "وب کم شما ممکن است در حال استفاده باشد."
     }
 }

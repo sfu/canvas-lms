@@ -489,7 +489,7 @@ class ActiveRecord::Base
     result = if ActiveRecord::Base.configurations[Rails.env]['adapter'] == 'postgresql'
       sql = ''
       sql << "SELECT NULL AS #{column} WHERE EXISTS (SELECT * FROM #{quoted_table_name} WHERE #{column} IS NULL) UNION ALL (" if include_nil
-      sql << <<-SQL
+      sql << <<~SQL
         WITH RECURSIVE t AS (
           SELECT MIN(#{column}) AS #{column} FROM #{quoted_table_name}
           UNION ALL
@@ -720,11 +720,11 @@ class ActiveRecord::Base
   # do _NOT_ improve in the future to handle validations and callbacks - make
   # it a separate method or optional functionality. some callers explicitly
   # rely on no callbacks or validations
-  def save_without_transaction
+  def save_without_transaction(touch: true)
     return unless changed?
-    self.updated_at = Time.now.utc
+    self.updated_at = Time.now.utc if touch
     if new_record?
-      self.created_at = updated_at
+      self.created_at = updated_at if touch
       self.id = self.class._insert_record(attributes_with_values(changed_attribute_names_to_save))
       @new_record = false
     else
@@ -1163,7 +1163,7 @@ module UpdateAndDeleteWithJoins
     join_conditions = []
     joins_sql.strip.split('INNER JOIN')[1..-1].each do |join|
       # this could probably be improved
-      raise "PostgreSQL update_all/delete_all only supports INNER JOIN" unless join.strip =~ /([a-zA-Z0-9'"_\.]+(?:(?:\s+[aA][sS])?\s+[a-zA-Z0-9'"_]+)?)\s+ON\s+(.*)/
+      raise "PostgreSQL update_all/delete_all only supports INNER JOIN" unless join.strip =~ /([a-zA-Z0-9'"_\.]+(?:(?:\s+[aA][sS])?\s+[a-zA-Z0-9'"_]+)?)\s+ON\s+(.*)/m
       tables << $1
       join_conditions << $2
     end
@@ -1291,7 +1291,7 @@ ActiveRecord::ConnectionAdapters::AbstractAdapter.class_eval do
     keys = records.first.keys
     quoted_keys = keys.map{ |k| quote_column_name(k) }.join(', ')
     records.each do |record|
-      execute <<-SQL
+      execute <<~SQL
         INSERT INTO #{quote_table_name(table_name)}
           (#{quoted_keys})
         VALUES

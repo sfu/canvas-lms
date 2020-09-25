@@ -49,6 +49,7 @@ import {
 const RestoreAutoSaveModal = React.lazy(() => import('./RestoreAutoSaveModal'))
 
 const ASYNC_FOCUS_TIMEOUT = 250
+const DEFAULT_RCE_HEIGHT = '400'
 
 // we  `require` instead of `import` these 2 css files because the ui-themeable babel require hook only works with `require`
 const styles = require('../skins/skin-delta.css')
@@ -177,7 +178,8 @@ class RCEWrapper extends React.Component {
       })
     ),
     tinymce: PropTypes.object,
-    trayProps
+    trayProps,
+    instRecordDisabled: PropTypes.bool
   }
 
   static defaultProps = {
@@ -246,6 +248,15 @@ class RCEWrapper extends React.Component {
 
   setCode(newContent) {
     this.mceInstance().setContent(newContent)
+  }
+
+  // This function is called imperatively by the page that renders the RCE.
+  // It should be called when the RCE content is done being edited.
+  RCEClosed() {
+    // We want to clear the autosaved content, since the page was legitimately closed.
+    if (this.storage) {
+      this.storage.removeItem(this.autoSaveKey)
+    }
   }
 
   indicateEditor(element) {
@@ -665,7 +676,6 @@ class RCEWrapper extends React.Component {
     }
     // Probably should do this in tinymce.scss, but we only want it in new rce
     this.getTextarea().style.resize = 'none'
-    editor.on('Change', this.doAutoResize)
     editor.on('ExecCommand', this._forceCloseFloatingToolbar)
     editor.on('keydown', this.handleKey)
 
@@ -731,16 +741,6 @@ class RCEWrapper extends React.Component {
     })
   }
 
-  doAutoResize = e => {
-    const ifr = this.iframe
-    if (ifr) {
-      const contentElm = ifr.contentDocument.documentElement
-      if (contentElm.scrollHeight > contentElm.clientHeight) {
-        this.onResize(e, {deltaY: contentElm.scrollHeight - contentElm.clientHeight})
-      }
-    }
-  }
-
   /* ********** autosave support *************** */
   initAutoSave = editor => {
     this.storage = window.localStorage
@@ -753,12 +753,19 @@ class RCEWrapper extends React.Component {
       try {
         const autosaved = this.getAutoSaved(this.autoSaveKey)
         if (autosaved && autosaved.content) {
-          const editorContent = editor.getContent({no_events: true})
-          const autosavedContent = this.patchAutosavedContent(autosaved.content)
-          if (autosaved.content !== editorContent) {
+          // We'll compare just the text of the autosave content, since
+          // Canvas is prone to swizzling images and iframes which will
+          // make the editor content and autosave content never match up
+          const editorContent = this.patchAutosavedContent(
+            editor.getContent({no_events: true}),
+            true
+          )
+          const autosavedContent = this.patchAutosavedContent(autosaved.content, true)
+
+          if (autosavedContent !== editorContent) {
             this.setState({
               confirmAutoSave: true,
-              autoSavedContent: autosavedContent
+              autoSavedContent: this.patchAutosavedContent(autosaved.content)
             })
           } else {
             this.storage.removeItem(this.autoSaveKey)
@@ -806,12 +813,13 @@ class RCEWrapper extends React.Component {
   // because the data url gets converted to a blob, which is not valid when restored.
   // besides, the placeholder is intended to be temporary while the file
   // is being uploaded
-  patchAutosavedContent(content) {
+  patchAutosavedContent(content, asText) {
     const temp = document.createElement('div')
     temp.innerHTML = content
     temp.querySelectorAll('img[data-placeholder-for]').forEach(placeholder => {
       placeholder.parentElement.removeChild(placeholder)
     })
+    if (asText) return temp.textContent
     return temp.innerHTML
   }
 
@@ -960,12 +968,14 @@ class RCEWrapper extends React.Component {
     const setupCallback = options.setup
 
     const canvasPlugins = ['instructure_links', 'instructure_image', 'instructure_documents']
-    if (!ENV.RICH_CONTENT_INST_RECORD_TAB_DISABLED) {
+    if (!this.props.instRecordDisabled) {
       canvasPlugins.splice(2, 0, 'instructure_record')
     }
 
     return {
       ...options,
+
+      height: options.height || DEFAULT_RCE_HEIGHT,
 
       block_formats: [
         `${formatMessage('Heading 2')}=h2`,
@@ -1106,7 +1116,6 @@ class RCEWrapper extends React.Component {
 
         this.mceInstance().show()
         this.mceInstance().focus()
-        this.doAutoResize()
       }
     }
   }

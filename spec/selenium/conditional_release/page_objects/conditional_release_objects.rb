@@ -27,7 +27,7 @@ class ConditionalReleaseObjects
     # Assignment Index Page
 
     def assignment_kebob(page_title)
-      fxpath("//a[.//*[text() = 'Settings for Assignment #{page_title}']]")
+      fxpath("//button[.//*[text() = 'Settings for Assignment #{page_title}']]")
     end
 
     def edit_assignment(page_title)
@@ -74,6 +74,14 @@ class ConditionalReleaseObjects
 
     def division_cutoff2
       f("[title='Division cutoff 2']")
+    end
+
+    def must_not_be_empty_exists?
+      element_exists?("//*[contains(@id,'error') and contains(text(),'must not be empty')]", true)
+    end
+
+    def these_scores_are_out_of_order_exists?
+      element_exists?("//*[contains(@id,'error') and contains(text(),'these scores are out of order')]", true)
     end
 
     # Common Selectors

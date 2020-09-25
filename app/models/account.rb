@@ -129,6 +129,7 @@ class Account < ActiveRecord::Base
   before_save :ensure_defaults
   before_create :enable_sis_imports, if: :root_account?
   after_save :update_account_associations_if_changed
+  after_save :check_downstream_caches
 
   before_save :setup_cache_invalidation
   after_save :invalidate_caches_if_changed
@@ -203,22 +204,26 @@ class Account < ActiveRecord::Base
     MultiCache.delete(root_account_cache_key)
   end
 
-  def default_locale(recurse = false)
-    result = read_attribute(:default_locale)
-    if recurse && !result && parent_account
-      unless instance_variable_defined?(:@cached_parent_locale)
-        @cached_parent_locale = Rails.cache.fetch(['default_locale', self.global_id].cache_key) do
-          parent_account.default_locale(true)
-        end
+  def self.recursive_default_locale_for_id(account_id)
+    local_id, shard = Shard.local_id_for(account_id)
+    (shard || Shard.current).activate do
+      obj = Account.new(id: local_id) # someday i should figure out a better way to avoid instantiating an object instead of tricking cache register
+      Rails.cache.fetch_with_batched_keys('default_locale_for_id', batch_object: obj, batched_keys: [:account_chain, :default_locale]) do
+        # couldn't find the cache so now we actually need to find the account
+        acc = Account.find(local_id)
+        acc.default_locale || (acc.parent_account_id && recursive_default_locale_for_id(acc.parent_account_id))
       end
-      result = @cached_parent_locale
     end
+  end
+
+  def default_locale
+    result = read_attribute(:default_locale)
     result = nil unless I18n.locale_available?(result)
     result
   end
 
   def resolved_outcome_proficiency
-    outcome_proficiency || parent_account&.resolved_outcome_proficiency
+    outcome_proficiency&.active? ? outcome_proficiency : parent_account&.resolved_outcome_proficiency
   end
 
   def resolved_outcome_calculation_method
@@ -326,9 +331,6 @@ class Account < ActiveRecord::Base
   # privacy settings for root accounts
   add_setting :enable_fullstory, boolean: true, root_only: true, default: true
   add_setting :enable_google_analytics, boolean: true, root_only: true, default: true
-
-  add_setting :lock_outcome_proficiency, boolean: true, default: false, inheritable: true
-  add_setting :lock_proficiency_calculation, boolean: true, default: false, inheritable: true
 
   def settings=(hash)
     if hash.is_a?(Hash) || hash.is_a?(ActionController::Parameters)
@@ -518,8 +520,21 @@ class Account < ActiveRecord::Base
   def update_account_associations_if_changed
     if self.saved_change_to_parent_account_id? || self.saved_change_to_root_account_id?
       self.shard.activate do
-        send_later_if_production(:clear_downstream_caches, :account_chain)
         send_later_if_production(:update_account_associations)
+      end
+    end
+  end
+
+  def check_downstream_caches
+    keys_to_clear = []
+    keys_to_clear << :account_chain if self.saved_change_to_parent_account_id? || self.saved_change_to_root_account_id?
+    if self.saved_change_to_brand_config_md5? || (@old_settings && @old_settings[:sub_account_includes] != settings[:sub_account_includes])
+      keys_to_clear << :brand_config
+    end
+    keys_to_clear << :default_locale if self.saved_change_to_default_locale?
+    if keys_to_clear.any?
+      self.shard.activate do
+        send_later_if_production(:clear_downstream_caches, *keys_to_clear)
       end
     end
   end
@@ -553,8 +568,8 @@ class Account < ActiveRecord::Base
     {}.freeze
   end
 
-  def domain
-    HostUrl.context_host(self)
+  def domain(current_host = nil)
+    HostUrl.context_host(self, current_host)
   end
 
   def self.find_by_domain(domain)
@@ -698,7 +713,6 @@ class Account < ActiveRecord::Base
       # apparently, the try_rescues are because these columns don't exist on old migrations
       @invalidations += ['default_storage_quota', 'current_quota'] if invalidate_all || self.try_rescue(:default_storage_quota_changed?)
       @invalidations << 'default_group_storage_quota' if invalidate_all || self.try_rescue(:default_group_storage_quota_changed?)
-      @invalidations << 'default_locale' if invalidate_all || self.try_rescue(:default_locale_changed?)
     end
   end
 
@@ -854,7 +868,7 @@ class Account < ActiveRecord::Base
       shackles_env = Account.connection.open_transactions == 0 ? :slave : Shackles.environment
       Shackles.activate(shackles_env) do
         chain.concat(Shard.shard_for(starting_account_id).activate do
-          Account.find_by_sql(<<-SQL)
+          Account.find_by_sql(<<~SQL)
                 WITH RECURSIVE t AS (
                   SELECT * FROM #{Account.quoted_table_name} WHERE id=#{Shard.local_id_for(starting_account_id).first}
                   UNION
@@ -879,7 +893,7 @@ class Account < ActiveRecord::Base
 
         if starting_account_id
           Shackles.activate(:slave) do
-            ids = Account.connection.select_values(<<-SQL)
+            ids = Account.connection.select_values(<<~SQL)
                   WITH RECURSIVE t AS (
                     SELECT * FROM #{Account.quoted_table_name} WHERE id=#{Shard.local_id_for(starting_account_id).first}
                     UNION
@@ -901,7 +915,7 @@ class Account < ActiveRecord::Base
     if connection.adapter_name == 'PostgreSQL'
       original_shard = Shard.current
       Shard.partition_by_shard(starting_account_ids) do |sliced_acc_ids|
-        ids = Account.connection.select_values(<<-SQL)
+        ids = Account.connection.select_values(<<~SQL)
               WITH RECURSIVE t AS (
                 SELECT * FROM #{Account.quoted_table_name} WHERE id IN (#{sliced_acc_ids.join(", ")})
                 UNION
@@ -948,7 +962,7 @@ class Account < ActiveRecord::Base
   # build our own query string
   def sub_accounts_recursive(limit, offset)
     if ActiveRecord::Base.configurations[Rails.env]['adapter'] == 'postgresql'
-      Account.find_by_sql([<<-SQL, self.id, limit.to_i, offset.to_i])
+      Account.find_by_sql([<<~SQL, self.id, limit.to_i, offset.to_i])
           WITH RECURSIVE t AS (
             SELECT * FROM #{Account.quoted_table_name}
             WHERE parent_account_id = ? AND workflow_state <>'deleted'
@@ -1012,7 +1026,7 @@ class Account < ActiveRecord::Base
 
   def available_account_roles(include_inactive=false, user = nil)
     account_roles = available_custom_account_roles(include_inactive)
-    account_roles << Role.get_built_in_role('AccountAdmin')
+    account_roles << Role.get_built_in_role('AccountAdmin', root_account_id: resolved_root_account_id)
     if user
       account_roles.select! { |role| au = account_users.new; au.role_id = role.id; au.grants_right?(user, :create) }
     end
@@ -1025,7 +1039,7 @@ class Account < ActiveRecord::Base
 
   def available_course_roles(include_inactive=false)
     course_roles = available_custom_course_roles(include_inactive)
-    course_roles += Role.built_in_course_roles
+    course_roles += Role.built_in_course_roles(root_account_id: resolved_root_account_id)
     course_roles
   end
 
@@ -1050,7 +1064,7 @@ class Account < ActiveRecord::Base
   end
 
   def get_role_by_name(role_name)
-    if (role = Role.get_built_in_role(role_name))
+    if (role = Role.get_built_in_role(role_name, root_account_id: self.resolved_root_account_id))
       return role
     end
 
@@ -1491,7 +1505,9 @@ class Account < ActiveRecord::Base
   end
 
   def self.update_all_update_account_associations
-    Account.root_accounts.active.non_shadow.find_each(&:update_account_associations)
+    Account.root_accounts.active.non_shadow.find_in_batches(strategy: :pluck_ids) do |account_batch|
+      account_batch.each(&:update_account_associations)
+    end
   end
 
   def course_count
@@ -1724,7 +1740,7 @@ class Account < ActiveRecord::Base
       if allowed_service_names.count > 0
         unless [ '+', '-' ].member?(allowed_service_names[0][0,1])
           # This account has a hard-coded list of services, so we clear out the defaults
-          account_allowed_services = { }
+          account_allowed_services = AccountServices::AllowedServicesHash.new
         end
 
         allowed_service_names.each do |service_switch|
@@ -1889,9 +1905,23 @@ class Account < ActiveRecord::Base
       default_enrollment_term
       enable_canvas_authentication
       TermsOfService.ensure_terms_for_account(self, true) if self.root_account? && !TermsOfService.skip_automatic_terms_creation
+      create_built_in_roles if self.root_account?
     end
     return work.call if Rails.env.test?
     self.class.connection.after_transaction_commit(&work)
+  end
+
+  def create_built_in_roles
+    self.shard.activate do
+      Role::BASE_TYPES.each do |base_type|
+        role = Role.new
+        role.name = base_type
+        role.base_role_type = base_type
+        role.workflow_state = :built_in
+        role.root_account_id = self.id
+        role.save!
+      end
+    end
   end
 
   def migrate_to_canvadocs?
@@ -2001,4 +2031,8 @@ class Account < ActiveRecord::Base
 
   relation_delegate_class(ActiveRecord::Relation).prepend(DomainRootAccountCache)
   relation_delegate_class(ActiveRecord::AssociationRelation).prepend(DomainRootAccountCache)
+
+  def self.ensure_dummy_root_account
+    Account.find_or_create_by!(id: 0) if Rails.env.test?
+  end
 end

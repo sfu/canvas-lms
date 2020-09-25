@@ -303,7 +303,7 @@ class GradebookImporter
 
   def process_custom_column_headers(row)
     row.each_with_index do |header_column, index|
-      next if GRADEBOOK_IMPORTER_RESERVED_NAMES.include?(header_column) && Account.site_admin.feature_enabled?(:gradebook_reserved_importer_bugfix)
+      next if GRADEBOOK_IMPORTER_RESERVED_NAMES.include?(header_column)
       gradebook_column = custom_gradebook_columns.detect { |column| column.title == header_column }
       next if gradebook_column.blank?
 
@@ -482,7 +482,7 @@ class GradebookImporter
     importer_submissions = []
     @assignments.each_with_index do |assignment, idx|
       assignment_id = assignment.new_record? ? assignment.id : assignment.previous_id
-      grade = row[idx + @student_columns]
+      grade = row[idx + @student_columns]&.strip
       if !assignment_visible_to_student(student, assignment, assignment_id, @visible_assignments)
         grade = ''
       end
@@ -535,11 +535,7 @@ class GradebookImporter
   protected
 
   def custom_gradebook_columns
-    @custom_gradebook_columns ||= if Account.site_admin.feature_enabled?(:gradebook_reserved_importer_bugfix)
-      @context.custom_gradebook_columns.active.to_a
-    else
-      @context.custom_gradebook_columns.to_a
-    end
+    @custom_gradebook_columns ||= @context.custom_gradebook_columns.active.to_a
   end
 
   def identify_delimiter(rows)

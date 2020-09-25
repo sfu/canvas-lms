@@ -242,12 +242,16 @@ Rails.configuration.after_initialize do
     with_each_shard_by_database(ObserverAlert, :clean_up_old_alerts)
   end
 
-  Delayed::Periodic.cron 'ObserverAlert.create_assignment_missing_alerts', '*/5 * * * *', priority: Delayed::LOW_PRIORITY do
+  Delayed::Periodic.cron 'ObserverAlert.create_assignment_missing_alerts', '*/15 * * * *', priority: Delayed::LOW_PRIORITY do
     with_each_shard_by_database(ObserverAlert, :create_assignment_missing_alerts)
   end
 
   Delayed::Periodic.cron 'Lti::KeyStorage.rotate_keys', '0 0 1 * *', priority: Delayed::LOW_PRIORITY do
     Lti::KeyStorage.rotate_keys
+  end
+
+  Delayed::Periodic.cron 'Canvas::Oauth::KeyStorage.rotate_keys', '0 0 1 * *', priority: Delayed::LOW_PRIORITY do
+    Canvas::Oauth::KeyStorage.rotate_keys
   end
 
   Delayed::Periodic.cron 'abandoned job cleanup', '*/10 * * * *' do

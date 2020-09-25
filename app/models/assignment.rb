@@ -1052,6 +1052,16 @@ class Assignment < ActiveRecord::Base
     end
   end
 
+  def prepare_for_ags_if_needed!(tool)
+    # Don't do anything unless the tool is AGS ready
+    return unless tool&.use_1_3? && tool.developer_key.present?
+
+    # The assignment is already AGS ready
+    return if line_items.active.present?
+
+    update_line_items
+  end
+
   def create_assignment_line_item!
     update_line_items
   end
@@ -1083,8 +1093,12 @@ class Assignment < ActiveRecord::Base
     if lti_1_3_external_tool_tag? && line_items.empty?
       rl = Lti::ResourceLink.create!(
         resource_link_id: lti_context_id,
-        context_external_tool: ContextExternalTool.from_content_tag(external_tool_tag, context)
+        context_external_tool: ContextExternalTool.from_content_tag(
+          external_tool_tag,
+          context
+        )
       )
+
       line_items.create!(label: title, score_maximum: points_possible, resource_link: rl, coupled: true)
     elsif saved_change_to_title? || saved_change_to_points_possible?
       line_items.
@@ -1099,7 +1113,10 @@ class Assignment < ActiveRecord::Base
     return false unless external_tool_tag&.content_type == "ContextExternalTool"
 
     # Lookup the tool and check if the LTI version is 1.3
-    ContextExternalTool.from_content_tag(external_tool_tag, context)&.use_1_3?
+    ContextExternalTool.from_content_tag(
+      external_tool_tag,
+      context
+    )&.use_1_3?
   end
   private :lti_1_3_external_tool_tag?
 
@@ -2337,12 +2354,16 @@ class Assignment < ActiveRecord::Base
   # for file naming (how we're sending it down to the teacher) is
   # last_name_first_name_user_id_attachment_id.
   # extension
-  def generate_comments_from_files_later(attachment_data, user)
+  def generate_comments_from_files_later(attachment_data, user, attachment_id = nil)
     progress = Progress.create!(context: self, tag: "submissions_reupload") do |p|
       p.user = user
     end
 
-    attachment = user.attachments.create!(attachment_data)
+    if attachment_id.present?
+      attachment = user.attachments.find_by(id: attachment_id)
+    end
+
+    attachment ||= user.attachments.create!(attachment_data)
     progress.process_job(self, :generate_comments_from_files, {}, attachment, user, progress)
     progress
   end
@@ -2388,9 +2409,11 @@ class Assignment < ActiveRecord::Base
         }
       end
 
+      comment_submission = comment.submission
       submission = {
-        user_id: comment.submission.user_id,
-        user_name: comment.submission.user.name
+        user_id: comment_submission.user_id,
+        user_name: comment_submission.user.name,
+        anonymous_id: comment_submission.anonymous_id
       }
 
       results[:comments].push({
@@ -2639,7 +2662,7 @@ class Assignment < ActiveRecord::Base
     else
       user_ids = Array.wrap(user_ids).join(',')
       course_ids = Array.wrap(course_ids_that_have_da_enabled).join(',')
-      scope = joins(sanitize_sql([<<-SQL, course_ids, user_ids]))
+      scope = joins(sanitize_sql([<<~SQL, course_ids, user_ids]))
         LEFT OUTER JOIN #{AssignmentStudentVisibility.quoted_table_name} ON (
          assignment_student_visibilities.assignment_id = assignments.id
          AND assignment_student_visibilities.course_id IN (%s)
@@ -3287,6 +3310,18 @@ class Assignment < ActiveRecord::Base
     return true if final_grader_id == user.id || context.account_membership_allows(user, :select_final_grade)
 
     grader_comments_visible_to_graders?
+  end
+
+  # This only checks whether this assignment allows score statistics to be shown.
+  # You must also check submission.eligible_for_showing_score_statistics
+  def can_view_score_statistics?(user)
+    # The assignment must have points_possible > 0,
+    return false unless (points_possible.present? && points_possible > 0)
+
+    # Students can only see statistics when count >= 5 and not disabled by the instructor
+    # Instructor can see statistics at any time.
+    count = score_statistic&.count || 0
+    context.grants_right?(user, :read_as_admin) || (count >= 5 && !context.hide_distribution_graphs)
   end
 
   def grader_ids_to_anonymous_ids

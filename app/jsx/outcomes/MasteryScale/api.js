@@ -18,8 +18,31 @@
 
 import axios from 'axios'
 
-export const fetchProficiency = accountId =>
-  axios.get(`/api/v1/accounts/${accountId}/outcome_proficiency`)
+import {gql} from 'jsx/canvas-apollo'
 
-export const saveProficiency = (accountId, config) =>
-  axios.post(`/api/v1/accounts/${accountId}/outcome_proficiency`, config)
+export const OUTCOME_PROFICIENCY_QUERY = gql`
+  query GetOutcomeProficiencyData($contextId: ID!) {
+    account(id: $contextId) {
+      outcomeProficiency {
+        _id
+        contextId
+        contextType
+        proficiencyRatingsConnection {
+          nodes {
+            _id
+            color
+            description
+            mastery
+            points
+          }
+        }
+      }
+    }
+  }
+`
+
+export const fetchProficiency = (contextType, contextId) =>
+  axios.get(`/api/v1/accounts/${contextId}/outcome_proficiency`)
+
+export const saveProficiency = (contextType, contextId, config) =>
+  axios.post(`/api/v1/accounts/${contextId}/outcome_proficiency`, config)

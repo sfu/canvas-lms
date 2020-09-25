@@ -16,27 +16,18 @@
 # with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-class CreateMutationAuditLog < ActiveRecord::Migration[5.1]
-  tag :predeploy
+module Api::V1::HistoryEntry
+  include Api::V1::Json
 
-  include Canvas::DynamoDB::Migration
-
-  category :auditors
-
-  def self.up
-    create_table table_name: :graphql_mutations,
-      ttl_attribute: "expires",
-      attribute_definitions: [
-        {attribute_name: "object_id", attribute_type: "S"},
-        {attribute_name: "mutation_id", attribute_type: "S"},
-      ],
-      key_schema: [
-        {attribute_name: "object_id", key_type: "HASH"},
-        {attribute_name: "mutation_id", key_type: "RANGE"},
-      ]
-  end
-
-  def self.down
-    delete_table table_name: :graphql_mutations
+  def history_entry_json(page_view, asset_user_access, user, session)
+    entry = api_json(asset_user_access, user, session, only: %w(asset_code context_type context_id))
+    entry['visited_at'] = page_view.created_at
+    entry['visited_url'] = page_view.url
+    entry['interaction_seconds'] = page_view.interaction_seconds
+    entry['asset_icon'] = asset_user_access.icon
+    entry['asset_readable_category'] = asset_user_access.readable_category
+    entry['asset_name'] = asset_user_access.readable_name(include_group_name: false)
+    entry['context_name'] = asset_user_access.context.nickname_for(user)
+    entry
   end
 end

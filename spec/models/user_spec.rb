@@ -1046,7 +1046,9 @@ describe User do
     end
 
     it "should check both active and concluded courses" do
-      expect(@student1.check_courses_right?(@teacher1, :manage_wiki)).to be_truthy
+      expect(@student1.check_courses_right?(@teacher1, :manage_wiki_create)).to be_truthy
+      expect(@student1.check_courses_right?(@teacher1, :manage_wiki_update)).to be_truthy
+      expect(@student1.check_courses_right?(@teacher1, :manage_wiki_delete)).to be_truthy
       expect(@student2.check_courses_right?(@teacher2, :read_forum)).to be_truthy
       @concluded_course.grants_right?(@teacher2, :manage_wiki)
     end
@@ -2772,9 +2774,9 @@ describe User do
         # create account on another shard
         account = @shard1.activate{ Account.create! }
         # associate target user with that account
-        account_admin_user(user: target, account: account, role: Role.get_built_in_role('AccountMembership'))
+        account_admin_user(user: target, account: account, role: Role.get_built_in_role('AccountMembership', root_account_id: account.id))
         # create seeking user as admin on that account
-        seeker = account_admin_user(account: account, role: Role.get_built_in_role('AccountAdmin'))
+        seeker = account_admin_user(account: account, role: Role.get_built_in_role('AccountAdmin', root_account_id: account.id))
         # ensure seeking user gets permissions it should on target user
         expect(target.grants_right?(seeker, :view_statistics)).to be_truthy
       end
@@ -2784,9 +2786,9 @@ describe User do
         # create account on another shard
         account = @shard1.activate{ Account.create! }
         # associate target user with that account
-        account_admin_user(user: target, account: account, role: Role.get_built_in_role('AccountMembership'))
+        account_admin_user(user: target, account: account, role: Role.get_built_in_role('AccountMembership', root_account_id: account.id))
         # create seeking user as admin on that account
-        seeker = account_admin_user(account: account, role: Role.get_built_in_role('AccountAdmin'))
+        seeker = account_admin_user(account: account, role: Role.get_built_in_role('AccountAdmin', root_account_id: account.id))
         allow(seeker).to receive(:associated_shards).and_return([])
         # ensure seeking user gets permissions it should on target user
         expect(target.grants_right?(seeker, :view_statistics)).to eq true
@@ -3405,6 +3407,19 @@ describe User do
       it "returns true" do
         expect(user.prefers_no_celebrations?).to eq true
       end
+    end
+  end
+
+  describe "#prefers_no_keyboard_shortcuts?" do
+    let(:user) { user_model }
+
+    it "returns false by default" do
+      expect(user.prefers_no_keyboard_shortcuts?).to eq false
+    end
+
+    it "returns true if user disables keyboard shortcuts" do
+      user.enable_feature!(:disable_keyboard_shortcuts)
+      expect(user.prefers_no_keyboard_shortcuts?).to eq true
     end
   end
 

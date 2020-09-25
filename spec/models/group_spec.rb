@@ -101,6 +101,15 @@ describe Group do
     expect(@group.inactive?).to eq false
   end
 
+  it "should set the root_account_id for GroupMemberships when bulk adding users" do
+    @account = account_model
+    group_model(group_category: @communities, is_public: true, context: @account)
+    @group.bulk_add_users_to_group([@user])
+    @group.group_memberships.each do |gm|
+      expect(gm.root_account_id).not_to be nil
+    end
+  end
+
   describe '#grading_standard_or_default' do
     context 'when the Group belongs to a Course' do
       it 'returns the grading scheme being used by the course, if one exists' do
@@ -244,7 +253,9 @@ describe Group do
     teacher = e.user
     group = course.groups.create
     expect(course.grants_right?(teacher, :manage_groups)).to be_truthy
-    expect(group.grants_right?(teacher, :manage_wiki)).to be_truthy
+    expect(group.grants_right?(teacher, :manage_wiki_create)).to be_truthy
+    expect(group.grants_right?(teacher, :manage_wiki_update)).to be_truthy
+    expect(group.grants_right?(teacher, :manage_wiki_delete)).to be_truthy
     expect(group.grants_right?(teacher, :manage_files)).to be_truthy
     expect(group.wiki.grants_right?(teacher, :update_page)).to be_truthy
     attachment = group.attachments.build

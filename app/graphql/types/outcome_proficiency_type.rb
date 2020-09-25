@@ -20,7 +20,10 @@ module Types
   class OutcomeProficiencyType < ApplicationObjectType
     description 'Customized proficiency ratings'
 
+    implements GraphQL::Types::Relay::Node
     implements Interfaces::LegacyIDInterface
+
+    global_id_field :id
 
     field :context_type, String, null: false
     field :context_id, Integer, null: false
@@ -28,12 +31,6 @@ module Types
     field :proficiency_ratings_connection, ProficiencyRatingType.connection_type, null: true
     def proficiency_ratings_connection
       object.outcome_proficiency_ratings
-    end
-
-    field :locked, Boolean, null: false
-    def locked
-      context = object.context
-      (context.is_a?(Account) ? context : context.account).lock_outcome_proficiency[:locked]
     end
   end
 end

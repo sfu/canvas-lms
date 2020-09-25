@@ -2216,7 +2216,7 @@ class CoursesController < ApplicationController
     params[:enrollment_type] ||= 'StudentEnrollment'
 
     custom_role = nil
-    if params[:role_id].present? || !Role.get_built_in_role(params[:enrollment_type])
+    if params[:role_id].present? || !Role.get_built_in_role(params[:enrollment_type], root_account_id: @context.root_account_id)
       custom_role = @context.account.get_role_by_id(params[:role_id]) if params[:role_id].present?
       custom_role ||= @context.account.get_role_by_name(params[:enrollment_type]) # backwards compatibility
       if custom_role && custom_role.course_role?
@@ -2751,7 +2751,7 @@ class CoursesController < ApplicationController
       end
 
       params_for_update[:conclude_at] = params[:course].delete(:end_at) if api_request? && params[:course].has_key?(:end_at)
-      @default_wiki_editing_roles_was = @course.default_wiki_editing_roles
+      @default_wiki_editing_roles_was = @course.default_wiki_editing_roles || "teachers"
 
       if params[:course].has_key?(:blueprint)
         master_course = value_to_boolean(params[:course].delete(:blueprint))

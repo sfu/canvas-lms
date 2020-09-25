@@ -20,10 +20,6 @@
 // the RCE's Media > Upload/Record Media function, it's not this one
 // (though this panel can handle video with the right "accept" prop).
 // See @instructure/canvas-media/src/ComputerPanel.js
-// On the other hand, becuase the VideoPlayer v5 doesn't forward onLoadedMetadata
-// to the underlying <video>, the sizing of the video preview is wrong.
-// This isn't a big issue because (1) this isn't the panel being used to upload
-// video, and (2) it will be fixed with MediaPlayer v7
 
 import React, {useCallback, useEffect, useRef, useState} from 'react'
 import {arrayOf, func, instanceOf, number, oneOfType, shape, string} from 'prop-types'
@@ -38,12 +34,17 @@ import {PresentationContent, ScreenReaderContent} from '@instructure/ui-a11y'
 import {IconTrashLine} from '@instructure/ui-icons'
 import {Img, Text, TruncateText} from '@instructure/ui-elements'
 import {Flex, View} from '@instructure/ui-layout'
-import {VideoPlayer} from '@instructure/ui-media-player'
+import {MediaPlayer} from '@instructure/ui-media-player'
 
 import {RocketSVG, useComputerPanelFocus, isAudio, sizeMediaPlayer} from '@instructure/canvas-media'
 
 import formatMessage from '../../../../format-message'
 import {getIconFromType, isAudioOrVideo, isImage, isText} from '../fileTypeUtils'
+
+function isPreviewableAudioOrVideo(type) {
+  // chrome reports .avi files as video/avi, firefox and safari as video/x-msvideo
+  return type !== 'video/avi' && type !== 'video/x-msvideo' && isAudioOrVideo(type)
+}
 
 function readFile(theFile) {
   const p = new Promise((resolve, reject) => {
@@ -67,8 +68,8 @@ function readFile(theFile) {
       reader.readAsDataURL(theFile)
     } else if (isText(theFile.type)) {
       reader.readAsText(theFile)
-    } else if (isAudioOrVideo(theFile.type)) {
-      const sources = [{label: theFile.name, src: URL.createObjectURL(theFile)}]
+    } else if (isPreviewableAudioOrVideo(theFile.type)) {
+      const sources = [{label: theFile.name, src: URL.createObjectURL(theFile), type: theFile.type}]
       resolve(sources)
     } else {
       const icon = getIconFromType(theFile.type)
@@ -83,6 +84,14 @@ export default function ComputerPanel({theFile, setFile, setError, accept, label
   const [preview, setPreview] = useState({preview: null, isLoading: false})
   const height = 0.8 * (bounds.height - 38 - px('1.5rem')) // the trashcan is 38px tall and the 1.5rem margin-bottom
   const width = 0.8 * bounds.width
+
+  useEffect(() => {
+    return () => {
+      if (Array.isArray(preview?.preview)) {
+        URL?.revokeObjectURL?.(preview.preview[0].src)
+      }
+    }
+  }, [preview])
 
   useEffect(() => {
     if (!theFile || preview.isLoading || preview.preview || preview.error) return
@@ -164,8 +173,8 @@ export default function ComputerPanel({theFile, setFile, setError, accept, label
             <TruncateText maxLines={21}>{preview.preview}</TruncateText>
           </View>
         )
-      } else if (isAudioOrVideo(theFile.type)) {
-        return <VideoPlayer sources={preview.preview} onLoadedMetadata={handleLoadedMetadata} />
+      } else if (isPreviewableAudioOrVideo(theFile.type)) {
+        return <MediaPlayer sources={preview.preview} onLoadedMetadata={handleLoadedMetadata} />
       } else {
         return (
           <div

@@ -177,6 +177,34 @@ describe "course rubrics" do
       expect(fj('.rubric_grading:hidden')).not_to be_nil
     end
 
+    context "with the account_level_mastery_scales FF enabled" do
+      before :each do
+        @course.account.enable_feature!(:account_level_mastery_scales)
+      end
+
+      it "should use the account outcome proficiency for mastery scales if one exists" do
+        proficiency = outcome_proficiency_model(@course.account)
+        rubric_association_model(:user => @user, :context => @course, :purpose => "grading")
+        outcome_model(:context => @course)
+
+        get "/courses/#{@course.id}/rubrics/#{@rubric.id}"
+        wait_for_ajaximations
+        import_outcome
+        points = proficiency.outcome_proficiency_ratings.map { |rating| round_if_whole(rating.points).to_s}
+        expect(ff('tr.learning_outcome_criterion td.rating .points').map(&:text)).to eq points
+      end
+
+      it "defaults to the the outcome ratings for mastery scales if no outcome proficiecy exists" do
+        rubric_association_model(:user => @user, :context => @course, :purpose => "grading")
+        outcome_model(:context => @course)
+
+        get "/courses/#{@course.id}/rubrics/#{@rubric.id}"
+        wait_for_ajaximations
+        import_outcome
+        points = @outcome.data[:rubric_criterion][:ratings].map { |c| round_if_whole(c[:points]).to_s }
+        expect(ff('tr.learning_outcome_criterion td.rating .points').map(&:text)).to eq points
+      end
+    end
   end
 
   it "should display free-form comments to the student" do
@@ -232,7 +260,7 @@ describe "course rubrics" do
     get "/courses/#{@course.id}/assignments/#{@assignment.id}/submissions/#{@student.id}"
     f('.assess_submission_link').click
     wait_for_ajaximations
-    expect(ff('.rubric-criterion:nth-of-type(1) .rating-tier').third).to have_class('selected')
+    expect(ff('tr[data-testid="rubric-criterion"]:nth-of-type(1) .rating-tier').third).to have_class('selected')
   end
 
   it "should not highlight a criterion level if score is nil" do
@@ -256,7 +284,7 @@ describe "course rubrics" do
     get "/courses/#{@course.id}/assignments/#{@assignment.id}/submissions/#{@student.id}"
     f('.assess_submission_link').click
     wait_for_ajaximations
-    ff('.rubric-criterion:nth-of-type(1) .rating-tier').each do |criterion|
+    ff('tr[data-testid="rubric-criterion"]:nth-of-type(1) .rating-tier').each do |criterion|
       expect(criterion).not_to have_class('selected')
     end
   end

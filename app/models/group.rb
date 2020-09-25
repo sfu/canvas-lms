@@ -261,7 +261,7 @@ class Group < ActiveRecord::Base
 
   def self.not_in_group_sql_fragment(groups)
     return nil if groups.empty?
-    sanitize_sql([<<-SQL, groups])
+    sanitize_sql([<<~SQL, groups])
       NOT EXISTS (SELECT * FROM #{GroupMembership.quoted_table_name} gm
       WHERE gm.user_id = users.id AND
       gm.workflow_state != 'deleted' AND
@@ -398,7 +398,8 @@ class Group < ActiveRecord::Base
         :workflow_state => 'accepted',
         :moderator => false,
         :created_at => current_time,
-        :updated_at => current_time
+        :updated_at => current_time,
+        :root_account_id => self.root_account_id
     }.merge(options)
     GroupMembership.bulk_insert(users.map{ |user|
       options.merge({:user_id => user.id, :uuid => CanvasSlug.generate_securish_uuid})
@@ -493,7 +494,6 @@ class Group < ActiveRecord::Base
     can :manage_calendar and
     can :manage_content and
     can :manage_files and
-    can :manage_wiki and
     can :manage_wiki_create and
     can :manage_wiki_delete and
     can :manage_wiki_update and
@@ -554,7 +554,6 @@ class Group < ActiveRecord::Base
       can :manage_content and
       can :manage_files and
       can :manage_students and
-      can :manage_wiki and
       can :manage_wiki_create and
       can :manage_wiki_delete and
       can :manage_wiki_update and

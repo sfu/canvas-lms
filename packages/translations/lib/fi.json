@@ -32,8 +32,8 @@
     "align_right_9bad3ac1": {
         "message": "Tasaa oikealle"
     },
-    "alignment_and_indentation_f7de34bf": {
-        "message": "Kohdistus ja tunnistus"
+    "alignment_and_lists_5cebcb69": {
+        "message": "Kohdistukset ja luettelot"
     },
     "all_4321c3a1": {
         "message": "Kaikki"
@@ -146,9 +146,6 @@
     "canvas_planner_98ed106": {
         "message": "Canvas-kalenteri"
     },
-    "canvas_plugins_705a5016": {
-        "message": "Canvas-lisäosat"
-    },
     "choose_caption_file_9c45bc4e": {
         "message": "Muokkaa tekstitystiedostoa"
     },
@@ -190,6 +187,9 @@
     },
     "computer_1d7dfa6f": {
         "message": "Tietokone"
+    },
+    "content_1440204b": {
+        "message": "Sisältö"
     },
     "content_is_still_being_uploaded_if_you_continue_it_8f06d0cb": {
         "message": "Sisältöä ladataan yhä, jos jatkat, sitä ei upoteta kunnolla."
@@ -292,6 +292,9 @@
     },
     "dimensions_45ddb7b7": {
         "message": "Mitat"
+    },
+    "directionality_26ae9e08": {
+        "message": "Suuntaisuus"
     },
     "disable_in_line_preview_2a675175": {
         "message": "Poista tekstiin sidottu esikatselu."
@@ -419,6 +422,9 @@
     "external_links_3d9f074e": {
         "message": "Ulkoiset linkit"
     },
+    "external_tools_6e77821": {
+        "message": "Ulkoiset työkalut"
+    },
     "extra_large_b6cdf1ff": {
         "message": "Erittäin suuri"
     },
@@ -472,6 +478,9 @@
     },
     "folder_tree_fbab0726": {
         "message": "Kansiopuu"
+    },
+    "format_4247a9c5": {
+        "message": "Muotoile"
     },
     "formatting_5b143aa8": {
         "message": "Muotoillaan"
@@ -560,6 +569,9 @@
     "invalid_file_type_881cc9b2": {
         "message": "Virheellinen tiedostotyyppi"
     },
+    "invalid_url_cbde79f": {
+        "message": "Virheellinen URL"
+    },
     "items_completed_items_plural_1_item_other_items_717d579f": {
         "message": "{ items } suoritettu { items, plural,\n     =1 {kohde}\n  other {kohdetta}\n}"
     },
@@ -571,6 +583,9 @@
     },
     "late_2be42b88": {
         "message": "Myöhään"
+    },
+    "left_to_right_e9b4fd06": {
+        "message": "Vasemmalta-Oikealle"
     },
     "link_7262adec": {
         "message": "Linkki"
@@ -652,6 +667,9 @@
     },
     "mic_a7f3d311": {
         "message": "Mikrofoni"
+    },
+    "miscellaneous_e9818229": {
+        "message": "Muut asiat"
     },
     "missing_1a256b3b": {
         "message": "Puuttuu"
@@ -767,6 +785,9 @@
     "other_editor_shortcuts_may_be_found_at_404aba4a": {
         "message": "Muu editorin pikakuvakkeet löytyvät"
     },
+    "p_is_not_a_valid_protocol_which_must_be_ftp_http_h_adf13fc2": {
+        "message": "{ p } ei ole voimassa oleva protokolla. Sen täytyy olla ftp, http, https, mailto, skype, tel tai se saatetaan poistaa"
+    },
     "page_50c4823d": {
         "message": "Sivu"
     },
@@ -818,6 +839,9 @@
     "previous_page_928fc112": {
         "message": "Edellinen sivu"
     },
+    "protocol_must_be_ftp_http_https_mailto_skype_tel_o_73beb4f8": {
+        "message": "Protokollan täytyy olla ftp, http, https, mailto, skype, tel tai se saatetaan poistaa"
+    },
     "pts_699bd9aa": {
         "message": "pistettä"
     },
@@ -859,6 +883,9 @@
     },
     "rich_content_editor_2708ef21": {
         "message": "Rikas sisältöeditori"
+    },
+    "right_to_left_9cfb092a": {
+        "message": "Oikealta-Vasemmalle"
     },
     "save_11a80ec3": {
         "message": "Tallenna"
@@ -904,6 +931,9 @@
     },
     "size_b30e1077": {
         "message": "Koko"
+    },
+    "size_of_file_is_greater_than_the_maximum_max_mb_al_6eb3fa9a": {
+        "message": "{ file } on kooltaan suurempi kuin suurin sallittu tiedostokoko { max } MB."
     },
     "small_b070434a": {
         "message": "Pieni"

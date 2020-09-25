@@ -23,10 +23,15 @@
 
 require_relative '../helpers/wiki_and_tiny_common'
 require_relative 'pages/rce_next_page'
+require_relative 'pages/rcs_sidebar_page'
 
+# while there's a mix of instui 6 and 7 in canvas we're getting
+# "Warning: [themeable] A theme registry has already been initialized." js errors
+# Ignore js errors so specs can pass
 describe 'RCE next tests', ignore_js_errors: true do
   include_context 'in-process server selenium tests'
   include WikiAndTinyCommon
+  include RCSSidebarPage
   include RCENextPage
 
   context 'WYSIWYG generic as a teacher' do
@@ -84,7 +89,7 @@ describe 'RCE next tests', ignore_js_errors: true do
       visit_front_page_edit(@course)
       wait_for_tiny(edit_wiki_css)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
 
       click_pages_accordion
@@ -99,6 +104,7 @@ describe 'RCE next tests', ignore_js_errors: true do
     context 'links' do
       it 'should respect selected text when creating a course link in body',
          ignore_js_errors: true do
+        skip 'flakey, LS-1394 (8/26/2020)'
         title = 'test_page'
         unpublished = false
         edit_roles = 'public'
@@ -111,7 +117,7 @@ describe 'RCE next tests', ignore_js_errors: true do
 
         select_all_in_tiny(f('#wiki_page_body'))
 
-        click_links_toolbar_button
+        click_links_toolbar_menu_button
         click_course_links
 
         click_pages_accordion
@@ -270,12 +276,13 @@ describe 'RCE next tests', ignore_js_errors: true do
     end
 
     it 'should click on sidebar assignment page to create link in body' do
+      skip 'flakey, LS-1394 (8/26/2020)'
       title = 'Assignment-Title'
       @assignment = @course.assignments.create!(name: title)
 
       visit_front_page_edit(@course)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
 
       click_assignments_accordion
@@ -295,7 +302,7 @@ describe 'RCE next tests', ignore_js_errors: true do
 
       visit_front_page_edit(@course)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
 
       click_quizzes_accordion
@@ -313,7 +320,7 @@ describe 'RCE next tests', ignore_js_errors: true do
 
       visit_front_page_edit(@course)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
 
       click_announcements_accordion
@@ -333,7 +340,7 @@ describe 'RCE next tests', ignore_js_errors: true do
 
       visit_front_page_edit(@course)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
 
       click_discussions_accordion
@@ -348,12 +355,13 @@ describe 'RCE next tests', ignore_js_errors: true do
     end
 
     it 'should click on sidebar modules page to create link in body', ignore_js_errors: true do
+      skip 'flakey, LS-1394 (8/26/2020)'
       title = 'Module-Title'
       @module = @course.context_modules.create!(name: title)
 
       visit_front_page_edit(@course)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
 
       click_modules_accordion
@@ -369,7 +377,7 @@ describe 'RCE next tests', ignore_js_errors: true do
       title = 'Files'
       visit_front_page_edit(@course)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
 
       click_navigation_accordion
@@ -382,12 +390,13 @@ describe 'RCE next tests', ignore_js_errors: true do
 
     it 'should click on assignment in sidebar to create link to it in announcement page',
        ignore_js_errors: true do
+      skip 'flakey, LS-1394 (8/26/2020)'
       title = 'Assignment-Title'
       @assignment = @course.assignments.create!(name: title)
 
       visit_new_announcement_page(@course)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
 
       click_assignments_accordion
@@ -408,7 +417,7 @@ describe 'RCE next tests', ignore_js_errors: true do
 
       visit_new_assignment_page(@course)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
 
       click_modules_accordion
@@ -420,12 +429,13 @@ describe 'RCE next tests', ignore_js_errors: true do
     end
 
     it 'should click on assignment in sidebar to create link to it in discussion page' do
+      skip 'flakey, LS-1394 (8/26/2020)'
       title = 'Assignment-Title'
       @assignment = @course.assignments.create!(name: title)
 
       visit_new_discussion_page(@course)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
 
       click_assignments_accordion
@@ -440,13 +450,14 @@ describe 'RCE next tests', ignore_js_errors: true do
     end
 
     it 'should click on assignment in sidebar to create link to it in quiz page' do
+      skip 'flakey, LS-1394 (8/26/2020)'
       title = 'Assignment-Title'
       @assignment = @course.assignments.create!(name: title)
       @quiz = @course.quizzes.create!
 
       visit_new_quiz_page(@course, @quiz)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
 
       click_assignments_accordion
@@ -461,13 +472,14 @@ describe 'RCE next tests', ignore_js_errors: true do
     end
 
     it 'should click on assignment in sidebar to create link to it in syllabus page' do
+      skip 'flakey, LS-1394 (8/26/2020)'
       title = 'Assignment-Title'
       @assignment = @course.assignments.create!(name: title)
 
       visit_syllabus(@course)
       click_edit_syllabus
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
 
       click_assignments_accordion
@@ -485,7 +497,7 @@ describe 'RCE next tests', ignore_js_errors: true do
       skip('Unskip in CORE-2629')
       visit_front_page_edit(@course)
 
-      click_images_toolbar_button
+      click_images_toolbar_menu_button
       click_course_images
 
       expect(upload_new_image).to be_displayed
@@ -501,7 +513,7 @@ describe 'RCE next tests', ignore_js_errors: true do
 
       visit_front_page_edit(@course)
 
-      click_images_toolbar_button
+      click_images_toolbar_menu_button
       click_course_images
 
       click_image_link(title)
@@ -511,25 +523,22 @@ describe 'RCE next tests', ignore_js_errors: true do
       end
     end
 
-    it "should link image to selected text" do
-      title = "email.png"
+    it 'should link image to selected text' do
+      title = 'email.png'
       @root_folder = Folder.root_folders(@course).first
-      @image = @root_folder.attachments.build(:context => @course)
+      @image = @root_folder.attachments.build(context: @course)
       path = File.expand_path(File.dirname(__FILE__) + '/../../../public/images/email.png')
       @image.uploaded_data = Rack::Test::UploadedFile.new(path, Attachment.mimetype(path))
       @image.save!
 
-      @course.wiki_pages.create!(
-        title: 'title',
-        body: "<p id='para'>select me</p>"
-      )
+      @course.wiki_pages.create!(title: 'title', body: "<p id='para'>select me</p>")
       visit_existing_wiki_edit(@course, 'title')
       wait_for_tiny(edit_wiki_css)
 
       f("##{rce_page_body_ifr_id}").click
-      select_text_of_element_by_id("para")
+      select_text_of_element_by_id('para')
 
-      click_images_toolbar_button
+      click_images_toolbar_menu_button
       click_course_images
 
       click_image_link(title)
@@ -540,8 +549,8 @@ describe 'RCE next tests', ignore_js_errors: true do
       end
     end
 
-    it "should open tray when clicking options button on existing image" do
-      page_title = "Page1"
+    it 'should open tray when clicking options button on existing image' do
+      page_title = 'Page1'
       create_wiki_page_with_embedded_image(page_title)
 
       visit_existing_wiki_edit(@course, page_title)
@@ -612,7 +621,7 @@ describe 'RCE next tests', ignore_js_errors: true do
 
       visit_new_announcement_page(@course)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
       click_assignments_accordion
 
@@ -621,7 +630,7 @@ describe 'RCE next tests', ignore_js_errors: true do
       @assignment.save!(status: unpublished)
       visit_new_announcement_page(@course)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
       click_assignments_accordion
 
@@ -638,7 +647,7 @@ describe 'RCE next tests', ignore_js_errors: true do
 
       visit_front_page_edit(@course)
 
-      click_document_toolbar_button
+      click_document_toolbar_menu_button
       click_course_documents
 
       click_document_link(title)
@@ -656,7 +665,7 @@ describe 'RCE next tests', ignore_js_errors: true do
 
       visit_new_announcement_page
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
       click_assignments_accordion
 
@@ -683,7 +692,7 @@ describe 'RCE next tests', ignore_js_errors: true do
       skip('Unskip in CORE-2878')
       visit_front_page_edit(@course)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
       wait_for_tiny(edit_wiki_css)
 
@@ -696,7 +705,7 @@ describe 'RCE next tests', ignore_js_errors: true do
       skip('Unskip in CORE-2878')
       visit_front_page_edit(@course)
 
-      click_images_toolbar_button
+      click_images_toolbar_menu_button
       click_course_images
       wait_for_tiny(edit_wiki_css)
 
@@ -708,7 +717,7 @@ describe 'RCE next tests', ignore_js_errors: true do
     it 'should open upload image modal when clicking upload option' do
       visit_front_page_edit(@course)
 
-      click_images_toolbar_button
+      click_images_toolbar_menu_button
       click_upload_image
 
       expect(upload_image_modal).to be_displayed
@@ -718,7 +727,7 @@ describe 'RCE next tests', ignore_js_errors: true do
       skip('Unskip after adding upload option back COREFE-268')
       visit_front_page_edit(@course)
 
-      click_media_toolbar_button
+      click_media_toolbar_menu_button
       click_upload_media
 
       expect(upload_media_modal).to be_displayed
@@ -726,51 +735,52 @@ describe 'RCE next tests', ignore_js_errors: true do
 
     it 'should open upload document modal when clicking upload option' do
       visit_front_page_edit(@course)
-
-      click_document_toolbar_button
+      click_document_toolbar_menu_button
       click_upload_document
 
       expect(upload_document_modal).to be_displayed
     end
 
-    it 'should include media upload option if kaltura is enabled' do
-      double('CanvasKaltura::ClientV3')
-      allow(CanvasKaltura::ClientV3).to receive(:config).and_return({})
-      visit_front_page_edit(@course)
-      media_button = media_toolbar_button
-      media_button.click
-      wait_for_animations
-      menu_id = media_button.attribute('aria-owns')
-      expect(menu_item_by_menu_id(menu_id, 'Upload/Record Media')).to be_displayed
-      expect(menu_item_by_menu_id(menu_id, 'Course Media')).to be_displayed
-      expect(menu_item_by_menu_id(menu_id, 'User Media')).to be_displayed
-      expect(menu_items_by_menu_id(menu_id).length).to be(3)
-    end
+    describe 'kaltura interaction' do
+      it 'should include media upload option if kaltura is enabled' do
+        double('CanvasKaltura::ClientV3')
+        allow(CanvasKaltura::ClientV3).to receive(:config).and_return({})
+        visit_front_page_edit(@course)
+        media_button = media_toolbar_button
+        media_toolbar_menu_button.click
+        wait_for_animations
+        menu_id = media_button.attribute('aria-owns')
+        expect(menu_item_by_menu_id(menu_id, 'Upload/Record Media')).to be_displayed
+        expect(menu_item_by_menu_id(menu_id, 'Course Media')).to be_displayed
+        expect(menu_item_by_menu_id(menu_id, 'User Media')).to be_displayed
+        expect(menu_items_by_menu_id(menu_id).length).to be(3)
+      end
 
-    it 'should not include media upload option if kaltura is disabled' do
-      double('CanvasKaltura::ClientV3')
-      allow(CanvasKaltura::ClientV3).to receive(:config).and_return(nil)
-      visit_front_page_edit(@course)
-      media_button = media_toolbar_button
-      media_button.click
-      wait_for_animations
-      menu_id = media_button.attribute('aria-owns')
-      expect(menu_item_by_menu_id(menu_id, 'Course Media')).to be_displayed
-      expect(menu_item_by_menu_id(menu_id, 'User Media')).to be_displayed
-      expect(menu_items_by_menu_id(menu_id).length).to be(2)
-    end
+      it 'should not include media upload option if kaltura is disabled' do
+        double('CanvasKaltura::ClientV3')
+        allow(CanvasKaltura::ClientV3).to receive(:config).and_return(nil)
+        visit_front_page_edit(@course)
+        media_button = media_toolbar_button
+        media_toolbar_menu_button.click
+        wait_for_animations
+        menu_id = media_button.attribute('aria-owns')
+        expect(menu_item_by_menu_id(menu_id, 'Course Media')).to be_displayed
+        expect(menu_item_by_menu_id(menu_id, 'User Media')).to be_displayed
+        expect(menu_items_by_menu_id(menu_id).length).to be(2)
+      end
 
-    it 'should not include media upload option if button is disabled' do
-      double('CanvasKaltura::ClientV3')
-      allow(CanvasKaltura::ClientV3).to receive(:config).and_return({ 'hide_rte_button' => true })
-      visit_front_page_edit(@course)
-      media_button = media_toolbar_button
-      media_button.click
-      wait_for_animations
-      menu_id = media_button.attribute('aria-owns')
-      expect(menu_item_by_menu_id(menu_id, 'Course Media')).to be_displayed
-      expect(menu_item_by_menu_id(menu_id, 'User Media')).to be_displayed
-      expect(menu_items_by_menu_id(menu_id).length).to be(2)
+      it 'should not include media upload option if button is disabled' do
+        double('CanvasKaltura::ClientV3')
+        allow(CanvasKaltura::ClientV3).to receive(:config).and_return({ 'hide_rte_button' => true })
+        visit_front_page_edit(@course)
+        media_button = media_toolbar_button
+        media_toolbar_menu_button.click
+        wait_for_animations
+        menu_id = media_button.attribute('aria-owns')
+        expect(menu_item_by_menu_id(menu_id, 'Course Media')).to be_displayed
+        expect(menu_item_by_menu_id(menu_id, 'User Media')).to be_displayed
+        expect(menu_items_by_menu_id(menu_id).length).to be(2)
+      end
     end
 
     it 'should close sidebar after drag and drop' do
@@ -780,7 +790,7 @@ describe 'RCE next tests', ignore_js_errors: true do
 
       visit_front_page_edit(@course)
 
-      click_links_toolbar_button
+      click_links_toolbar_menu_button
       click_course_links
       click_assignments_accordion
 
@@ -797,7 +807,7 @@ describe 'RCE next tests', ignore_js_errors: true do
       allow(CanvasKaltura::ClientV3).to receive(:config).and_return({})
       visit_front_page_edit(@course)
 
-      click_media_toolbar_button
+      click_media_toolbar_menu_button
       click_upload_media
       click_embed_media_tab
       code_box = embed_code_textarea
@@ -810,6 +820,27 @@ describe 'RCE next tests', ignore_js_errors: true do
       wait_for_ajaximations
 
       expect(f('iframe[title="embedded content"][src="https://example.com/"]')).to be_displayed # save the page
+    end
+
+    it 'should not load duplicate data when opening sidbar tray multiple times' do
+      user_attachment = @user.attachments.build(filename: 'myimage.png', context: @student)
+      user_attachment.content_type = 'image/png'
+      user_attachment.save!
+
+      visit_new_assignment_page(@course)
+
+      click_images_toolbar_menu_button
+      click_user_images
+
+      expect(user_image_links.count).to eq 1
+      expect(tray_container).to include_text('myimage.png')
+
+      click_close_button
+      click_images_toolbar_menu_button
+      click_user_images
+
+      expect(user_image_links.count).to eq 1
+      expect(tray_container).to include_text('myimage.png')
     end
 
     describe 'keyboard shortcuts' do
@@ -909,14 +940,36 @@ describe 'RCE next tests', ignore_js_errors: true do
         expect(lti_tools_button).to be_displayed
       end
 
+      # if there's mru data in local_storage we get the menu button
+      # if not we get a button that opens the modal directly
       it 'should display the lti tool modal', ignore_js_errors: true do
+        page_title = 'Page1'
+        create_wiki_page_with_embedded_image(page_title)
+        driver.local_storage.clear
+
+        visit_existing_wiki_edit(@course, page_title)
+        driver.local_storage.delete('ltimru')
+        lti_tools_button.click
+
+        expect(lti_tools_modal).to be_displayed
+      end
+
+      it 'should display the lti tool modal, reprise', ignore_js_errors: true do
         page_title = 'Page1'
         create_wiki_page_with_embedded_image(page_title)
 
         visit_existing_wiki_edit(@course, page_title)
-        lti_tools_button.click
+        # value doesn't matter, its existance triggers the menu button
+        driver.local_storage['ltimru'] = [999]
+        # ltimru has to be in local storage when the page loads to get the menu button
+        driver.navigate.refresh
+        wait_for_tiny(edit_wiki_css)
+
+        lti_tools_button_with_mru.click
+        menu_item_by_name('View All').click
 
         expect(lti_tools_modal).to be_displayed
+        driver.local_storage.clear
       end
 
       it 'should show favorited LTI tool icon when a tool is favorited', ignore_js_errors: true do
@@ -936,6 +989,116 @@ describe 'RCE next tests', ignore_js_errors: true do
         lti_favorite_button.click
 
         expect(lti_favorite_modal).to be_displayed
+      end
+
+      describe 'Tools menubar menu', ignore_js_errors: true do
+        it 'should include Apps menu item in' do
+          rce_wysiwyg_state_setup(@course)
+
+          menubar_open_menu('Tools')
+          expect(menubar_menu_item('Apps')).to be_displayed
+        end
+
+        it 'should show "View All" in the Tools > Apps submenu', ignore_js_errors: true do
+          rce_wysiwyg_state_setup(@course)
+
+          click_menubar_submenu_item('Tools', 'Apps')
+          expect(menubar_menu_item('View All')).to be_displayed
+          expect(f('body')).not_to contain_css(menubar_menu_item_css('Commons Favorites'))
+        end
+
+        it 'should show MRU tools in the Tools > Apps submenu', ignore_js_errors: true do
+          rce_wysiwyg_state_setup(@course)
+          driver.local_storage['ltimru'] = "[#{@tool.id}]"
+
+          click_menubar_submenu_item('Tools', 'Apps')
+          expect(menubar_menu_item('View All')).to be_displayed
+          expect(f('body')).to contain_css(menubar_menu_item_css('Commons Favorites'))
+          driver.local_storage.clear
+        end
+      end
+    end
+
+    context 'fonts', ignore_js_errors: true do
+      it 'should successfully change to Balsamiq Sans font with menubar options' do
+        text = 'Hello font'
+        rce_wysiwyg_state_setup(@course, text)
+        select_all_in_tiny(f('#wiki_page_body'))
+        click_menubar_submenu_item('Format', 'Fonts')
+        menu_option_by_name('Balsamiq Sans').click
+        fj('button:contains("Save")').click
+        wait_for_ajaximations
+        expect(f('.show-content.user_content p span').attribute('style')).to eq(
+          'font-family: "Balsamiq Sans", lato, "Helvetica Neue", Helvetica, Arial, sans-serif;'
+        )
+      end
+
+      it 'should successfully change to Architects Daughter font with menubar options' do
+        text = 'Hello font'
+        rce_wysiwyg_state_setup(@course, text)
+        select_all_in_tiny(f('#wiki_page_body'))
+        click_menubar_submenu_item('Format', 'Fonts')
+        menu_option_by_name("Architect's Daughter").click
+        fj('button:contains("Save")').click
+        wait_for_ajaximations
+        expect(f('.show-content.user_content p span').attribute('style')).to eq(
+          'font-family: "Architects Daughter", lato, "Helvetica Neue", Helvetica, Arial, sans-serif;'
+        )
+      end
+    end
+
+    describe 'Insert menubar menu' do
+      it 'should show content insertion menu items' do
+        double('CanvasKaltura::ClientV3')
+        allow(CanvasKaltura::ClientV3).to receive(:config).and_return({})
+        rce_wysiwyg_state_setup(@course)
+        menubar_open_menu('Insert')
+
+        expect(menubar_menu_item('Link')).to be_displayed
+        click_menubar_menu_item('Link')
+        expect(f('body')).to contain_css(menubar_menu_item_css('External Links'))
+        expect(f('body')).to contain_css(menubar_menu_item_css('Course Links'))
+
+        expect(menubar_menu_item('Image')).to be_displayed
+        click_menubar_menu_item('Image')
+        expect(f('body')).to contain_css(menubar_menu_item_css('Upload Image'))
+        expect(f('body')).to contain_css(menubar_menu_item_css('Course Images'))
+        expect(f('body')).to contain_css(menubar_menu_item_css('User Images'))
+
+        expect(menubar_menu_item('Media')).to be_displayed
+        click_menubar_menu_item('Media')
+        expect(f('body')).to contain_css(menubar_menu_item_css('Upload/Record Media'))
+        expect(f('body')).to contain_css(menubar_menu_item_css('Course Media'))
+        expect(f('body')).to contain_css(menubar_menu_item_css('User Media'))
+
+        expect(menubar_menu_item('Document')).to be_displayed
+        click_menubar_menu_item('Document')
+        expect(f('body')).to contain_css(menubar_menu_item_css('Upload Document'))
+        expect(f('body')).to contain_css(menubar_menu_item_css('Course Documents'))
+        expect(f('body')).to contain_css(menubar_menu_item_css('User Documents'))
+      end
+    end
+    describe 'Insert content toolbar button default actions' do
+      it 'should do the right thing when clicking the toolbar button' do
+        double('CanvasKaltura::ClientV3')
+        allow(CanvasKaltura::ClientV3).to receive(:config).and_return({})
+        rce_wysiwyg_state_setup(@course)
+
+        click_links_toolbar_button
+        expect(insert_link_modal).to be_displayed
+        f('body').send_keys :escape # close the modal
+
+        click_images_toolbar_button
+        expect(upload_image_modal).to be_displayed
+        f('body').send_keys :escape
+
+        click_media_toolbar_button
+        expect(upload_media_modal).to be_displayed
+        f('body').send_keys :escape
+
+        click_document_toolbar_button
+        expect(upload_file_modal).to be_displayed
+        f('body').send_keys :escape
       end
     end
   end

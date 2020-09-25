@@ -2233,6 +2233,17 @@ describe CoursesController do
         expect(response.body).to include 'Invalid restrictions'
       end
     end
+
+    it "should update pages' permissions even if course default is nil" do
+      user_session(@teacher)
+      wiki_page = @course.wiki_pages.create! :title => 'Wiki page 1', :editing_roles=> 'teachers'
+      new_permissions = 'teachers,students'
+      put 'update', params: {:id => @course.id, :update_default_pages => true, :course => {:default_wiki_editing_roles => new_permissions}}
+      @course.reload
+      wiki_page.reload
+      expect(@course.default_wiki_editing_roles).to eq new_permissions
+      expect(wiki_page.editing_roles).to eq new_permissions
+    end
   end
 
   describe "POST 'unconclude'" do
@@ -3118,7 +3129,7 @@ describe CoursesController do
     it 'does not allow a teacher without the permission to change visibility' do
       course = Course.create!
       teacher = teacher_in_course(course: course, active_all: true).user
-      course.account.role_overrides.create!(role: Role.get_built_in_role('TeacherEnrollment'), permission: 'manage_course_visibility', enabled: false)
+      course.account.role_overrides.create!(role: teacher_role, permission: 'manage_course_visibility', enabled: false)
       user_session(teacher)
 
       post 'update', params: { id: course.id,

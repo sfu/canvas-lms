@@ -32,8 +32,8 @@
     "align_right_9bad3ac1": {
         "message": "Högerjustera"
     },
-    "alignment_and_indentation_f7de34bf": {
-        "message": "Justering och indrag"
+    "alignment_and_lists_5cebcb69": {
+        "message": "Justering och listor"
     },
     "all_4321c3a1": {
         "message": "Alla"
@@ -146,9 +146,6 @@
     "canvas_planner_98ed106": {
         "message": "Canvas Planner"
     },
-    "canvas_plugins_705a5016": {
-        "message": "Canvas-plugins"
-    },
     "choose_caption_file_9c45bc4e": {
         "message": "Välj undertextfil"
     },
@@ -190,6 +187,9 @@
     },
     "computer_1d7dfa6f": {
         "message": "Dator"
+    },
+    "content_1440204b": {
+        "message": "Innehåll"
     },
     "content_is_still_being_uploaded_if_you_continue_it_8f06d0cb": {
         "message": "Innehåll laddas fortfarande upp, om du fortsätter kommer det inte att bäddas in korrekt."
@@ -292,6 +292,9 @@
     },
     "dimensions_45ddb7b7": {
         "message": "Dimensioner"
+    },
+    "directionality_26ae9e08": {
+        "message": "Dirigerbarhet"
     },
     "disable_in_line_preview_2a675175": {
         "message": "Inaktivera infogad förhandsvisning."
@@ -419,6 +422,9 @@
     "external_links_3d9f074e": {
         "message": "Externa länkar"
     },
+    "external_tools_6e77821": {
+        "message": "Externa verktyg"
+    },
     "extra_large_b6cdf1ff": {
         "message": "Extra stor"
     },
@@ -472,6 +478,9 @@
     },
     "folder_tree_fbab0726": {
         "message": "Mappträd"
+    },
+    "format_4247a9c5": {
+        "message": "Format"
     },
     "formatting_5b143aa8": {
         "message": "Formaterar"
@@ -560,6 +569,9 @@
     "invalid_file_type_881cc9b2": {
         "message": "Ogiltig filtyp"
     },
+    "invalid_url_cbde79f": {
+        "message": "Ogiltig URL"
+    },
     "items_completed_items_plural_1_item_other_items_717d579f": {
         "message": "{ items } fullgjorda { items, plural,\n     =1 {objekt}\n  other {objekt}\n}"
     },
@@ -571,6 +583,9 @@
     },
     "late_2be42b88": {
         "message": "Sen"
+    },
+    "left_to_right_e9b4fd06": {
+        "message": "Vänster till höger"
     },
     "link_7262adec": {
         "message": "Länk"
@@ -652,6 +667,9 @@
     },
     "mic_a7f3d311": {
         "message": "Mikrofon"
+    },
+    "miscellaneous_e9818229": {
+        "message": "Blandat"
     },
     "missing_1a256b3b": {
         "message": "Saknas"
@@ -767,6 +785,9 @@
     "other_editor_shortcuts_may_be_found_at_404aba4a": {
         "message": "Andra genvägar till redigeraren kan hittas på"
     },
+    "p_is_not_a_valid_protocol_which_must_be_ftp_http_h_adf13fc2": {
+        "message": "{ p } är inte ett giltigt protokoll. Protokollet måste vara ftp, http, https, mailto, skype, tel eller så kan det utelämnas"
+    },
     "page_50c4823d": {
         "message": "Sida"
     },
@@ -818,6 +839,9 @@
     "previous_page_928fc112": {
         "message": "Föregående sida"
     },
+    "protocol_must_be_ftp_http_https_mailto_skype_tel_o_73beb4f8": {
+        "message": "Protokollet måste vara ftp, http, https, mailto, skype, tel eller så kan det utelämnas"
+    },
     "pts_699bd9aa": {
         "message": "poäng"
     },
@@ -859,6 +883,9 @@
     },
     "rich_content_editor_2708ef21": {
         "message": "Redigerare för formaterat innehåll"
+    },
+    "right_to_left_9cfb092a": {
+        "message": "Höger till vänster"
     },
     "save_11a80ec3": {
         "message": "Spara"
@@ -904,6 +931,9 @@
     },
     "size_b30e1077": {
         "message": "Storlek"
+    },
+    "size_of_file_is_greater_than_the_maximum_max_mb_al_6eb3fa9a": {
+        "message": "Storleken på { file } är större än den maximalt tillåtna storleken { max } MB för en fil."
     },
     "small_b070434a": {
         "message": "Liten"

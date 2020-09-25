@@ -36,7 +36,6 @@ class ContentMigration < ActiveRecord::Base
   after_save :handle_import_in_progress_notice
   after_save :check_for_blocked_migration
   before_create :set_root_account_id
-  attr_accessor :skip_root_account_assignment
 
   DATE_FORMAT = "%m/%d/%Y"
 
@@ -120,7 +119,7 @@ class ContentMigration < ActiveRecord::Base
   end
 
   def content_export
-    if !association(:content_export).loaded? && source_course_id && Shard.shard_for(source_course_id) != self.shard
+    if self.persisted? && !association(:content_export).loaded? && source_course_id && Shard.shard_for(source_course_id) != self.shard
       association(:content_export).target = Shard.shard_for(source_course_id).activate { ContentExport.where(:content_migration_id => self).first }
     end
     super
@@ -985,13 +984,16 @@ class ContentMigration < ActiveRecord::Base
   end
 
   def set_root_account_id
-    return if skip_root_account_assignment
-    case self.context
-    when Course, Group
-      self.root_account_id = self.context.root_account_id
-    when Account
-      self.root_account_id = self.context.resolved_root_account_id
-    end
+    self.root_account_id ||=
+      case self.context
+      when Course, Group
+        self.context.root_account_id
+      when Account
+        self.context.resolved_root_account_id
+      when User
+        0 # root account id unknown, use dummy root account id
+      end
+    Account.ensure_dummy_root_account if root_account_id == 0
   end
 
   def notification_link_anchor

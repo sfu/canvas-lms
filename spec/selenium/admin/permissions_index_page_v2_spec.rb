@@ -34,14 +34,6 @@ describe "permissions index" do
     new_role.id
   end
 
-  def student_role
-    Role.get_built_in_role('StudentEnrollment')
-  end
-
-  def ta_role
-    Role.get_built_in_role('TaEnrollment')
-  end
-
   describe "editing role info" do
     before :each do
       user_session(@admin)
@@ -141,19 +133,12 @@ describe "permissions index" do
         expect(r).to be_empty
       end
 
-      context "with granular permissions enabled" do
-        let(:set_granular_permission) do
-          @account.enable_feature!(:granular_permissions_wiki_pages)
-        end
-
-        it "autoscrolls so expanded granular permissions are visible" do
-          set_granular_permission
-          PermissionsIndex.visit(@account)
-          PermissionsIndex.expand_manage_wiki
-          expect(PermissionsIndex.permission_link('manage_wiki_create')).to be_displayed
-          expect(PermissionsIndex.permission_link('manage_wiki_delete')).to be_displayed
-          expect(PermissionsIndex.permission_link('manage_wiki_update')).to be_displayed
-        end
+      it "autoscrolls so expanded granular permissions are visible" do
+        PermissionsIndex.visit(@account)
+        PermissionsIndex.expand_manage_wiki
+        expect(PermissionsIndex.permission_link('manage_wiki_create')).to be_displayed
+        expect(PermissionsIndex.permission_link('manage_wiki_delete')).to be_displayed
+        expect(PermissionsIndex.permission_link('manage_wiki_update')).to be_displayed
       end
     end
 

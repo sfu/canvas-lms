@@ -32,8 +32,8 @@
     "align_right_9bad3ac1": {
         "message": "向右對齊"
     },
-    "alignment_and_indentation_f7de34bf": {
-        "message": "校準及縮排"
+    "alignment_and_lists_5cebcb69": {
+        "message": "對齊及清單"
     },
     "all_4321c3a1": {
         "message": "全部"
@@ -146,9 +146,6 @@
     "canvas_planner_98ed106": {
         "message": "Canvas 手冊"
     },
-    "canvas_plugins_705a5016": {
-        "message": "Canvas 外掛程式"
-    },
     "choose_caption_file_9c45bc4e": {
         "message": "選擇字幕檔案"
     },
@@ -190,6 +187,9 @@
     },
     "computer_1d7dfa6f": {
         "message": "電腦"
+    },
+    "content_1440204b": {
+        "message": "內容"
     },
     "content_is_still_being_uploaded_if_you_continue_it_8f06d0cb": {
         "message": "內容仍在上傳中，如果您繼續將無法正確嵌入內容。"
@@ -292,6 +292,9 @@
     },
     "dimensions_45ddb7b7": {
         "message": "尺寸"
+    },
+    "directionality_26ae9e08": {
+        "message": "方向"
     },
     "disable_in_line_preview_2a675175": {
         "message": "停用行中預覽。"
@@ -419,6 +422,9 @@
     "external_links_3d9f074e": {
         "message": "外部連結"
     },
+    "external_tools_6e77821": {
+        "message": "外部工具"
+    },
     "extra_large_b6cdf1ff": {
         "message": "超大"
     },
@@ -472,6 +478,9 @@
     },
     "folder_tree_fbab0726": {
         "message": "樹狀資件夾"
+    },
+    "format_4247a9c5": {
+        "message": "格式"
     },
     "formatting_5b143aa8": {
         "message": "格式"
@@ -560,6 +569,9 @@
     "invalid_file_type_881cc9b2": {
         "message": "無效的檔案類型"
     },
+    "invalid_url_cbde79f": {
+        "message": "無效的 URL"
+    },
     "items_completed_items_plural_1_item_other_items_717d579f": {
         "message": "{ items } 已完成 { items, plural,\n     =1 { 個項目}\n  other { 個項目}\n}"
     },
@@ -571,6 +583,9 @@
     },
     "late_2be42b88": {
         "message": "逾期"
+    },
+    "left_to_right_e9b4fd06": {
+        "message": "左至右"
     },
     "link_7262adec": {
         "message": "連結"
@@ -652,6 +667,9 @@
     },
     "mic_a7f3d311": {
         "message": "麥克風"
+    },
+    "miscellaneous_e9818229": {
+        "message": "雜項"
     },
     "missing_1a256b3b": {
         "message": "缺失"
@@ -767,6 +785,9 @@
     "other_editor_shortcuts_may_be_found_at_404aba4a": {
         "message": "其他編輯器快速鍵位於"
     },
+    "p_is_not_a_valid_protocol_which_must_be_ftp_http_h_adf13fc2": {
+        "message": "{ p }並非有效協議，必須使用 ftp、http、https、mailto、skype、tel 或忽略此項"
+    },
     "page_50c4823d": {
         "message": "頁面"
     },
@@ -818,6 +839,9 @@
     "previous_page_928fc112": {
         "message": "上一頁"
     },
+    "protocol_must_be_ftp_http_https_mailto_skype_tel_o_73beb4f8": {
+        "message": "協議必須為 ftp、http、https、mailto、skype、tel 或忽略此項"
+    },
     "pts_699bd9aa": {
         "message": "分數"
     },
@@ -859,6 +883,9 @@
     },
     "rich_content_editor_2708ef21": {
         "message": "多種格式的內容編輯器"
+    },
+    "right_to_left_9cfb092a": {
+        "message": "右至左"
     },
     "save_11a80ec3": {
         "message": "儲存"
@@ -904,6 +931,9 @@
     },
     "size_b30e1077": {
         "message": "大小"
+    },
+    "size_of_file_is_greater_than_the_maximum_max_mb_al_6eb3fa9a": {
+        "message": "{ file } 的大小超過允許的最大檔案大小 { max } MB。"
     },
     "small_b070434a": {
         "message": "小"
