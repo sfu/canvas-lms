@@ -1110,11 +1110,6 @@ describe Assignment do
 
     let(:assignment) { Assignment.create!(name: 'assignment with tool settings', context: course) }
 
-    before do
-      allow_any_instance_of(Lti::AssignmentSubscriptionsHelper).to receive(:create_subscription) { SecureRandom.uuid }
-      allow_any_instance_of(Lti::AssignmentSubscriptionsHelper).to receive(:destroy_subscription) { {} }
-    end
-
     it 'returns a hash of three identifying lti codes' do
       assignment.tool_settings_tool = message_handler
       assignment.save!
@@ -1124,11 +1119,6 @@ describe Assignment do
 
   describe '#tool_settings_tool_name' do
     let(:assignment) { Assignment.create!(name: 'assignment with tool settings', context: course) }
-
-    before do
-      allow_any_instance_of(Lti::AssignmentSubscriptionsHelper).to receive(:create_subscription) { SecureRandom.uuid }
-      allow_any_instance_of(Lti::AssignmentSubscriptionsHelper).to receive(:destroy_subscription) { {} }
-    end
 
     it 'returns the name of the tool proxy' do
       expected_name = 'test name'
@@ -1151,14 +1141,6 @@ describe Assignment do
   end
 
   describe '#tool_settings_tool=' do
-    let(:stub_response){ double(code: 200, body: {}.to_json, parsed_response: {'Id' => 'test-id'}, ok?: true) }
-    let(:subscription_helper){ class_double(Lti::AssignmentSubscriptionsHelper).as_stubbed_const }
-    let(:subscription_helper_instance){ double(destroy_subscription: true, create_subscription: true) }
-
-    before(:each) do
-      allow(subscription_helper).to receive_messages(new: subscription_helper_instance)
-    end
-
     it "should allow ContextExternalTools through polymorphic association" do
       setup_assignment_with_homework
       tool = @course.context_external_tools.create!(name: "a", url: "http://www.google.com", consumer_key: '12345', shared_secret: 'secret')
@@ -1167,19 +1149,8 @@ describe Assignment do
       expect(@assignment.tool_settings_tool).to eq(tool)
     end
 
-    it 'destroys subscriptions when they exist' do
-      setup_assignment_with_homework
-      expect(subscription_helper_instance).to receive(:destroy_subscription)
-      course.assignments << @assignment
-      @assignment.tool_settings_tool = message_handler
-      @assignment.save!
-      @assignment.tool_settings_tool = nil
-      @assignment.save!
-    end
-
     it "destroys tool unless tool is 'ContextExternalTool'" do
       setup_assignment_with_homework
-      expect(subscription_helper_instance).not_to receive(:destroy_subscription)
       tool = @course.context_external_tools.create!(name: "a", url: "http://www.google.com", consumer_key: '12345', shared_secret: 'secret')
       @assignment.tool_settings_tool = tool
       @assignment.save!
@@ -1317,10 +1288,8 @@ describe Assignment do
 
       let(:assignment) { assignment_model }
       let(:lookup) { assignment.assignment_configuration_tool_lookups.first }
-      let(:subscription_helper) { double(create_subscription: SecureRandom.uuid) }
 
       before do
-        allow(Lti::AssignmentSubscriptionsHelper).to receive(:new).and_return(subscription_helper)
         assignment.assignment_configuration_tool_lookups.create!(
           context_type: 'Account',
           tool_vendor_code: product_family.vendor_code,
@@ -8873,76 +8842,6 @@ describe Assignment do
               expect(subject.line_items.first.resource_link).not_to eq resource_link
             end
           end
-
-          describe '#prepare_for_ags_if_needed!' do
-            subject { assignment }
-
-            context 'when the assignment is not AGS ready' do
-              before do
-                # assignments configured with LTI 1.1 will not have
-                # LineItem or ResouceLink records prior to the LTI 1.3
-                # launch.
-                assignment.line_items.destroy_all
-
-                Lti::ResourceLink.where(
-                  resource_link_id: assignment.lti_context_id
-                ).destroy_all
-
-                assignment.update!(lti_context_id: SecureRandom.uuid)
-
-                assignment.prepare_for_ags_if_needed!(tool)
-              end
-
-              it 'creates the default line item' do
-                expect(subject.line_items).to be_present
-              end
-
-              it 'creates the LTI resource link' do
-                expect(
-                  Lti::ResourceLink.where(
-                    resource_link_id: subject.lti_context_id
-                  )
-                ).to be_present
-              end
-            end
-
-            shared_examples_for 'a method that does not change AGS columns' do
-              it 'does not recreate the default line item' do
-                expect {
-                  assignment.prepare_for_ags_if_needed!(tool)
-                }.not_to change { assignment.line_items.first.id }
-              end
-
-              it 'does not recreate the LTI resource link' do
-                expect {
-                  assignment.prepare_for_ags_if_needed!(tool)
-                }.not_to change {
-                  Lti::ResourceLink.where(resource_link_id: subject.lti_context_id).
-                    first.
-                    id
-                }
-              end
-            end
-
-            context 'when the tool does not use 1.3' do
-              before do
-                tool.use_1_3 = false
-                tool.save!
-              end
-
-              it_behaves_like 'a method that does not change AGS columns'
-            end
-
-            context 'when the tool does not have a developer key' do
-              before { tool.update!(developer_key: nil) }
-
-              it_behaves_like 'a method that does not change AGS columns'
-            end
-
-            context 'when the assignment already has line items' do
-              it_behaves_like 'a method that does not change AGS columns'
-            end
-          end
         end
 
         context 'and resource link and line item exist' do
@@ -9061,31 +8960,12 @@ describe Assignment do
           expect(assignment.line_items).to be_empty
         end
 
-        context 'but when a LTI 1.3 tool is subsequently added with an ID' do
+        context 'but when a LTI 1.3 tool is subsequently added' do
           before do
             assignment.update!(external_tool_tag_attributes: { content: tool })
           end
 
           it_behaves_like 'line item and resource link existence check'
-        end
-
-        context 'but when an LTI 1.3 tool is added with a URL' do
-          before do
-            assignment.update!(external_tool_tag_attributes: { url: tool.url })
-            assignment.external_tool_tag.update_attribute(:content_id, nil)
-            assignment.external_tool_tag.update_attribute(:content_type, nil)
-            assignment.save!
-          end
-
-          context 'and an LTI 1.1 and LTI 1.3 tool exist with the same URL' do
-            before do
-              lti_1_1_tool = tool.dup
-              lti_1_1_tool.use_1_3 = false
-              lti_1_1_tool.save!
-            end
-
-            it_behaves_like 'line item and resource link existence check'
-          end
         end
       end
     end

@@ -433,14 +433,14 @@ describe User do
       context 'and communication channels for the user exist' do
         let(:communication_channel) { user.communication_channels.create!(path: 'test@test.com') }
 
-        before { communication_channel.update_attribute(:root_account_ids, []) }
+        before { communication_channel.update(root_account_ids: nil) }
 
         it 'updates root_account_ids on associated communication channels' do
           expect {
             user.update_root_account_ids
           }.to change {
             user.communication_channels.first.root_account_ids
-          }.from([]).to([root_account.id])
+          }.from(nil).to([root_account.id])
         end
       end
     end
@@ -467,38 +467,6 @@ describe User do
         }.from(nil).to(
           [root_account.id, shard_two_root_account.global_id].sort
         )
-      end
-
-      context 'and communication channels exist on each shard' do
-        let(:shard_one_channel) do
-          CommunicationChannel.create!(user: user, path: 'test@test.com')
-        end
-
-        let(:shard_two_channel) do
-          @shard2.activate { CommunicationChannel.create!(user: user, path: 'test@test.com') }
-        end
-
-        before do
-          shard_one_channel.update_attribute(:root_account_ids, [])
-          shard_two_channel.update_attribute(:root_account_ids, [])
-          user.update_root_account_ids
-        end
-
-        it 'populates root_account_ids on the local communication channel' do
-          expect(shard_one_channel.reload.root_account_ids).to match_array [
-            root_account.id,
-            shard_two_root_account.id
-          ]
-        end
-
-        it 'populates root_account_ids on the foreign communication channel' do
-          @shard2.activate {
-            expect(shard_two_channel.reload.root_account_ids).to match_array [
-              root_account.id,
-              shard_two_root_account.id
-            ]
-          }
-        end
       end
     end
   end
@@ -554,6 +522,8 @@ describe User do
 
       account1.parent_account = account2
       account1.save!
+      @course.root_account = account2
+      @course.save!
       expect(@fake_student.reload.user_account_associations).to be_empty
 
       @course.complete!
@@ -1909,6 +1879,16 @@ describe User do
       @user.email = path
       expect(@user.communication_channels.first).to be_unconfirmed
       expect(@user.email).to eq 'john@example.com'
+    end
+
+    it "allows the email casing to be updated" do
+      @user = User.create!
+      @user.email = 'EMAIL@example.com'
+      expect(@user.communication_channels.map(&:path)).to eq ['EMAIL@example.com']
+      expect(@user.email).to eq 'EMAIL@example.com'
+      @user.email = 'email@example.com'
+      expect(@user.communication_channels.map(&:path)).to eq ['email@example.com']
+      expect(@user.email).to eq 'email@example.com'
     end
   end
 

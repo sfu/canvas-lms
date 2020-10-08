@@ -21,6 +21,12 @@ class Auditors::GradeChange
   # that won't successfully "join" to any other tables.
   NULL_PLACEHOLDER = 0
 
+  # This is a "dummy assignment" that we use to look up override grade changes in
+  # Cassandra, since it stores them with the placeholder assignment ID above.
+  # If we're querying ActiveRecord, we swap this out for an actual IS NULL
+  # query instead.
+  COURSE_OVERRIDE_ASSIGNMENT = OpenStruct.new(id: NULL_PLACEHOLDER, global_id: NULL_PLACEHOLDER).freeze
+
   OverrideGradeChange = Struct.new(:grader, :old_grade, :old_score, :score, keyword_init: true)
 
   class Record < Auditors::Record
@@ -204,24 +210,21 @@ class Auditors::GradeChange
     delegate :root_account, to: :account
   end
 
-  # This method in its current form is temporary to make sure that we don't ever return
-  # override grade changes to the caller from Postgres, even though we record them.
-  def self.filter_by_assignment(conditions)
-    # No need to change anything if an assignment ID was specified
-    return conditions if conditions[:assignment_id].present?
+  def self.filter_by_assignment(scope)
+    # If we're not specifically searching for override grades, this query is
+    # fine as is.
+    return scope unless scope.where_values_hash["assignment_id"] == Auditors::GradeChange::NULL_PLACEHOLDER
 
-    # If the final grade override feature flag is enabled, no need to restrict
-    # results further
-    return conditions if Auditors::GradeChange.return_override_grades?
-
-    # If the flag is not enabled, make sure we don't return override grades
-    ["assignment_id IS NOT NULL", conditions.except(:assignment_id)]
+    # If we *are* specifically searching for override grades, swap out the
+    # placeholder ID for a real NULL check.
+    scope.unscope(where: :assignment_id).where("assignment_id IS NULL")
   end
 
   # rubocop:disable Metrics/BlockLength
   Stream = Auditors.stream do
+    grades_ar_type = Auditors::ActiveRecord::GradeChangeRecord
     backend_strategy -> { Auditors.backend_strategy }
-    active_record_type Auditors::ActiveRecord::GradeChangeRecord
+    active_record_type grades_ar_type
     database -> { Canvas::Cassandra::DatabaseBuilder.from_config(:auditors) }
     table :grade_changes
     record_type Auditors::GradeChange::Record
@@ -231,15 +234,16 @@ class Auditors::GradeChange
       table :grade_changes_by_assignment
       entry_proc lambda{ |record| record.assignment }
       key_proc lambda{ |assignment| assignment.global_id }
-      ar_conditions_proc lambda { |assignment| { assignment_id: assignment.id } }
+      ar_scope_proc lambda { |assignment| grades_ar_type.where(assignment_id: assignment.id) }
     end
 
     add_index :course do
       table :grade_changes_by_course
       entry_proc lambda{ |record| record.course }
       key_proc lambda{ |course| course.global_id }
-      ar_conditions_proc lambda { |course|
-        Auditors::GradeChange.filter_by_assignment({ context_id: course.id, context_type: 'Course' })
+      ar_scope_proc lambda { |course|
+        scope = grades_ar_type.where(context_id: course.id, context_type: 'Course')
+        Auditors::GradeChange.filter_by_assignment(scope)
       }
     end
 
@@ -249,8 +253,9 @@ class Auditors::GradeChange
       # indexing events for auto grader in cassandra.
       entry_proc lambda{ |record| [record.root_account, record.grader] if record.grader && !record.autograded? }
       key_proc lambda{ |root_account, grader| [root_account.global_id, grader.global_id] }
-      ar_conditions_proc lambda { |root_account, grader|
-        Auditors::GradeChange.filter_by_assignment({ root_account_id: root_account.id, grader_id: grader.id })
+      ar_scope_proc lambda { |root_account, grader|
+        scope = grades_ar_type.where(root_account_id: root_account.id, grader_id: grader.id)
+        Auditors::GradeChange.filter_by_assignment(scope)
       }
     end
 
@@ -258,8 +263,9 @@ class Auditors::GradeChange
       table :grade_changes_by_root_account_student
       entry_proc lambda{ |record| [record.root_account, record.student] }
       key_proc lambda{ |root_account, student| [root_account.global_id, student.global_id] }
-      ar_conditions_proc lambda { |root_account, student|
-        Auditors::GradeChange.filter_by_assignment({ root_account_id: root_account.id, student_id: student.id })
+      ar_scope_proc lambda { |root_account, student|
+        scope = grades_ar_type.where(root_account_id: root_account.id, student_id: student.id)
+        Auditors::GradeChange.filter_by_assignment(scope)
       }
     end
 
@@ -267,8 +273,9 @@ class Auditors::GradeChange
       table :grade_changes_by_course_assignment
       entry_proc lambda { |record| [record.course, record.assignment] }
       key_proc lambda { |course, assignment| [course.global_id, assignment&.global_id] }
-      ar_conditions_proc lambda { |course, assignment|
-        Auditors::GradeChange.filter_by_assignment({ context_id: course.id, context_type: 'Course', assignment_id: assignment&.id })
+      ar_scope_proc lambda { |course, assignment|
+        scope = grades_ar_type.where(context_id: course.id, context_type: 'Course', assignment_id: assignment&.id)
+        Auditors::GradeChange.filter_by_assignment(scope)
       }
     end
 
@@ -278,8 +285,9 @@ class Auditors::GradeChange
         [record.course, record.assignment, record.grader] if record.grader && !record.autograded?
       }
       key_proc lambda { |course, assignment, grader| [course.global_id, assignment&.global_id, grader.global_id] }
-      ar_conditions_proc lambda { |course, assignment, grader|
-        Auditors::GradeChange.filter_by_assignment({ context_id: course.id, context_type: 'Course', assignment_id: assignment&.id, grader_id: grader.id })
+      ar_scope_proc lambda { |course, assignment, grader|
+        scope = grades_ar_type.where(context_id: course.id, context_type: 'Course', assignment_id: assignment&.id, grader_id: grader.id)
+        Auditors::GradeChange.filter_by_assignment(scope)
       }
     end
 
@@ -293,8 +301,9 @@ class Auditors::GradeChange
       key_proc lambda { |course, assignment, grader, student|
         [course.global_id, assignment&.global_id, grader.global_id, student.global_id]
       }
-      ar_conditions_proc lambda { |course, assignment, grader, student|
-        Auditors::GradeChange.filter_by_assignment({ context_id: course.id, context_type: 'Course', assignment_id: assignment&.id, grader_id: grader.id, student_id: student.id })
+      ar_scope_proc lambda { |course, assignment, grader, student|
+        scope = grades_ar_type.where(context_id: course.id, context_type: 'Course', assignment_id: assignment&.id, grader_id: grader.id, student_id: student.id)
+        Auditors::GradeChange.filter_by_assignment(scope)
       }
     end
 
@@ -302,8 +311,9 @@ class Auditors::GradeChange
       table :grade_changes_by_course_assignment_student
       entry_proc lambda { |record| [record.course, record.assignment, record.student] }
       key_proc lambda { |course, assignment, student| [course.global_id, assignment&.global_id, student.global_id] }
-      ar_conditions_proc lambda { |course, assignment, student|
-        Auditors::GradeChange.filter_by_assignment({ context_id: course.id, context_type: 'Course', assignment_id: assignment&.id, student_id: student.id })
+      ar_scope_proc lambda { |course, assignment, student|
+        scope = grades_ar_type.where(context_id: course.id, context_type: 'Course', assignment_id: assignment&.id, student_id: student.id)
+        Auditors::GradeChange.filter_by_assignment(scope)
       }
     end
 
@@ -311,8 +321,9 @@ class Auditors::GradeChange
       table :grade_changes_by_course_grader
       entry_proc lambda { |record| [record.course, record.grader] if record.grader && !record.autograded? }
       key_proc lambda { |course, grader| [course.global_id, grader.global_id] }
-      ar_conditions_proc lambda { |course, grader|
-        Auditors::GradeChange.filter_by_assignment({ context_id: course.id, context_type: 'Course', grader_id: grader.id })
+      ar_scope_proc lambda { |course, grader|
+        scope = grades_ar_type.where(context_id: course.id, context_type: 'Course', grader_id: grader.id)
+        Auditors::GradeChange.filter_by_assignment(scope)
       }
     end
 
@@ -322,8 +333,9 @@ class Auditors::GradeChange
         [record.course, record.grader, record.student] if record.grader && !record.autograded?
       }
       key_proc lambda { |course, grader, student| [course.global_id, grader.global_id, student.global_id] }
-      ar_conditions_proc lambda { |course, grader, student|
-        Auditors::GradeChange.filter_by_assignment({ context_id: course.id, context_type: 'Course', grader_id: grader.id, student_id: student.id })
+      ar_scope_proc lambda { |course, grader, student|
+        scope = grades_ar_type.where(context_id: course.id, context_type: 'Course', grader_id: grader.id, student_id: student.id)
+        Auditors::GradeChange.filter_by_assignment(scope)
       }
     end
 
@@ -331,8 +343,9 @@ class Auditors::GradeChange
       table :grade_changes_by_course_student
       entry_proc lambda { |record| [record.course, record.student] }
       key_proc lambda { |course, student| [course.global_id, student.global_id] }
-      ar_conditions_proc lambda { |course, student|
-        Auditors::GradeChange.filter_by_assignment({ context_id: course.id, context_type: 'Course', student_id: student.id })
+      ar_scope_proc lambda { |course, student|
+        scope = grades_ar_type.where(context_id: course.id, context_type: 'Course', student_id: student.id)
+        Auditors::GradeChange.filter_by_assignment(scope)
       }
     end
   end

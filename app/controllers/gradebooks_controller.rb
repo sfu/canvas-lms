@@ -165,11 +165,11 @@ class GradebooksController < ApplicationController
 
   def save_assignment_order
     if authorized_action(@context, @current_user, :read)
-      whitelisted_orders = {
+      allowed_orders = {
         'due_at' => :due_at, 'title' => :title,
         'module' => :module, 'assignment_group' => :assignment_group
       }
-      assignment_order = whitelisted_orders.fetch(params.fetch(:assignment_order), :due_at)
+      assignment_order = allowed_orders.fetch(params.fetch(:assignment_order), :due_at)
       @current_user.set_preference(:course_grades_assignment_order, @context.id, assignment_order)
       redirect_back(fallback_location: course_grades_url(@context))
     end
@@ -453,7 +453,6 @@ class GradebooksController < ApplicationController
       late_policy: @context.late_policy.as_json(include_root: false),
       login_handle_name: @context.root_account.settings[:login_handle_name],
       new_gradebook_development_enabled: new_gradebook_development_enabled?,
-      new_post_policy_icons_enabled: @context.root_account.feature_enabled?(:new_post_policy_icons),
       outcome_gradebook_enabled: outcome_gradebook_enabled?,
       performance_controls: gradebook_performance_controls,
       post_grades_feature: post_grades_feature?,
@@ -572,7 +571,6 @@ class GradebooksController < ApplicationController
       late_policy: @context.late_policy.as_json(include_root: false),
       login_handle_name: @context.root_account.settings[:login_handle_name],
       new_gradebook_development_enabled: new_gradebook_development_enabled?,
-      new_post_policy_icons_enabled: @context.root_account.feature_enabled?(:new_post_policy_icons),
       outcome_gradebook_enabled: outcome_gradebook_enabled?,
       outcome_links_url: api_v1_course_outcome_group_links_url(@context, outcome_style: :full),
       outcome_rollups_url: api_v1_course_outcome_rollups_url(@context, per_page: 100),
@@ -647,7 +645,8 @@ class GradebooksController < ApplicationController
       @body_classes << "full-width padless-content"
       js_bundle :gradebook_history
       js_env(
-        COURSE_IS_CONCLUDED: @context.is_a?(Course) && @context.completed?
+        COURSE_IS_CONCLUDED: @context.is_a?(Course) && @context.completed?,
+        OVERRIDE_GRADES_ENABLED: Account.site_admin.feature_enabled?(:final_grade_override_in_gradebook_history)
       )
 
       render html: "", layout: true
