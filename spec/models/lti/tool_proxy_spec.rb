@@ -195,6 +195,92 @@ module Lti
           end
         end
 
+        describe '#proxies_in_order_by_codes' do
+          let(:course) { course_model(account: sub_account_2_1) }
+
+          it 'returns tool proxies in context hierarchy order' do
+            tool_proxy1 = create_tool_proxy(context: root_account)
+            tool_proxy1.bindings.create!(context: root_account)
+            tool_proxy2 = create_tool_proxy(context: sub_account_2_1)
+            tool_proxy2.bindings.create!(context: sub_account_2_1)
+            tool_proxy3 = create_tool_proxy(context: course)
+            tool_proxy3.bindings.create!(context: course)
+
+            tools = described_class.proxies_in_order_by_codes(
+              context: course,
+              vendor_code: '123',
+              product_code: 'abc',
+              resource_type_code: 'resource-type-code'
+            )
+            expect(tools.map(&:id)).to eq([tool_proxy3.id, tool_proxy2.id, tool_proxy1.id])
+          end
+
+          it 'returns the newest tool when there are 2 in a context' do
+            tool_proxy1 = create_tool_proxy(context: root_account)
+            tool_proxy1.bindings.create!(context: root_account)
+            tool_proxy2 = create_tool_proxy(context: root_account)
+            tool_proxy2.bindings.create!(context: root_account)
+            tool_proxy3 = create_tool_proxy(context: course)
+            tool_proxy3.bindings.create!(context: course)
+            tool_proxy4 = create_tool_proxy(context: course)
+            tool_proxy4.bindings.create!(context: course)
+
+            tools = described_class.proxies_in_order_by_codes(
+              context: course,
+              vendor_code: '123',
+              product_code: 'abc',
+              resource_type_code: 'resource-type-code'
+            )
+            expect(tools.map(&:id)).to eq([tool_proxy4.id, tool_proxy3.id, tool_proxy2.id, tool_proxy1.id])
+          end
+
+          it "doesn't return tool_proxies when closest ancestor is disabled" do
+            tool_proxy = create_tool_proxy(context: sub_account_2_1)
+            tool_proxy.bindings.create!(context: sub_account_2_1, enabled: false)
+            tool_proxy.bindings.create!(context: sub_account_1_1)
+            proxies = described_class.proxies_in_order_by_codes(
+              context: sub_account_2_1,
+              vendor_code: '123',
+              product_code: 'abc',
+              resource_type_code: 'resource-type-code'
+            )
+            expect(proxies.count).to eq 0
+          end
+
+          it "doesn't return deleted tool proxies" do
+            tool_proxy = create_tool_proxy(context: sub_account_2_1, workflow_state: 'deleted')
+            tool_proxy.bindings.create!(context: sub_account_2_1)
+            proxies = described_class.proxies_in_order_by_codes(
+              context: sub_account_2_1,
+              vendor_code: '123',
+              product_code: 'abc',
+              resource_type_code: 'resource-type-code'
+            )
+            expect(proxies.count).to eq 0
+          end
+
+          it "does not return tools with mismatched resource type codes" do
+            tool_proxy1 = create_tool_proxy(context: root_account)
+            tool_proxy1.bindings.create!(context: root_account)
+            tool_proxy2 = create_tool_proxy(context: root_account)
+            tool_proxy2.bindings.create!(context: root_account)
+            tool_proxy3 = create_tool_proxy(context: course)
+            tool_proxy3.bindings.create!(context: course)
+            tool_proxy4 = create_tool_proxy(context: course)
+            tool_proxy4.bindings.create!(context: course)
+
+            tool_proxy4.resources.first.update!(resource_type_code: 'changed!')
+
+            tools = described_class.proxies_in_order_by_codes(
+              context: course,
+              vendor_code: '123',
+              product_code: 'abc',
+              resource_type_code: 'resource-type-code'
+            )
+            expect(tools.map(&:id)).to eq([tool_proxy3.id, tool_proxy2.id, tool_proxy1.id])
+          end
+        end
+
         describe "#find_active_proxies_for_context_by_vendor_code_and_product_code" do
           it "doesn't return tool_proxies that are disabled" do
             tool_proxy = create_tool_proxy(context: sub_account_2_1, workflow_state: 'disabled')
@@ -273,7 +359,19 @@ module Lti
           workflow_state: 'active',
           raw_data: 'some raw data'
       }
-      ToolProxy.create(default_opts.merge(opts))
+
+      tp = ToolProxy.create(default_opts.merge(opts))
+      create_resource_handler(tp)
+      tp
+    end
+
+    def create_resource_handler(tool_proxy)
+      return unless tool_proxy.persisted?
+      Lti::ResourceHandler.create!(
+        tool_proxy: tool_proxy,
+        name: 'resource_handler',
+        resource_type_code: 'resource-type-code'
+      )
     end
 
     context "singleton message handlers" do
@@ -595,7 +693,7 @@ module Lti
               {
                 "endpoint" => 'endpoint',
                 "action" => ["POST", "GET"],
-                "@id" => 'id',
+                "@id" => '#vnd.Canvas.SubmissionEvent',
                 "@type" => "RestService"
               }
             ]
@@ -618,9 +716,12 @@ module Lti
         expect(tool_proxy.subscription_id).to eq 'subscription_id1'
       end
 
-      it 'should not create a subscription if another tool already has one' do
+      it 'should not create a subscription if another matching tool already has one' do
         ToolProxy.create!(
-          raw_data: {'enabled_capability' => [placement]},
+          raw_data: {
+            'enabled_capability' => [placement],
+            'tool_profile' => {'service_offered' => [{'endpoint' => 'endpoint', '@id' => '#vnd.Canvas.SubmissionEvent'}]},
+          },
           subscription_id: 'id',
           context: course_factory(account: account),
           shared_secret: 'shared_secret',
@@ -638,9 +739,12 @@ module Lti
         expect(tool_proxy.subscription_id).to eq 'id'
       end
 
-      it 'should not create a subscription if a root account tool already has one' do
+      it 'should not create a subscription if a matching root account tool already has one' do
         ToolProxy.create!(
-          raw_data: {'enabled_capability' => [placement]},
+          raw_data: {
+            'enabled_capability' => [placement],
+            'tool_profile' => {'service_offered' => [{'endpoint' => 'endpoint', '@id' => '#vnd.Canvas.SubmissionEvent'}]},
+          },
           subscription_id: 'id',
           context: account,
           shared_secret: 'shared_secret',
@@ -656,6 +760,29 @@ module Lti
         tool_proxy.raw_data['enabled_capability'] = [placement]
         tool_proxy.save!
         expect(tool_proxy.subscription_id).to eq 'id'
+      end
+
+      it "should create a new subscription if the #vnd.Canvas.SubmissionEvent endpoint doesn't match" do
+        ToolProxy.create!(
+          raw_data: {
+            'enabled_capability' => [placement],
+            'tool_profile' => {'service_offered' => [{'endpoint' => 'hi.url', '@id' => '#vnd.Canvas.SubmissionEvent'}]},
+          },
+          subscription_id: 'id',
+          context: course_factory(account: account),
+          shared_secret: 'shared_secret',
+          guid: 'guid',
+          product_version: '1.0beta',
+          lti_version: 'LTI-2p0',
+          product_family: product_family,
+          workflow_state: 'active'
+        )
+
+        expect_any_instance_of(Lti::PlagiarismSubscriptionsHelper).to receive(:create_subscription).and_return('id1')
+        tool_proxy.context = course_factory(account: account)
+        tool_proxy.raw_data['enabled_capability'] = [placement]
+        tool_proxy.save!
+        expect(tool_proxy.subscription_id).to eq 'id1'
       end
 
       it 'should not create subscriptions for non-plagiarism tools' do

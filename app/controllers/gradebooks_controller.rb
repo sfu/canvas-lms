@@ -94,8 +94,8 @@ class GradebooksController < ApplicationController
 
     @exclude_total = exclude_total?(@context)
 
-    Shackles.activate(:slave) do
-      # run these queries on the slave database for speed
+    GuardRail.activate(:secondary) do
+      # run these queries on the secondary database for speed
       @presenter.assignments
       aggregate_assignments
       @presenter.submissions
@@ -484,7 +484,8 @@ class GradebooksController < ApplicationController
       submissions_url: api_v1_course_student_submissions_url(@context, grouped: '1'),
       teacher_notes: teacher_notes && custom_gradebook_column_json(teacher_notes, @current_user, session),
       user_asset_string: @current_user&.asset_string,
-      version: params.fetch(:version, nil)
+      version: params.fetch(:version, nil),
+      allow_view_ungraded_as_zero: Account.site_admin.feature_enabled?(:view_ungraded_as_zero)
     }
 
     js_env({
@@ -646,7 +647,8 @@ class GradebooksController < ApplicationController
       js_bundle :gradebook_history
       js_env(
         COURSE_IS_CONCLUDED: @context.is_a?(Course) && @context.completed?,
-        OVERRIDE_GRADES_ENABLED: Account.site_admin.feature_enabled?(:final_grade_override_in_gradebook_history)
+        OVERRIDE_GRADES_ENABLED: @context.try(:allow_final_grade_override?) &&
+          Account.site_admin.feature_enabled?(:final_grade_override_in_gradebook_history)
       )
 
       render html: "", layout: true

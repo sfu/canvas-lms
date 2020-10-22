@@ -78,7 +78,7 @@ class AccountNotification < ActiveRecord::Base
   alias past :past?
 
   def self.for_user_and_account(user, root_account, include_past: false)
-    Shackles.activate(:slave) do
+    GuardRail.activate(:secondary) do
       if root_account.site_admin?
         current = self.for_account(root_account, include_past: include_past)
       else
@@ -145,7 +145,7 @@ class AccountNotification < ActiveRecord::Base
           # applicable, they probably need to be cleared out.
           current_ids = current.map(&:id)
           unless (closed_ids - current_ids).empty?
-            Shackles.activate(:master) do
+            GuardRail.activate(:primary) do
               user.set_preference(:closed_notifications, closed_ids & current_ids)
             end
           end
@@ -173,7 +173,7 @@ class AccountNotification < ActiveRecord::Base
   end
 
   def self.cache_key_for_root_account(root_account_id, date)
-    ['root_account_notifications', Shard.global_id_for(root_account_id), date.strftime('%Y-%m-%d')].cache_key
+    ['root_account_notifications2', Shard.global_id_for(root_account_id), date.strftime('%Y-%m-%d')].cache_key
   end
 
   def self.for_account(root_account, all_visible_account_ids=nil, include_past: false)
@@ -200,7 +200,6 @@ class AccountNotification < ActiveRecord::Base
       result = Shard.partition_by_shard(account_ids) do |sharded_account_ids|
         load_by_account = ->(slice_account_ids) do
           scope = AccountNotification.where("account_id IN (?) AND start_at <=? AND end_at >=?", slice_account_ids, start_at, end_at).
-            where("required_account_service IS NULL OR required_account_service IN (?)", enabled_flags).
             order('start_at DESC').
             preload({:account => :root_account}, account_notification_roles: :role)
           if Shard.current == root_account.shard
@@ -226,6 +225,9 @@ class AccountNotification < ActiveRecord::Base
           load_by_account.call(sharded_account_ids)
         end
       end
+
+      # need to post-process, since the cache covers all enabled flags
+      result.select! { |n| n.required_account_service.nil? || enabled_flags.include?(n.required_account_service) }
 
       # need to post-process since the cache covers the entire day
       unless include_past
@@ -322,7 +324,7 @@ class AccountNotification < ActiveRecord::Base
 
   def applicable_user_ids
     roles = self.account_notification_roles.preload(:role).to_a.map(&:role)
-    Shackles.activate(:slave) do
+    GuardRail.activate(:secondary) do
       self.class.applicable_user_ids_for_account_and_roles(self.account, roles)
     end
   end

@@ -239,12 +239,15 @@ module Canvas::LiveEvents
     actl = assignment.assignment_configuration_tool_lookups.take
     domain = assignment.root_account&.domain(ApplicationController.test_cluster_name)
     event[:domain] = domain if domain
-    if actl && Lti::ToolProxy.find_active_proxies_for_context_by_vendor_code_and_product_code(
-      context: assignment.course,
-      vendor_code: actl.tool_vendor_code,
-      product_code: actl.tool_product_code
-    ).any?
-      event[:associated_integration_id] = "#{actl.tool_vendor_code}-#{actl.tool_product_code}"
+    if actl
+      if (tool_proxy = Lti::ToolProxy.proxies_in_order_by_codes(
+        context: assignment.course,
+        vendor_code: actl.tool_vendor_code,
+        product_code: actl.tool_product_code,
+        resource_type_code: actl.tool_resource_type_code
+      ).first)
+        event[:associated_integration_id] = [actl.tool_vendor_code, actl.tool_product_code, tool_proxy.event_endpoint].join('_')
+      end
     end
     event
   end
@@ -339,16 +342,24 @@ module Canvas::LiveEvents
       lti_assignment_id: submission.assignment.lti_context_id,
       group_id: submission.group_id,
       posted_at: submission.posted_at,
+      workflow_state: submission.workflow_state,
     }
     actl = submission.assignment.assignment_configuration_tool_lookups.take
-    if actl && Lti::ToolProxy.find_active_proxies_for_context_by_vendor_code_and_product_code(
-      context: submission.course,
-      vendor_code: actl.tool_vendor_code,
-      product_code: actl.tool_product_code
-    ).any?
-      event[:associated_integration_id] = "#{actl.tool_vendor_code}-#{actl.tool_product_code}"
+    if actl
+      if (tool_proxy = Lti::ToolProxy.proxies_in_order_by_codes(
+        context: submission.course,
+        vendor_code: actl.tool_vendor_code,
+        product_code: actl.tool_product_code,
+        resource_type_code: actl.tool_resource_type_code
+      ).first)
+        event[:associated_integration_id] = [actl.tool_vendor_code, actl.tool_product_code, tool_proxy.event_endpoint].join('_')
+      end
     end
     event
+  end
+
+  def self.submission_event(event_type, submission)
+    post_event_stringified(event_type, get_submission_data(submission), amended_context(submission.context))
   end
 
   def self.get_attachment_data(attachment)
@@ -368,11 +379,11 @@ module Canvas::LiveEvents
   end
 
   def self.submission_created(submission)
-    post_event_stringified('submission_created', get_submission_data(submission))
+    submission_event('submission_created', submission)
   end
 
   def self.submission_updated(submission)
-    post_event_stringified('submission_updated', get_submission_data(submission))
+    submission_event('submission_updated', submission)
   end
 
   def self.submission_comment_created(comment)
@@ -388,7 +399,7 @@ module Canvas::LiveEvents
   end
 
   def self.plagiarism_resubmit(submission)
-    post_event_stringified('plagiarism_resubmit', get_submission_data(submission))
+    submission_event('plagiarism_resubmit', submission)
   end
 
   def self.get_user_data(user)
@@ -550,7 +561,7 @@ module Canvas::LiveEvents
       grader_id = submission.global_grader_id
     end
 
-    sis_pseudonym = Shackles.activate(:slave) do
+    sis_pseudonym = GuardRail.activate(:secondary) do
       SisPseudonym.for(submission.user, submission.assignment.context, type: :trusted, require_sis: false)
     end
 

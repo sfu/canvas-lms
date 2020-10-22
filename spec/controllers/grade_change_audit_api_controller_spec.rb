@@ -120,8 +120,12 @@ describe GradeChangeAuditApiController do
         events.map { |event| event.dig('links', 'assignment') }.uniq
       end
 
-      it "includes override grade change events in the results if the feature flag is enabled" do
+      it "includes override grade change events in the results if the feature flag is enabled and the course allows overrides" do
         Account.site_admin.enable_feature!(:final_grade_override_in_gradebook_history)
+        course.enable_feature!(:final_grades_override)
+        course.allow_final_grade_override = true
+        course.save!
+
         expect(returned_event_assignment_ids).to contain_exactly(assignment.id, nil)
       end
 
@@ -132,10 +136,13 @@ describe GradeChangeAuditApiController do
         expect(returned_event_assignment_ids).to contain_exactly(assignment.id)
       end
 
-      it "explicitly filters out override events when reading from Cassandra and the feature flag is disabled" do
-        allow(Auditors).to receive(:read_from_cassandra?).and_return(true)
-        allow(Auditors).to receive(:read_from_postgres?).and_return(false)
+      it "excludes override grade change events from the results when the course does not allow overrides" do
+        Account.site_admin.enable_feature!(:final_grade_override_in_gradebook_history)
 
+        expect(returned_event_assignment_ids).to contain_exactly(assignment.id)
+      end
+
+      it "explicitly filters out override events when they are not supposed to be shown" do
         expect(BookmarkedCollection).to receive(:filter).once
         get :for_course, params: { course_id: course.id }
       end
@@ -344,7 +351,7 @@ describe GradeChangeAuditApiController do
     end
   end
 
-  describe "GET for_course_and_other_parameters" do
+  describe "GET query" do
     let(:params) do
       {
         course_id: course.id,
@@ -355,11 +362,15 @@ describe GradeChangeAuditApiController do
     end
 
     before :each do
+      allow(Auditors).to receive(:read_from_cassandra?).and_return(false)
+      allow(Auditors).to receive(:write_to_cassandra?).and_return(false)
+      allow(Auditors).to receive(:read_from_postgres?).and_return(true)
+      allow(Auditors).to receive(:write_to_postgres?).and_return(true)
       assignment.grade_student(student, grader: teacher, score: 100)
     end
 
     it "returns events with the student's id included" do
-      get :for_course_and_other_parameters, params: params
+      get :query, params: params
       expect(student_ids).to include(student.id.to_s)
     end
 
@@ -373,19 +384,19 @@ describe GradeChangeAuditApiController do
 
       context "and student_id present in params" do
         it "returns no events" do
-          get :for_course_and_other_parameters, params: params
+          get :query, params: params
           expect(events_for_assignment).to be_empty
         end
       end
 
       context "and student_id is not present in params" do
         it "returns events" do
-          get :for_course_and_other_parameters, params: params.except(:student_id)
+          get :query, params: params.except(:student_id)
           expect(events_for_assignment.count).to be >= 2
         end
 
         it "returns events without the student id included" do
-          get :for_course_and_other_parameters, params: params
+          get :query, params: params
           expect(student_ids).to be_empty
         end
       end
@@ -397,6 +408,69 @@ describe GradeChangeAuditApiController do
       before(:once) do
         assignment.grade_student(student, score: 10, grader: teacher)
 
+        @override_grade_change = Auditors::GradeChange::OverrideGradeChange.new(
+          grader: teacher,
+          old_grade: nil,
+          old_score: nil,
+          score: student.enrollments.first.find_score
+        )
+      end
+
+      before(:each) do
+        # FIXME this should be in before(:once) but Auditors.write_to_postgres? isn't stubbed there
+        Auditors::GradeChange.record(override_grade_change: @override_grade_change)
+      end
+
+      context "with the Final Grade Override in Gradebook History feature flag enabled" do
+        before(:once) do
+          Account.site_admin.enable_feature!(:final_grade_override_in_gradebook_history)
+
+          course.enable_feature!(:final_grades_override)
+          course.allow_final_grade_override = true
+          course.save!
+        end
+
+        it "returns both assignment and override grade changes when no assignment_id value is specified" do
+          get :query, params: params.except(:assignment_id)
+          expect(returned_assignment_ids.uniq).to contain_exactly(assignment.id, nil)
+        end
+
+        it "returns only override grade changes when an assignment ID of 'override' is specified" do
+          get :query, params: params.merge({assignment_id: "override"})
+          expect(returned_assignment_ids).to contain_exactly(nil)
+        end
+
+        it "omits override grade changes when the course does not allow final grade overrides" do
+          course.allow_final_grade_override = false
+          course.save!
+
+          get :query, params: params.except(:assignment_id)
+          expect(returned_assignment_ids).to contain_exactly(assignment.id)
+        end
+      end
+
+      context "with the Final Grade Override in Gradebook History feature flag disabled" do
+        it "returns only assignment grade changes when no assignment_id value is specified" do
+          get :query, params: params.except(:assignment_id)
+          expect(returned_assignment_ids.uniq).to contain_exactly(assignment.id)
+        end
+
+        it "returns no results when an assignment ID of 'override' is specified" do
+          get :query, params: params.merge({assignment_id: "override"})
+          expect(returned_events).to be_empty
+        end
+      end
+
+      it "returns only grade changes for the assignment when a legitimate assignment ID is specified" do
+        get :query, params: params
+        expect(returned_assignment_ids).to contain_exactly(assignment.id)
+      end
+    end
+
+    describe "filtering by student" do
+      let(:returned_assignment_ids) { returned_events.map { |event| event.dig('links', 'assignment') } }
+
+      before(:each) do
         override_grade_change = Auditors::GradeChange::OverrideGradeChange.new(
           grader: teacher,
           old_grade: nil,
@@ -406,37 +480,16 @@ describe GradeChangeAuditApiController do
         Auditors::GradeChange.record(override_grade_change: override_grade_change)
       end
 
-      context "with the Final Grade Override in Gradebook History feature flag enabled" do
-        before(:once) do
-          Account.site_admin.enable_feature!(:final_grade_override_in_gradebook_history)
-        end
+      it "returns override grade changes when the Final Grade Override in Gradebook History feature is enabled" do
+        Account.site_admin.enable_feature!(:final_grade_override_in_gradebook_history)
 
-        it "returns both assignment and override grade changes when no assignment_id value is specified" do
-          get :for_course_and_other_parameters, params: params.except(:assignment_id)
-          expect(returned_assignment_ids.uniq).to contain_exactly(assignment.id, nil)
-        end
-
-        it "returns only override grade changes when an assignment ID of 'override' is specified" do
-          get :for_course_and_other_parameters, params: params.merge({assignment_id: "override"})
-          expect(returned_assignment_ids).to all(be_nil)
-        end
+        get :query, params: { student_id: student.id }
+        expect(returned_assignment_ids).to contain_exactly(assignment.id, nil)
       end
 
-      context "with the Final Grade Override in Gradebook History feature flag disabled" do
-        it "returns only assignment grade changes when no assignment_id value is specified" do
-          get :for_course_and_other_parameters, params: params.except(:assignment_id)
-          expect(returned_assignment_ids.uniq).to contain_exactly(assignment.id)
-        end
-
-        it "returns no results when an assignment ID of 'override' is specified" do
-          get :for_course_and_other_parameters, params: params.merge({assignment_id: "override"})
-          expect(returned_events).to be_empty
-        end
-      end
-
-      it "returns only grade changes for the assignment when a legitimate assignment ID is specified" do
-        get :for_course_and_other_parameters, params: params
-        expect(returned_assignment_ids).to all(eq(assignment.id))
+      it "omits override grade changes when the Final Grade Override in Gradebook History feature is disabled" do
+        get :query, params: { student_id: student.id }
+        expect(returned_assignment_ids).to contain_exactly(assignment.id)
       end
     end
   end
