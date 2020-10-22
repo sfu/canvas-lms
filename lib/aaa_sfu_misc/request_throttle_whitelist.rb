@@ -1,5 +1,5 @@
 class RequestThrottle
-  alias_method :whitelisted_original?, :whitelisted?
+  alias_method :whitelisted_original?, :approved?
   def whitelisted?(request)
     if request.fullpath.to_s.start_with?("/health_check") &&
         request.headers['User-Agent'].to_s.include?("Hobbit")
