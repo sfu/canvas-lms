@@ -32,7 +32,7 @@ const SFUPrivacyNotice = ({ usage, alertStyle }) => {
         external_apps: 'any app',
         google_docs: GOOGLE_DOCS
       },
-      tlc_will_help: {
+      cee_will_help: {
         external_apps: 'complete an app privacy assessment and, if needed, advise you how to obtain students’ consent in the manner prescribed by law',
         google_docs: 'with the student consent procedure that you must use'
       },
@@ -61,7 +61,7 @@ const SFUPrivacyNotice = ({ usage, alertStyle }) => {
         There are <strong> personal legal consequences</strong> if you use an app that discloses and stores students&rsquo; personal information elsewhere inside or outside Canada without their consent. Unauthorized disclosure is a privacy protection offense under BC law. Employees and SFU are liable to investigation and possible fines.
       </p>
       <p>
-        <strong>Before using {getString('before_using')}</strong>, carefully review the complete <a href="http://www.sfu.ca/canvasprivacynotice" target="_blank" rel="noreferrer noopener"> Canvas Privacy Protection Notice</a> to <strong>understand your legal responsibilities</strong> and please contact <a href="mailto:learntech@sfu.ca">learntech@sfu.ca</a>. The Learning Technology Specialists in the Teaching and Learning Centre will help you {getString('tlc_will_help')}.
+        <strong>Before using {getString('before_using')}</strong>, carefully review the complete <a href="http://www.sfu.ca/canvasprivacynotice" target="_blank" rel="noreferrer noopener"> Canvas Privacy Protection Notice</a> to <strong>understand your legal responsibilities</strong> and please contact the <a href="https://www.sfu.ca/cee/about/contact.html" target="_blank">Centre for Educational Excellence (CEE)</a>. The Learning Technology Specialists in CEE will help you {getString('cee_will_help')}.
       </p>
       <p>
         By {getString('by_using_in_course')}, you acknowledge that you have <strong>read the <a href="http://www.sfu.ca/canvasprivacynotice" target="_blank" rel="noreferrer noopener">Canvas Privacy Protection Notice</a></strong> and will <strong>follow the described protection of privacy requirements and procedure</strong>.
