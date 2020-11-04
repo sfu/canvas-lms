@@ -1208,6 +1208,27 @@ test_1,u1,student,active}
     end
   end
 
+  describe 'remove_previous_imports' do
+    it 'refuses to do anything if the batch is already failed' do
+      term = Account.default.enrollment_terms.first
+      batch = create_csv_data([
+                                %{course_id,short_name,long_name,account_id,term_id,status},
+                                %{course_id,user_id,role,status},
+                              ]) do |batch|
+        batch.options = {}
+        batch.batch_mode = true
+        batch.options[:multi_term_batch_mode] = true
+        batch.batch_mode_term = term
+        batch.save!
+      end
+      ['failed', 'failed_with_messages', 'aborted' ].each do |status|
+        batch.workflow_state = status
+        batch.save!
+        expect(batch.remove_previous_imports).to be_falsey
+      end
+    end
+  end
+
   describe 'live events' do
 
     def test_batch

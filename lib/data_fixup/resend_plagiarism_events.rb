@@ -37,78 +37,84 @@ module DataFixup
     EVENT_NAME = 'plagiarism_resubmit'.freeze
 
     def self.run(start_time = 3.months.ago, end_time = Time.zone.now)
-      raise 'start_time must be less than end_time' unless start_time < end_time
+      limit, = Setting.get('trigger_plagiarism_resubmit', '100,180').split(',').map(&:to_i)
 
-      schedule_resubmit_job(
-        submissions_missing_reports(start_time, end_time).union(
-          submissions_missing_scored_reports(start_time, end_time)
-        )
-      )
+      # We're going to create all of the jobs that need to run with some far future run date
+      # (so we know what they all are and we won't run them all at once and overwhelm our partners) and
+      # then we're going to start the first one.
+      batch_end_time = end_time
+      loop do
+        batch_start_time = resend_scope(start_time, batch_end_time).limit(limit).pluck(:submitted_at)&.last
+        break if batch_start_time.nil?
+
+        schedule_resubmit_job_by_time(batch_start_time, batch_end_time)
+        batch_end_time = batch_start_time
+      end
+      run_next_job
     end
 
-    def self.schedule_resubmit_job(scope)
-      _, wait_time = Setting.get('trigger_plagiarism_resubmit', '100,180').split(',').map(&:to_i)
-      run_at = Delayed::Job.where(strand: "plagiarism_event_resend").order(:run_at).last&.run_at
+    def self.resend_scope(start_time, end_time)
+      raise 'start_time must be less than end_time' unless start_time < end_time
+
+      submission_scope = all_configured_submissions(start_time, end_time)
+      submission_scope.joins(:attachment_associations).
+        joins("LEFT JOIN #{OriginalityReport.quoted_table_name}
+                AS ors ON submissions.id = ors.submission_id
+                      AND submissions.submitted_at = ors.submission_time
+                      AND attachment_associations.attachment_id = ors.attachment_id
+                      AND ors.workflow_state <> 'scored'").
+        union(
+          submission_scope.where(submission_type: 'online_text_entry').
+          joins("LEFT JOIN #{OriginalityReport.quoted_table_name}
+                  AS ors ON submissions.id = ors.submission_id
+                        AND submissions.submitted_at = ors.submission_time
+                        AND ors.attachment_id IS NULL
+                        AND ors.workflow_state <> 'scored'")
+        ).order(submitted_at: :desc).
+        preload(course: :root_account, assignment: :assignment_configuration_tool_lookups, user: :pseudonyms)
+    end
+
+    def self.schedule_resubmit_job_by_time(start_time, end_time)
       DataFixup::ResendPlagiarismEvents.send_later_if_production_enqueue_args(
-        :trigger_plagiarism_resubmit_for,
+        :trigger_plagiarism_resubmit_by_time,
         {
           priority: Delayed::LOWER_PRIORITY,
           strand: "plagiarism_event_resend",
-          run_at: (run_at &.+ wait_time.seconds) || Time.zone.now
+          run_at: 1.year.from_now
         },
-        scope
+        start_time,
+        end_time
       )
+    end
+
+    def self.run_next_job
+      _, wait_time = Setting.get('trigger_plagiarism_resubmit', '100,180').split(',').map(&:to_i)
+      Delayed::Job.where(strand: "plagiarism_event_resend", locked_at: nil).
+        order(:id).first&.update_attributes(run_at: wait_time.seconds.from_now)
     end
 
     # Retriggers the plagiarism resubmit event for the given
     # submission scope.
-    def self.trigger_plagiarism_resubmit_for(submission_scope)
-      limit, _ = Setting.get('trigger_plagiarism_resubmit', '100,180').split(',').map(&:to_i)
-      submission_scope = submission_scope.order(:id)
-      limited_scope = submission_scope.limit(limit)
-      limited_scope.each do |submission|
+    def self.trigger_plagiarism_resubmit_by_time(start_time, end_time)
+      resend_scope(start_time, end_time).each do |submission|
         Canvas::LiveEvents.post_event_stringified(
           ResendPlagiarismEvents::EVENT_NAME,
           Canvas::LiveEvents.get_submission_data(submission),
           context_for_event(submission)
         )
       end
-
-      # since we're sending these in limited batches, we need to check if we have more
-      # and start a new job for the next batch if there are more
-      last_batch_id = limited_scope.last&.id
-      if last_batch_id &.< submission_scope.maximum(:id)
-        schedule_resubmit_job(submission_scope.where("id > ?", last_batch_id))
-      end
+    ensure
+      # After we finish any job, we need to set the next one to run after the specified
+      # wait time
+      run_next_job
     end
-    private_class_method :trigger_plagiarism_resubmit_for
-
-    # Returns all submissions configured with a plagiarism
-    # platform assignment that lack a scored originality
-    # report.
-    def self.submissions_missing_scored_reports(start_time, end_time)
-      all_configured_submissions(start_time, end_time).joins(:originality_reports).
-        where.not(originality_reports: { workflow_state: 'scored' })
-    end
-    private_class_method :submissions_missing_scored_reports
-
-    # Returns all submissions configured with a plagiarism
-    # platform assignment that lack an do not have any
-    # originality reports
-    def self.submissions_missing_reports(start_time, end_time)
-      all_configured_submissions(start_time, end_time).left_outer_joins(:originality_reports).
-        where(originality_reports: {id: nil})
-    end
-    private_class_method :submissions_missing_reports
 
     # Returns all submissions for assignments associated with
     # a plagiarism platform assignment
     def self.all_configured_submissions(start_time, end_time)
       Submission.active.
-        where.not(workflow_state: 'unsubmitted').
-        where(submitted_at: start_time..end_time).
-        joins(assignment: :assignment_configuration_tool_lookups).
-        preload(course: :root_account, assignment: :assignment_configuration_tool_lookups, user: :pseudonyms)
+        where(submitted_at: start_time...end_time).
+        where("EXISTS(?)", AssignmentConfigurationToolLookup.where("assignment_id = submissions.assignment_id"))
     end
     private_class_method :all_configured_submissions
 
