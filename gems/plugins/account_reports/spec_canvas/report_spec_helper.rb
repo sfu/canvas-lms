@@ -41,10 +41,11 @@ module ReportSpecHelper
     account_report = AccountReport.new(:user => @admin || user_factory,
                                        :account => account,
                                        :report_type => type)
-    account_report.parameters = parameters
+    parameters ||= {}
+    account_report.parameters = parameters.merge({'skip_message' => true})
     account_report.save!
     if AccountReport.available_reports[type]
-      AccountReports.generate_report(account_report, send_message: false)
+      AccountReports.generate_report(account_report)
     else
       raise ReportSpecHelperError.new("report is not properly configured in engine.")
     end
@@ -75,7 +76,7 @@ module ReportSpecHelper
     }
     skip_order = true if options[:order] == 'skip'
     order = Array(options[:order]).presence || [0, 1]
-    all_parsed = CSV.parse(csv, csv_parse_opts).map.to_a
+    all_parsed = CSV.parse(csv, **csv_parse_opts).map.to_a
     raise 'Must order report results to avoid brittle specs' unless options[:order].present? || all_parsed.count < 3
     header = all_parsed.shift
     if all_parsed.present? && !skip_order
