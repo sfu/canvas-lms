@@ -31,7 +31,7 @@ gem 'active_model_serializers', '0.9.0alpha1',
   github: 'rails-api/active_model_serializers', ref: '61882e1e4127facfe92e49057aec71edbe981829'
 gem 'addressable', '2.7.0', require: false
 gem 'after_transaction_commit', '2.2.1'
-gem 'authlogic', '5.0.4'
+gem 'authlogic', '6.2.0'
   gem 'scrypt', '3.0.7'
 gem 'aws-sdk-core', '3.109.2', require: false
   gem 'aws-partitions', '1.393.0', require: false
@@ -53,7 +53,7 @@ gem 'canvas_connect', '0.3.11'
   gem 'adobe_connect', '1.0.8', require: false
 gem 'canvas_webex', '0.17'
 gem 'crocodoc-ruby', '0.0.1', require: false
-gem 'ddtrace', '0.33.1', require: false
+gem 'ddtrace', '0.42.0', require: false
 gem 'encrypted_cookie_store-instructure', '1.2.10', require: 'encrypted_cookie_store'
 gem 'folio-pagination', '0.0.12', require: 'folio/rails'
 gem 'ffi', '1.13.1', require: false
@@ -73,13 +73,13 @@ gem 'ims-lti', '2.3.0', require: 'ims'
 gem 'inst_statsd', '2.1.6'
   gem 'statsd-ruby', '1.4.0', require: false
   gem 'aroi', '0.0.7', require: false
-  gem 'dogstatsd-ruby', '4.7.0'
-gem 'inst-jobs', '1.0.4'
+  gem 'dogstatsd-ruby', '4.8.2'
+gem 'inst-jobs', '2.1.2'
   gem 'fugit', '1.4.0', require: false
     gem 'et-orbi', '1.2.4', require: false
-gem 'inst-jobs-autoscaling', '2.0.0'
+gem 'inst-jobs-autoscaling', '2.1.0'
   gem 'aws-sdk-autoscaling', '1.49.0', require: false
-gem 'inst-jobs-statsd', '2.0.0'
+gem 'inst-jobs-statsd', '2.1.0'
 gem 'json', '2.3.1'
 gem 'json_schemer', '0.2.16'
 gem 'json-jwt', '1.13.0', require: false
@@ -120,7 +120,7 @@ gem 'guardrail', '2.0.1'
 gem 'simple_oauth', '0.3.1', require: false
 gem 'switchman', '2.0.2'
   gem 'open4', '1.3.4', require: false
-gem 'switchman-inst-jobs', '3.0.5'
+gem 'switchman-inst-jobs', '3.1.0'
 gem 'twilio-ruby', '5.36.0', require: false
 gem 'tzinfo', '1.2.7'
 gem 'vault', '0.15.0', require: false

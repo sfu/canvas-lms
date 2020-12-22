@@ -23,6 +23,7 @@ class Quizzes::QuizzesController < ApplicationController
   include KalturaHelper
   include ::Filters::Quizzes
   include SubmittablesGradingPeriodProtection
+  include QuizMathDataFixup
 
   # If Quiz#one_time_results is on, this flag must be set whenever we've
   # rendered the submission results to the student so that the results can be
@@ -68,14 +69,14 @@ class Quizzes::QuizzesController < ApplicationController
       quiz_options = Rails.cache.fetch(
         [
           'quiz_user_permissions', @context.id, @current_user,
-          scoped_quizzes.map(&:id), # invalidate on add/delete of quizzes
-          scoped_quizzes.map(&:updated_at).sort.last # invalidate on modifications
+          scoped_quizzes_index.map(&:id), # invalidate on add/delete of quizzes
+          scoped_quizzes_index.map(&:updated_at).sort.last # invalidate on modifications
         ].cache_key
       ) do
         if can_manage
-          Quizzes::Quiz.preload_can_unpublish(scoped_quizzes)
+          Quizzes::Quiz.preload_can_unpublish(scoped_quizzes_index)
         end
-        scoped_quizzes.each_with_object({}) do |quiz, quiz_user_permissions|
+        scoped_quizzes_index.each_with_object({}) do |quiz, quiz_user_permissions|
           quiz_user_permissions[quiz.id] = {
             can_update: can_manage,
             can_unpublish: can_manage && quiz.can_unpublish?
@@ -83,8 +84,8 @@ class Quizzes::QuizzesController < ApplicationController
         end
       end
 
-      practice_quizzes   = scoped_quizzes.select{ |q| q.quiz_type == QUIZ_TYPE_PRACTICE }
-      surveys            = scoped_quizzes.select{ |q| QUIZ_TYPE_SURVEYS.include?(q.quiz_type) }
+      practice_quizzes   = scoped_quizzes_index.select{ |q| q.quiz_type == QUIZ_TYPE_PRACTICE }
+      surveys            = scoped_quizzes_index.select{ |q| QUIZ_TYPE_SURVEYS.include?(q.quiz_type) }
       serializer_options = [@context, @current_user, session, {
         permissions: quiz_options,
         skip_date_overrides: true,
@@ -205,7 +206,6 @@ class Quizzes::QuizzesController < ApplicationController
       GuardRail.activate(:primary) do
         @quiz.context_module_action(@current_user, :read) unless @locked && !@locked_reason[:can_view]
       end
-
       @assignment = @quiz.assignment
       @assignment = @assignment.overridden_for(@current_user) if @assignment
 
@@ -245,12 +245,12 @@ class Quizzes::QuizzesController < ApplicationController
         QUIZZES_URL: course_quizzes_url(@context),
         MAX_GROUP_CONVERSATION_SIZE: Conversation.max_group_conversation_size
       }
+
       append_sis_data(hash)
       js_env(hash)
       conditional_release_js_env(@quiz.assignment, includes: [:rule])
 
       set_master_course_js_env_data(@quiz, @context)
-
       @quiz_menu_tools = external_tools_display_hashes(:quiz_menu)
       @can_take = can_take_quiz?
       GuardRail.activate(:primary) do
@@ -268,7 +268,10 @@ class Quizzes::QuizzesController < ApplicationController
           log_asset_access(@quiz, "quizzes", "quizzes")
           js_bundle :quiz_show
           css_bundle :quizzes, :learning_outcomes
-          render stream: can_stream_template? unless @declined_reason
+          if params[:take] && @quiz_eligibility && @quiz_eligibility.declined_reason_renders
+            return render @quiz_eligibility.declined_reason_renders
+          end
+          render stream: can_stream_template?
         end
       end
       @padless = true
@@ -292,6 +295,12 @@ class Quizzes::QuizzesController < ApplicationController
 
   def edit
     if authorized_action(@quiz, @current_user, :update)
+
+      if params[:fixup_quiz_math_questions] == "1"
+        InstStatsd::Statsd.increment("fixingup_quiz_math_question")
+        @quiz = fixup_quiz_questions_with_bad_math(@quiz)
+      end
+
       add_crumb(@quiz.title, named_context_url(@context, :context_quiz_url, @quiz))
       @assignment = @quiz.assignment
       @quiz.title = params[:title] if params[:title]
@@ -925,6 +934,11 @@ class Quizzes::QuizzesController < ApplicationController
       redirect_to course_quiz_url(@context, @quiz) and return
     end
 
+    if params[:fixup_quiz_math_questions] == "1"
+      InstStatsd::Statsd.increment("fixingup_quiz_math_submission")
+      fixup_submission_questions_with_bad_math(@submission)
+    end
+
     if !@submission.preview? && (!@js_env || !@js_env[:QUIZ_SUBMISSION_EVENTS_URL])
       events_url = api_v1_course_quiz_submission_events_url(@context, @quiz, @submission)
       js_env QUIZ_SUBMISSION_EVENTS_URL: events_url
@@ -946,9 +960,9 @@ class Quizzes::QuizzesController < ApplicationController
 
   def can_take_quiz?
     return true if params[:preview] && can_preview?
-    return false if params[:take] && !authorized_action(@quiz, @current_user, :submit)
+    return false if params[:take] && !@quiz.grants_right?(@current_user, :submit)
     return false if @submission && @submission.completed? && @submission.attempts_left == 0
-    can_take = Quizzes::QuizEligibility.new(course: @context,
+    @quiz_eligibility = Quizzes::QuizEligibility.new(course: @context,
                                             quiz: @quiz,
                                             user: @current_user,
                                             session: session,
@@ -956,11 +970,9 @@ class Quizzes::QuizzesController < ApplicationController
                                             access_code: params[:access_code])
 
     if params[:take]
-      @declined_reason = can_take.declined_reason_renders
-      render @declined_reason if @declined_reason
-      can_take.eligible?
+      @quiz_eligibility.eligible?
     else
-      can_take.potentially_eligible?
+      @quiz_eligibility.potentially_eligible?
     end
   end
 
@@ -1025,7 +1037,7 @@ class Quizzes::QuizzesController < ApplicationController
   end
 
   def assignment_quizzes_json(serializer_options)
-    old_quizzes = scoped_quizzes.select{ |q| q.quiz_type == QUIZ_TYPE_ASSIGNMENT }
+    old_quizzes = scoped_quizzes_index.select{ |q| q.quiz_type == QUIZ_TYPE_ASSIGNMENT }
     unless @context.root_account.feature_enabled?(:newquizzes_on_quiz_page)
       return quizzes_json(old_quizzes, *serializer_options)
     end
@@ -1066,6 +1078,19 @@ class Quizzes::QuizzesController < ApplicationController
 
   def hide_quiz?
     !@submission.posted?
+  end
+
+  def scoped_quizzes_index
+    return @_quizzes_index if @_quizzes_index
+    scope = @context.quizzes.active.preload(:assignment).select(*(Quizzes::Quiz.columns.map(&:name) - ["quiz_data"]))
+
+    # students only get to see published quizzes, and they will fetch the
+    # overrides later using the API:
+    scope = scope.available unless @context.grants_right?(@current_user, session, :read_as_admin)
+
+    scope = DifferentiableAssignment.scope_filter(scope, @current_user, @context)
+
+    @_quizzes_index = sort_quizzes(scope)
   end
 
   def scoped_quizzes

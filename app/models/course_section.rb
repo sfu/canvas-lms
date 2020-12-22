@@ -57,6 +57,10 @@ class CourseSection < ActiveRecord::Base
   include StickySisFields
   are_sis_sticky :course_id, :name, :start_at, :end_at, :restrict_enrollments_to_section_dates
 
+  def account
+    course.account
+  end
+
   def validate_section_dates
     if start_at.present? && end_at.present? && end_at < start_at
       self.errors.add(:end_at, t("End date cannot be before start date"))
@@ -142,7 +146,29 @@ class CourseSection < ActiveRecord::Base
   end
 
   set_policy do
-    given { |user, session| self.course.grants_right?(user, session, :manage_sections) }
+    given do |user, session|
+      self.course.root_account.feature_enabled?(:granular_permissions_course_sections) &&
+      self.course.grants_right?(user, session, :manage_sections_add)
+    end
+    can :read and can :create
+
+    given do |user, session|
+      self.course.root_account.feature_enabled?(:granular_permissions_course_sections) &&
+      self.course.grants_right?(user, session, :manage_sections_edit)
+    end
+    can :read and can :update
+
+    given do |user, session|
+      self.course.root_account.feature_enabled?(:granular_permissions_course_sections) &&
+      self.course.grants_right?(user, session, :manage_sections_delete)
+    end
+    can :read and can :delete
+
+    # Bundled legacy role override for managing course sections
+    given do |user, session|
+      !self.course.root_account.feature_enabled?(:granular_permissions_course_sections) &&
+      self.course.grants_right?(user, session, :manage_sections)
+    end
     can :read and can :create and can :update and can :delete
 
     given { |user, session| self.course.grants_any_right?(user, session, :manage_students, :manage_admin_users) }

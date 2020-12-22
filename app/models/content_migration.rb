@@ -236,12 +236,19 @@ class ContentMigration < ActiveRecord::Base
   # error_report_id - the id to an error report
   # fix_issue_html_url - the url to send the user to to fix problem
   #
+  ISSUE_TYPE_TO_ERROR_LEVEL_MAP = {
+    todo: :info,
+    warning: :warn,
+    error: :error
+  }.freeze
+
   def add_issue(user_message, type, opts={})
     mi = self.migration_issues.build(:issue_type => type.to_s, :description => user_message)
     if opts[:error_report_id]
       mi.error_report_id = opts[:error_report_id]
     elsif opts[:exception]
-      er = Canvas::Errors.capture_exception(:content_migration, opts[:exception])[:error_report]
+      level = ISSUE_TYPE_TO_ERROR_LEVEL_MAP[type]
+      er = Canvas::Errors.capture_exception(:content_migration, opts[:exception], level)[:error_report]
       mi.error_report_id = er
     end
     mi.error_message = opts[:error_message]
@@ -263,7 +270,8 @@ class ContentMigration < ActiveRecord::Base
   end
 
   def add_error(user_message, opts={})
-    add_issue(user_message, :error, opts)
+    level = opts.fetch(:issue_level, :error)
+    add_issue(user_message, level, opts)
   end
 
   def add_warning(user_message, opts={})
@@ -292,14 +300,15 @@ class ContentMigration < ActiveRecord::Base
     add_warning(t('errors.import_error', "Import Error:") + " #{item_type} - \"#{item_name}\"", warning)
   end
 
-  def fail_with_error!(exception_or_info)
-    opts={}
+  def fail_with_error!(exception_or_info, error_message: nil, issue_level: :error)
+    opts={ issue_level: issue_level }
     if exception_or_info.is_a?(Exception)
       opts[:exception] = exception_or_info
     else
       opts[:error_message] = exception_or_info
     end
-    add_error(t(:unexpected_error, "There was an unexpected error, please contact support."), opts)
+    message = error_message || t(:unexpected_error, "There was an unexpected error, please contact support.")
+    add_error(message, opts)
     self.workflow_state = :failed
     job_progress.fail if job_progress && !skip_job_progress
     save

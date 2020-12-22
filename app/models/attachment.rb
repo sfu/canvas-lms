@@ -1701,8 +1701,15 @@ class Attachment < ActiveRecord::Base
       update_attribute(:workflow_state, 'processing')
     end
   rescue => e
+    warnable_errors = [
+      Canvadocs::BadGateway,
+      Canvadoc::UploadTimeout,
+      Canvadocs::ServerError
+    ]
+    error_level = warnable_errors.any?{|kls| e.is_a?(kls) } ? :warn : :error
     update_attribute(:workflow_state, 'errored')
-    Canvas::Errors.capture(e, type: :canvadocs, attachment_id: id, annotatable: opts[:wants_annotation])
+    error_data = {type: :canvadocs, attachment_id: id, annotatable: opts[:wants_annotation]}
+    Canvas::Errors.capture(e, error_data, error_level)
 
     if attempt <= Setting.get('max_canvadocs_attempts', '5').to_i
       delay(n_strand: 'canvadocs_retries',

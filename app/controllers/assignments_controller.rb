@@ -126,6 +126,9 @@ class AssignmentsController < ApplicationController
   end
 
   def show
+    if !request.format.html?
+      return render body: "endpoint does not support #{request.format.symbol}", status: :bad_request
+    end
     GuardRail.activate(:secondary) do
       @assignment ||= @context.assignments.find(params[:id])
 
@@ -183,7 +186,7 @@ class AssignmentsController < ApplicationController
           eligible_categories = eligible_categories.where(id: @assignment.group_category) if @assignment.group_category.present?
           env[:group_categories] = group_categories_json(eligible_categories, @current_user, session, {include: ['groups']})
 
-          selected_group_id = @current_user.get_preference(:gradebook_settings, @context.global_id)&.dig('filter_rows_by', 'student_group_id')
+          selected_group_id = @current_user&.get_preference(:gradebook_settings, @context.global_id)&.dig('filter_rows_by', 'student_group_id')
           # If this is a group assignment and we had previously filtered by a
           # group that isn't part of this assignment's group set, behave as if
           # no group is selected.
@@ -293,6 +296,8 @@ class AssignmentsController < ApplicationController
           css_bundle :assignments
           js_bundle :assignment_show
         end
+
+        mastery_scales_js_env
 
         render locals: {
           eula_url: tool_eula_url,

@@ -540,11 +540,22 @@ describe AssignmentsController do
       assert_status(404)
     end
 
-    it "doesn't fail on a public course with a nil user" do
-      course = course_factory(:active_all => true, :is_public => true)
-      assignment = assignment_model(:course => course, :submission_types => "online_url")
-      get 'show', params: {:course_id => course.id, :id => assignment.id}
-      assert_status(200)
+    context "with public course" do
+      let(:course){ course_factory(:active_all => true, :is_public => true) }
+      let(:assignment){ assignment_model(:course => course, :submission_types => "online_url") }
+
+      it "doesn't fail on a public course with a nil user" do
+        get 'show', params: {:course_id => course.id, :id => assignment.id}
+        assert_status(200)
+      end
+
+      it "doesn't fail on a public course with a nil user EVEN IF filter_speed_grader_by_student_group is in play" do
+        course.root_account.enable_feature!(:filter_speed_grader_by_student_group)
+        course.update!(filter_speed_grader_by_student_group: true)
+        expect(course.reload.filter_speed_grader_by_student_group).to be_truthy
+        get 'show', params: {:course_id => course.id, :id => assignment.id}
+        assert_status(200)
+      end
     end
 
     it "should return unauthorized if not enrolled" do
@@ -698,6 +709,13 @@ describe AssignmentsController do
       expect(response).to be_successful
       expect(assigns[:current_user_submission]).not_to be_nil
       expect(assigns[:assigned_assessments]).to eq []
+    end
+
+    it "doesn't explode when fielding a JSON request" do
+      user_session(@student)
+      get 'show', params: {:course_id => @course.id, :id => @assignment.id}, format: :json
+      expect(response.body).to include("endpoint does not support json")
+      expect(response.code.to_i).to eq(400)
     end
 
     it "should assign (active) peer review requests" do
@@ -1032,6 +1050,16 @@ describe AssignmentsController do
           @assignment.update!(submission_types: "external_tool", external_tool_tag: ContentTag.new)
           get :show, params: {course_id: @course.id, id: @assignment.id}
           expect(assigns[:js_env]).to have_key(:speed_grader_url)
+        end
+      end
+
+      describe "mastery_scales" do
+        it "should set mastery_scales env when account has mastery scales enabled" do
+          @course.root_account.enable_feature!(:account_level_mastery_scales)
+          outcome_proficiency_model(@course)
+          get :show, params: {course_id: @course.id, id: @assignment.id}
+          expect(assigns[:js_env]).to have_key :ACCOUNT_LEVEL_MASTERY_SCALES
+          expect(assigns[:js_env]).to have_key :MASTERY_SCALE
         end
       end
     end

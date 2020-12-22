@@ -733,8 +733,17 @@ module ApplicationHelper
   end
   private :brand_config_account
 
+  def pseudonym_can_see_custom_assets
+    # custom JS could be used to hijack user stuff.  Let's not allow
+    # it to be rendered unless the pseudonym is really
+    # from this account (or trusts, etc).
+    return true unless @current_pseudonym
+    @current_pseudonym.works_for_account?(brand_config_account, ignore_types: [:site_admin])
+  end
+
   def include_account_js
     return if params[:global_includes] == '0' || !@domain_root_account
+    return unless pseudonym_can_see_custom_assets
 
     includes = if @domain_root_account.allow_global_includes? && (abc = active_brand_config(ignore_high_contrast_preference: true))
       abc.css_and_js_overrides[:js_overrides]
@@ -761,6 +770,7 @@ module ApplicationHelper
 
   def include_account_css
     return if disable_account_css?
+    return unless pseudonym_can_see_custom_assets
 
     includes = if @domain_root_account.allow_global_includes? && (abc = active_brand_config(ignore_high_contrast_preference: true))
       abc.css_and_js_overrides[:css_overrides]
@@ -1244,14 +1254,15 @@ module ApplicationHelper
   end
 
   def authenticated_download_url(attachment)
-    file_authenticator.download_url(attachment)
+    file_authenticator.download_url(attachment, options: {original_url: request.original_url})
   end
 
   def authenticated_inline_url(attachment)
-    file_authenticator.inline_url(attachment)
+    file_authenticator.inline_url(attachment, options: {original_url: request.original_url})
   end
 
   def authenticated_thumbnail_url(attachment, options={})
+    options[:original_url] = request.original_url
     file_authenticator.thumbnail_url(attachment, options)
   end
 
@@ -1286,6 +1297,7 @@ module ApplicationHelper
     if @domain_root_account.feature_enabled?(:account_level_mastery_scales)
       js_env(
         ACCOUNT_LEVEL_MASTERY_SCALES: true,
+        IMPROVED_OUTCOMES_MANAGEMENT: @domain_root_account.feature_enabled?(:improved_outcomes_management),
         MASTERY_SCALE: {
           outcome_proficiency: @context.resolved_outcome_proficiency&.as_json,
           outcome_calculation_method: @context.resolved_outcome_calculation_method&.as_json

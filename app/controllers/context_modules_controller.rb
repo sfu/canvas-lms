@@ -466,12 +466,11 @@ class ContextModulesController < ApplicationController
     progression = mod.evaluate_for(@current_user)
     progression ||= ContextModuleProgression.new
     if value_to_boolean(should_collapse)
-      progression.collapsed = true
+      progression.collapse!(skip_save: progression.new_record?)
     else
-      progression.uncollapse!
+      progression.uncollapse!(skip_save: progression.new_record?)
     end
-    progression.save unless progression.new_record?
-    progression
+    return progression
   end
 
   def toggle_collapse
@@ -582,7 +581,8 @@ class ContextModulesController < ApplicationController
     if authorized_action(@module, @current_user, :update)
       @tag = @module.add_item(params[:item])
       unless @tag&.valid?
-        return render :json => @tag.errors, :status => :bad_request
+        body = @tag.nil? ? { error: "Could not find item to tag" } : @tag.errors
+        return render :json => body, :status => :bad_request
       end
       json = @tag.as_json
       json['content_tag'].merge!(
