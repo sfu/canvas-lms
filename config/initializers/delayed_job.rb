@@ -43,6 +43,16 @@ Delayed::Backend::Base.class_eval do
   end
 end
 
+Delayed::Pool.on_fork = -> {
+  # because it's possible to accidentally share an open http
+  # socket between processes shortly after fork.
+  Imperium::Agent.reset_default_client
+  Imperium::Catalog.reset_default_client
+  Imperium::Client.reset_default_client
+  Imperium::Events.reset_default_client
+  Imperium::KV.reset_default_client
+}
+
 # if the method was defined by a previous module, use the existing
 # implementation, but provide a default otherwise
 module Delayed::Backend::DefaultJobAccount
@@ -121,10 +131,6 @@ module DelayedJobConfig
 end
 
 ### lifecycle callbacks
-
-Delayed::Pool.on_fork = ->{
-  Canvas.reconnect_redis
-}
 
 Delayed::Worker.lifecycle.around(:perform) do |worker, job, &block|
   Canvas::Reloader.reload! if Canvas::Reloader.pending_reload
