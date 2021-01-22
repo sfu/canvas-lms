@@ -156,18 +156,27 @@ describe ExternalToolsController do
             "client_id"
           ]
         end
-  
+
         it 'sets the "login_hint" to the current user lti id' do
           expect(assigns[:lti_launch].params['login_hint']).to eq Lti::Asset.opaque_identifier_for(@teacher)
         end
-  
+
         it 'caches the the LTI 1.3 launch' do
           expect(cached_launch["https://purl.imsglobal.org/spec/lti/claim/message_type"]).to eq "LtiResourceLinkRequest"
         end
-  
+
         it 'sets the "canvas_domain" to the request domain' do
           message_hint = JSON::JWT.decode(assigns[:lti_launch].params['lti_message_hint'], :skip_verification)
           expect(message_hint['canvas_domain']).to eq 'localhost'
+        end
+      end
+
+      context "with a bad launch url" do
+        it "fails gracefully" do
+          user_session(@teacher)
+          allow(controller).to receive(:basic_lti_launch_request).and_raise(Lti::Errors::InvalidLaunchUrlError)
+          get :show, params: {:course_id => @course.id, id: tool.id}
+          expect(response).to be_redirect
         end
       end
 
@@ -795,6 +804,15 @@ describe ExternalToolsController do
       tool.save!
       get 'retrieve', params: {course_id: @course.id, url: tool.url, content_item_id: collab.id, placement: 'collaboration'}
       expect(assigns[:lti_launch].params['custom_collaboration_url']).to eq api_v1_collaboration_members_url(collab)
+    end
+
+    it "messages appropriately when there is a launch error because of missing permissions" do
+      user_session(@teacher)
+      tool = new_valid_tool(@course)
+      tool.settings[:course_navigation] = { 'required_permissions' => 'not-real-permissions,nor-this-one' }
+      tool.save!
+      get 'retrieve', params: {:course_id => @course.id, :url => "http://www.example.com/basic_lti"}
+      expect(response).to be_unauthorized
     end
 
     it "should remove query params when post_only is set" do

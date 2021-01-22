@@ -159,6 +159,7 @@ class ExternalToolsController < ApplicationController
       secure_params: params[:secure_params],
       post_live_event: true
     )
+    return unless @lti_launch
     display_override = params['borderless'] ? 'borderless' : params[:display]
     render Lti::AppUtil.display_template(@tool.display_type(placement), display_override: display_override)
   end
@@ -486,6 +487,7 @@ class ExternalToolsController < ApplicationController
     render_unauthorized_action
     nil
   rescue Lti::Errors::UnsupportedExportTypeError,
+         Lti::Errors::InvalidLaunchUrlError,
          Lti::Errors::InvalidMediaTypeError,
          Lti::Errors::UnsupportedPlacement => e
     Canvas::Errors.capture_exception(:lti_launch, e, :info)
