@@ -41,6 +41,15 @@ class Lti::ResourceLink < ApplicationRecord
   before_validation :generate_lookup_id, on: :create
   before_save :set_root_account
 
+  def self.create_with(context, tool, custom_params = nil)
+    return if context.nil? || tool.nil?
+
+    context.lti_resource_links.create!(
+      custom: Lti::DeepLinkingUtil.validate_custom_params(custom_params),
+      context_external_tool: tool
+    )
+  end
+
   def context_external_tool
     # Use 'current_external_tool' to lookup the tool in a way that is safe with
     # tool reinstallation and content migrations
@@ -49,7 +58,7 @@ class Lti::ResourceLink < ApplicationRecord
 
   def current_external_tool(context)
     ContextExternalTool.find_external_tool(
-      original_context_external_tool.url,
+      original_context_external_tool.url || original_context_external_tool.domain,
       context,
       original_context_external_tool.id
     )
