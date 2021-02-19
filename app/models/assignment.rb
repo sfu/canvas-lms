@@ -1091,28 +1091,30 @@ class Assignment < ActiveRecord::Base
     # currently bound Tool doesn't support LTI 1.3 or if the LineItem's ResourceLink doesn't agree with Assignment's
     # ContentTag on the currently bound tool. Presumably you always want correct data in the LineItem, regardless of
     # which Tool it's bound to.
-    if lti_1_3_external_tool_tag? && line_items.empty?
-      rl = Lti::ResourceLink.create!(
-        context: self,
-        custom: lti_resource_link_custom_params_as_hash,
-        resource_link_id: lti_context_id,
-        context_external_tool: ContextExternalTool.from_content_tag(
-          external_tool_tag,
-          context
+    GuardRail.activate(:primary) do
+      if lti_1_3_external_tool_tag? && line_items.empty?
+        rl = Lti::ResourceLink.create!(
+          context: self,
+          custom: lti_resource_link_custom_params_as_hash,
+          resource_link_uuid: lti_context_id,
+          context_external_tool: ContextExternalTool.from_content_tag(
+            external_tool_tag,
+            context
+          )
         )
-      )
 
-      line_items.create!(label: title, score_maximum: points_possible, resource_link: rl, coupled: true)
-    elsif saved_change_to_title? || saved_change_to_points_possible?
-      line_items.
-        find(&:assignment_line_item?)&.
-        update!(label: title, score_maximum: points_possible)
-    end
+        line_items.create!(label: title, score_maximum: points_possible, resource_link: rl, coupled: true)
+      elsif saved_change_to_title? || saved_change_to_points_possible?
+        line_items.
+          find(&:assignment_line_item?)&.
+          update!(label: title, score_maximum: points_possible)
+      end
 
-    if lti_1_3_external_tool_tag? && !lti_resource_links.empty?
-      return if primary_resource_link.custom == lti_resource_link_custom_params_as_hash
+      if lti_1_3_external_tool_tag? && !lti_resource_links.empty?
+        return if primary_resource_link.custom == lti_resource_link_custom_params_as_hash
 
-      primary_resource_link.update!(custom: lti_resource_link_custom_params_as_hash)
+        primary_resource_link.update!(custom: lti_resource_link_custom_params_as_hash)
+      end
     end
   end
   protected :update_line_items
@@ -1125,7 +1127,7 @@ class Assignment < ActiveRecord::Base
   def primary_resource_link
     @primary_resource_link ||= begin
       lti_resource_links.find_by(
-        resource_link_id: lti_context_id,
+        resource_link_uuid: lti_context_id,
         context: self
       )
     end
@@ -1695,7 +1697,12 @@ class Assignment < ActiveRecord::Base
     can :read
 
     given { |user, session| self.context.grants_right?(user, session, :manage_grades) }
-    can :grade and can :attach_submission_comment_files and can :manage_files
+    can :grade and
+    can :attach_submission_comment_files and
+    can :manage_files and
+    can :manage_files_add and
+    can :manage_files_edit and
+    can :manage_files_delete
 
     given { |user, session| self.context.grants_right?(user, session, :manage_assignments) }
     can :create and can :read and can :attach_submission_comment_files
@@ -3191,14 +3198,34 @@ class Assignment < ActiveRecord::Base
 
   def in_closed_grading_period?
     return @in_closed_grading_period unless @in_closed_grading_period.nil?
+
     @in_closed_grading_period = if !context.grading_periods?
       false
     elsif submissions.loaded?
       # no need to check grading_periods are loaded because of
       # submissions association preload(:grading_period)
-      submissions.map(&:grading_period).compact.any? { |gp| gp.workflow_state == 'active' && gp.closed? }
+
+      submissions_in_closed_gp = submissions.select do |submission|
+        submission.grading_period.present? &&
+          submission.grading_period.workflow_state == 'active' &&
+          submission.grading_period.closed?
+      end
+
+      return false if submissions_in_closed_gp.blank?
+
+      # Only submissions from currently-enrolled students count when determining
+      # whether this assignment has submissions in a closed grading period
+      # (the student_enrollments scope returns only active students)
+      course.student_enrollments.
+        where(user_id: submissions_in_closed_gp.map(&:user_id)).
+        exists?
     else
-      GradingPeriod.joins(:submissions).active.where(submissions: { assignment: self }).closed.exists?
+      submissions.active.
+        joins(:grading_period, {user: :enrollments}).
+        merge(GradingPeriod.active.closed).
+        where(users: {enrollments: {course: course, type: "StudentEnrollment"}}).
+        merge(Enrollment.active_or_pending).
+        exists?
     end
   end
 

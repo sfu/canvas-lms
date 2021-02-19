@@ -38,7 +38,11 @@ class BounceNotificationProcessor
   end
 
   def self.process
-    self.new.process
+    bounce = self.new
+    key = 'bounce_processors_for_region_' + bounce.config[:region].to_s
+    num_of_jobs = Setting.get(key, '0').to_i
+    num_of_jobs.times { self.new.delay(priority: Delayed::LOW_PRIORITY).process }
+    bounce.process
   end
 
   def initialize
@@ -47,6 +51,8 @@ class BounceNotificationProcessor
 
   def process
     return nil unless self.class.enabled?
+    start = Time.now.utc
+
     bounce_queue.poll(config.slice(*POLL_PARAMS)) do |message|
       bounce_notification = parse_message(message)
       if bounce_notification
@@ -54,6 +60,11 @@ class BounceNotificationProcessor
       else
         InstStatsd::Statsd.increment('bounce_notification_processor.processed.no_bounce')
       end
+
+      # this job gets scheduled every 5 minutes and then can queue additional
+      # jobs; in order to release db resources and allow jobs to restart
+      # gracefully, don't run longer than 5 minutes for any particular instance.
+      break if Time.now.utc - start >= 5.minutes.to_i
     end
   end
 
