@@ -17,15 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License along
 # with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
 class AddRedoRequestToSubmissions < ActiveRecord::Migration[5.2]
   tag :predeploy
 
-  def up
-    remove_column :submissions, :redo_request, if_exists: true
-    add_column :submissions, :redo_request, :boolean, default: false, null: false
+  def change
+    add_column :submissions, :redo_request, :boolean
+    change_column_default(:submissions, :redo_request, false)
   end
 
   def down
-    change_column_null(:submissions, :redo_request, true)
+    remove_column :submissions, :redo_request, :boolean
   end
 end
