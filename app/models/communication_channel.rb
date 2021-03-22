@@ -40,6 +40,7 @@ class CommunicationChannel < ActiveRecord::Base
   before_save :assert_path_type, :set_confirmation_code
   before_save :consider_building_pseudonym
   validates_presence_of :path, :path_type, :user, :workflow_state
+  validate :under_user_cc_limit, if: -> { new_record? }
   validate :uniqueness_of_path
   validate :validate_email, if: lambda { |cc| cc.path_type == TYPE_EMAIL && cc.new_record? }
   validate :not_otp_communication_channel, :if => lambda { |cc| cc.path_type == TYPE_SMS && cc.retired? && !cc.new_record? }
@@ -64,6 +65,13 @@ class CommunicationChannel < ActiveRecord::Base
 
 
   RETIRE_THRESHOLD = 1
+
+  def under_user_cc_limit
+    max_ccs = Setting.get('max_ccs_per_user', '100').to_i
+    if self.user.communication_channels.limit(max_ccs + 1).count > max_ccs
+      self.errors.add(:user_id, 'user communication_channels limit exceeded')
+    end
+  end
 
   def clear_user_email_cache
     self.user.clear_email_cache! if self.path_type == TYPE_EMAIL
@@ -376,6 +384,7 @@ class CommunicationChannel < ActiveRecord::Base
   scope :sms, -> { where(path_type: TYPE_SMS) }
 
   scope :active, -> { where(workflow_state: 'active') }
+  scope :bouncing, -> { where(bounce_count: RETIRE_THRESHOLD..) }
   scope :unretired, -> { where.not(workflow_state: 'retired') }
 
   # Get the list of communication channels that overrides an association's default order clause.
@@ -531,7 +540,16 @@ class CommunicationChannel < ActiveRecord::Base
     return if !permanent_bounce && CommunicationChannel.associated_shards(path).count > Setting.get("comm_channel_shard_count_too_high", '50').to_i
 
     Shard.with_each_shard(CommunicationChannel.associated_shards(path)) do
-      CommunicationChannel.unretired.email.by_path(path).where("bounce_count<?", RETIRE_THRESHOLD).find_in_batches do |batch|
+      cc_scope = CommunicationChannel.unretired.email.by_path(path).where("bounce_count<?", RETIRE_THRESHOLD)
+      # If alllowed to do this naively, trying to capture bounces on the same
+      # email address over and over can lead to serious db churn.  Here we
+      # try to capture only the newly created communication channels for this path,
+      # or the ones that have NOT been bounced in the last hour, to make sure
+      # we aren't doing un-helpful overwork.
+      debounce_window = Setting.get("comm_channel_bounce_debounce_window_in_min", "60").to_i
+      bounce_field = suppression_bounce ? "last_suppression_bounce_at" : (permanent_bounce ? "last_bounce_at" : "last_transient_bounce_at")
+      bouncable_scope = cc_scope.where("#{bounce_field} IS NULL OR updated_at < ?", debounce_window.minutes.ago)
+      bouncable_scope.find_in_batches do |batch|
         update = if suppression_bounce
                    { last_suppression_bounce_at: timestamp, updated_at: Time.zone.now }
                  elsif permanent_bounce

@@ -21,6 +21,10 @@
 require File.expand_path(File.dirname(__FILE__) + '/../sharding_spec_helper')
 
 describe CommunicationChannel do
+  before(:once) do
+    Messages::Partitioner.process
+  end
+
   before(:each) do
     @pseudonym = double('Pseudonym')
     allow(@pseudonym).to receive(:destroyed?).and_return(false)
@@ -151,7 +155,8 @@ describe CommunicationChannel do
       path: 'foo@bar.edu',
       last_bounce_at: '2015-01-01T01:01:01.000Z',
       last_suppression_bounce_at: '2015-03-03T03:03:03.000Z',
-      last_transient_bounce_at: '2015-04-04T04:04:04.000Z'
+      last_transient_bounce_at: '2015-04-04T04:04:04.000Z',
+      updated_at: '2015-04-04T04:04:04.000Z'
     )
     CommunicationChannel.bounce_for_path(
       path: 'foo@bar.edu',
@@ -236,6 +241,12 @@ describe CommunicationChannel do
     user = User.create!
     invalid_stuff = {username: "invalid", user: user, pseudonym_id: "1" }
     expect{communication_channel(user, invalid_stuff)}.to raise_error(ActiveRecord::RecordInvalid)
+  end
+
+  it 'should limit quantity of channels a user can have' do
+    Setting.set('max_ccs_per_user', '3')
+    user = User.create!(name: 'jim halpert')
+    expect { 5.times { |i| communication_channel(user, username: "user_#{user.id}_#{i}@example.com") } }.to raise_error(ActiveRecord::RecordInvalid)
   end
 
   it "should act as list" do
@@ -459,7 +470,8 @@ describe CommunicationChannel do
           path: 'foo@bar.edu',
           last_bounce_at: '2015-01-01T01:01:01.000Z',
           last_suppression_bounce_at: '2015-03-03T03:03:03.000Z',
-          last_transient_bounce_at: '2015-04-04T04:04:04.000Z'
+          last_transient_bounce_at: '2015-04-04T04:04:04.000Z',
+          updated_at: '2015-04-04T04:04:04.000Z'
         )
         CommunicationChannel.bounce_for_path(
           path: 'foo@bar.edu',
@@ -480,7 +492,8 @@ describe CommunicationChannel do
           path: 'foo@bar.edu',
           last_bounce_at: '2015-01-01T01:01:01.000Z',
           last_suppression_bounce_at: '2015-03-03T03:03:03.000Z',
-          last_transient_bounce_at: '2015-04-04T04:04:04.000Z'
+          last_transient_bounce_at: '2015-04-04T04:04:04.000Z',
+          updated_at: '2015-04-04T04:04:04.000Z'
         )
         CommunicationChannel.bounce_for_path(
           path: 'foo@bar.edu',
@@ -501,7 +514,8 @@ describe CommunicationChannel do
           path: 'foo@bar.edu',
           last_bounce_at: '2015-01-01T01:01:01.000Z',
           last_suppression_bounce_at: '2015-03-03T03:03:03.000Z',
-          last_transient_bounce_at: '2015-04-04T04:04:04.000Z'
+          last_transient_bounce_at: '2015-04-04T04:04:04.000Z',
+          updated_at: '2015-04-04T04:04:04.000Z'
         )
         CommunicationChannel.bounce_for_path(
           path: 'foo@bar.edu',
@@ -530,6 +544,30 @@ describe CommunicationChannel do
         cc.reload
         expect(cc.last_bounce_details).to eq('some' => 'details', 'foo' => 'bar')
         expect(cc.last_transient_bounce_details).to be_nil
+      end
+
+      it "won't bounce twice in a row" do
+        cc = communication_channel_model(path: 'foo@bar.edu')
+        bounce_action = lambda do
+          CommunicationChannel.bounce_for_path(
+            path: cc.path,
+            timestamp: Time.zone.now,
+            details: { 'some' => 'details'},
+            permanent_bounce: false,
+            suppression_bounce: false
+          )
+        end
+        expect { bounce_action.call() }.to change {
+          cc.reload.last_transient_bounce_at
+        }
+        expect { bounce_action.call() }.to not_change {
+          cc.reload.last_transient_bounce_at
+        }
+        Timecop.travel(3.hours) do
+          expect { bounce_action.call() }.to change {
+            cc.reload.last_transient_bounce_at
+          }
+        end
       end
 
       it 'accounts for current callbacks in bulk bouncer' do
