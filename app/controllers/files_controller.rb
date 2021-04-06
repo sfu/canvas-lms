@@ -129,8 +129,8 @@ class FilesController < ApplicationController
   # show_relative is exempted from protect_from_forgery in order to allow
   # brand-config-uploaded JS to work
   # verify_authenticity_token is manually-invoked where @context is not
-  # an Account in show_relative
-  protect_from_forgery :except => [:api_capture, :show_relative], with: :exception
+  # an Account in show_relative and show
+  protect_from_forgery :except => [:api_capture, :show_relative, :show], with: :exception
 
   before_action :require_user, only: :create_pending
   before_action :require_context, except: [
@@ -527,6 +527,12 @@ class FilesController < ApplicationController
       # @current_user.attachments.find , since it might not actually be a user
       # attachment.
       # this implicit context magic happens in ApplicationController#get_context
+
+      #
+      # Skip forgery detection if downloading file from a course or account
+      #
+      verify_authenticity_token unless (@context.is_a?(Account) || @context.is_a?(Course))
+
       if @context.nil? || @current_user.nil? || @context == @current_user
         @attachment = Attachment.find(params[:id])
         @context = nil unless @context == @current_user || @context == @attachment.context
@@ -667,9 +673,9 @@ class FilesController < ApplicationController
     file_id = params[:file_id]
     file_id = nil unless file_id.to_s =~ Api::ID_REGEX
 
-    # Manually-invoke verify_authenticity_token for non-Account contexts
-    # This is to allow Account-level file downloads to skip request forgery protection
-    verify_authenticity_token unless @context.is_a?(Account)
+    # Manually-invoke verify_authenticity_token for non-Account and non-Course contexts
+    # This is to allow Account-level and Course-level file downloads to skip request forgery protection
+    verify_authenticity_token unless (@context.is_a?(Account) || @context.is_a?(Course))
 
     #if the relative path matches the given file id use that file
     if file_id && @attachment = @context.attachments.where(id: file_id).first
