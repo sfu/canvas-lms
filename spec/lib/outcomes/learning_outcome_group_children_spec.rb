@@ -26,6 +26,7 @@ describe Outcomes::LearningOutcomeGroupChildren do
   # rubocop:disable RSpec/LetSetup
   let!(:context) { Account.default }
   let!(:global_group) { LearningOutcomeGroup.create(title: 'global') }
+  let!(:global_group_subgroup) { global_group.child_outcome_groups.build(title: 'global subgroup') }
   let!(:global_outcome1) { outcome_model(outcome_group: global_group, title: 'G Outcome 1') }
   let!(:global_outcome2) { outcome_model(outcome_group: global_group, title: 'G Outcome 2') }
   let!(:g0) { context.root_outcome_group }
@@ -46,7 +47,7 @@ describe Outcomes::LearningOutcomeGroupChildren do
   let!(:o8) { outcome_model(context: context, outcome_group: g5, title:'Outcome 6', short_description: 'Outcome 6') }
   let!(:o9) { outcome_model(context: context, outcome_group: g6, title:'Outcome 7.1', short_description: 'Outcome 7.1') }
   let!(:o10) { outcome_model(context: context, outcome_group: g6, title:'Outcome 7.2', short_description: 'Outcome 7.2') }
-  let!(:o11) { outcome_model(context: context, outcome_group: g6, title:'Outcome 7.3', short_description: 'Outcome 7.3') }
+  let!(:o11) { outcome_model(context: context, outcome_group: g6, title:'Outcome 7.3 mathematic', short_description: 'Outcome 7.3 mathematic') }
   # rubocop:enable RSpec/LetSetup
 
   # Outcome Structure for visual reference
@@ -75,9 +76,9 @@ describe Outcomes::LearningOutcomeGroupChildren do
   #      g5: Group 3
   #         o8: Outcome 6
 
-
   before do
     Rails.cache.clear
+    context.root_account.enable_feature! :improved_outcomes_management
   end
 
   describe '#total_subgroups' do
@@ -106,10 +107,19 @@ describe Outcomes::LearningOutcomeGroupChildren do
     end
 
     context 'when context is nil' do
-      subject { described_class.new(nil) }
+      subject { described_class.new }
 
       it 'returns global outcome groups' do
-        expect(subject.total_subgroups(global_group.id)).to eq 0
+        expect(subject.total_subgroups(global_group.id)).to eq 1
+      end
+    end
+
+    it 'caches the total subgroups' do
+      enable_cache do
+        expect(LearningOutcomeGroup.connection).to receive(:execute).and_call_original.once
+        expect(subject.total_subgroups(g0.id)).to eq 6
+        expect(subject.total_subgroups(g0.id)).to eq 6
+        expect(described_class.new(context).total_subgroups(g0.id)).to eq 6
       end
     end
   end
@@ -125,10 +135,29 @@ describe Outcomes::LearningOutcomeGroupChildren do
       expect(subject.total_outcomes(g6.id)).to eq 3
     end
 
+    it 'caches the total outcomes' do
+      enable_cache do
+        expect(ContentTag).to receive(:active).and_call_original.once
+        expect(subject.total_outcomes(g0.id)).to eq 12
+        expect(subject.total_outcomes(g0.id)).to eq 12
+        expect(described_class.new(context).total_outcomes(g0.id)).to eq 12
+      end
+    end
+
+    it 'returns the total with search_query' do
+      expect(subject.total_outcomes(g0.id, search_query: 'mathematic')).to eq 1
+      expect(subject.total_outcomes(g1.id, search_query: 'mathematic')).to eq 1
+      expect(subject.total_outcomes(g2.id, search_query: 'mathematic')).to eq 0
+      expect(subject.total_outcomes(g3.id, search_query: 'mathematic')).to eq 1
+      expect(subject.total_outcomes(g4.id, search_query: 'mathematic')).to eq 0
+      expect(subject.total_outcomes(g5.id, search_query: 'mathematic')).to eq 0
+      expect(subject.total_outcomes(g6.id, search_query: 'mathematic')).to eq 1
+    end
+
     context 'when outcome is deleted' do
       before { o4.destroy }
 
-      it 'returns the total sugroups for a learning outcome group without the deleted groups' do
+      it 'returns the total outcomes for a learning outcome group without the deleted outcomes' do
         expect(subject.total_outcomes(g0.id)).to eq 11
         expect(subject.total_outcomes(g1.id)).to eq 8
         expect(subject.total_outcomes(g2.id)).to eq 2
@@ -140,7 +169,7 @@ describe Outcomes::LearningOutcomeGroupChildren do
     end
 
     context 'when context is nil' do
-      subject { described_class.new(nil) }
+      subject { described_class.new }
 
       it 'returns global outcomes' do
         expect(subject.total_outcomes(global_group.id)).to eq 2
@@ -157,7 +186,7 @@ describe Outcomes::LearningOutcomeGroupChildren do
         [
           'Outcome 1', 'Outcome 2.1', 'Outcome 2.2', 'Outcome 3', 'Outcome 4.1',
           'Outcome 4.2', 'Outcome 4.3', 'Outcome 5', 'Outcome 6', 'Outcome 7.1',
-          'Outcome 7.2', 'Outcome 7.3'
+          'Outcome 7.2', 'Outcome 7.3 mathematic'
         ]
       )
     end
@@ -171,7 +200,7 @@ describe Outcomes::LearningOutcomeGroupChildren do
           [
             'Outcome 3', 'Outcome 1', 'Outcome 2.1', 'Outcome 2.2', 'Outcome 4.1',
             'Outcome 4.2', 'Outcome 4.3', 'Outcome 5', 'Outcome 6', 'Outcome 7.1',
-            'Outcome 7.2', 'Outcome 7.3'
+            'Outcome 7.2', 'Outcome 7.3 mathematic'
           ]
         )
       end
@@ -187,7 +216,7 @@ describe Outcomes::LearningOutcomeGroupChildren do
         expect(outcomes).to match_array(
           [
             'Outcome 2.1', 'Outcome 2.2', 'A Outcome 4.2', 'Outcome 4.1', 'Outcome 4.3',
-            'Outcome 5', 'Outcome 7.1', 'Outcome 7.2', 'Outcome 7.3'
+            'Outcome 5', 'Outcome 7.1', 'Outcome 7.2', 'Outcome 7.3 mathematic'
           ]
         )
       end
@@ -204,18 +233,257 @@ describe Outcomes::LearningOutcomeGroupChildren do
         expect(outcomes).to match_array(
           [
             'Outcome 5', 'Outcome 2.1', 'Outcome 2.2', 'A Outcome 4.3', 'Outcome 4.1',
-            'Outcome 4.2', 'Outcome 7.1', 'Outcome 7.2', 'Outcome 7.3'
+            'Outcome 4.2', 'Outcome 7.1', 'Outcome 7.2', 'Outcome 7.3 mathematic'
           ]
         )
       end
     end
 
     context 'when context is nil' do
-      subject { described_class.new(nil) }
+      subject { described_class.new }
 
       it 'returns global outcomes' do
         outcomes = subject.suboutcomes_by_group_id(global_group.id).map(&:learning_outcome_content).map(&:short_description)
         expect(outcomes).to match_array(['G Outcome 1', 'G Outcome 2'])
+      end
+    end
+
+    context "search" do
+      before do
+        outcome_model(
+          context: context,
+          outcome_group: g1,
+          title: "LA.1.1.1.1",
+          description: 'Talk about personal experiences and familiar events.'
+        )
+        outcome_model(
+          context: context,
+          outcome_group: g1,
+          title: "LA.1.1.1",
+          description: 'continue to apply phonic knowledge and skills as the route to decode words until '\
+                       'automatic decoding has become embedded and reading is fluent'
+        )
+        outcome_model(
+          context: context,
+          outcome_group: g1,
+          title: "LA.2.2.1.2",
+          description: 'Explain anticipated meaning, recognize relationships, and draw conclusions; self-correct'\
+                       ' understanding using a variety of strategies [including rereading for story sense].'
+        )
+        outcome_model(
+          context: context,
+          outcome_group: g1,
+          title: "FO.3",
+          description: 'apply their growing knowledge of root words, prefixes and suffixes (etymology and morphology)'\
+                       ' as listed in English Appendix 1, both to read aloud and to understand the meaning of new words they meet'
+        )
+        outcome_model(
+          context: context,
+          outcome_group: g1,
+          title: "HT.ML.1.1",
+          description: '<p>Pellentesque&nbsp;habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.</p>'
+        )
+        outcome_model(
+          context: context,
+          outcome_group: g1,
+          title: "HT.ML.1.2",
+          description: '<p>This is <b>awesome</b>.</p>'
+        )
+      end
+
+      it "filters title with non-alphanumerical chars" do
+        outcomes = subject.suboutcomes_by_group_id(g1.id, {search_query: "LA.1"}).map(&:learning_outcome_content).map(&:short_description)
+        expect(outcomes).to eql([
+          "LA.1.1.1", "LA.1.1.1.1"
+        ])
+      end
+
+      it "filters description with text content" do
+        outcomes = subject.suboutcomes_by_group_id(g1.id, {search_query: "knowledge"}).map(&:learning_outcome_content).map(&:short_description)
+        expect(outcomes).to eql([
+          'LA.1.1.1', 'FO.3'
+        ])
+      end
+
+      it "filters description with html content" do
+        outcomes = subject.suboutcomes_by_group_id(g1.id, {search_query: "Pellentesque"}).map(&:learning_outcome_content).map(&:short_description)
+        expect(outcomes).to eql([
+          'HT.ML.1.1'
+        ])
+      end
+
+      it "filters more than 1 word" do
+        outcomes = subject.suboutcomes_by_group_id(g1.id, {search_query: "LA.1.1 Pellentesque"}).map(&:learning_outcome_content).map(&:short_description)
+        expect(outcomes).to eql([
+          "LA.1.1.1",
+          "LA.1.1.1.1",
+          "HT.ML.1.1"
+        ])
+      end
+
+      it "filters when words aren't all completed" do
+        outcomes = subject.suboutcomes_by_group_id(g1.id, {search_query: "recog awe"}).map(&:learning_outcome_content).map(&:short_description)
+        expect(outcomes).to eql([
+          "HT.ML.1.2",
+          "LA.2.2.1.2"
+        ])
+      end
+    end
+  end
+
+  describe '#clear_descendants_cache' do
+    it 'clears the cache' do
+      enable_cache do
+        expect(LearningOutcomeGroup.connection).to receive(:execute).and_call_original.twice
+        expect(ContentTag).to receive(:active).and_call_original.exactly(4).times
+        expect(subject.total_subgroups(g0.id)).to eq 6
+        expect(subject.total_outcomes(g0.id)).to eq 12
+        expect(subject.total_outcomes(g1.id)).to eq 9
+        subject.clear_descendants_cache
+        instance = described_class.new(context)
+        expect(instance.total_subgroups(g0.id)).to eq 6
+        expect(instance.total_outcomes(g0.id)).to eq 12
+        expect(instance.total_outcomes(g1.id)).to eq 9
+      end
+    end
+  end
+
+  describe '#clear_total_outcomes_cache' do
+    it 'clears the cache' do
+      enable_cache do
+        expect(ContentTag).to receive(:active).and_call_original.twice
+        expect(subject.total_outcomes(g0.id)).to eq 12
+        subject.clear_total_outcomes_cache
+        instance = described_class.new(context)
+        expect(instance.total_outcomes(g0.id)).to eq 12
+      end
+    end
+  end
+
+  context 'learning outcome groups and learning outcomes events' do
+    context 'when a group is destroyed' do
+      it 'clears the cache' do
+        enable_cache do
+          expect(subject.total_subgroups(g0.id)).to eq 6
+          g6.destroy
+          expect(described_class.new(context).total_subgroups(g0.id)).to eq 5
+        end
+      end
+    end
+
+    context 'when a group is added' do
+      it 'clears the cache' do
+        enable_cache do
+          expect(subject.total_subgroups(g0.id)).to eq 6
+          outcome_group_model(context: context, outcome_group_id: g0)
+          expect(described_class.new(context).total_subgroups(g0.id)).to eq 7
+        end
+      end
+
+      context 'when a global group is added' do
+        it 'clears the cache for total_subgroups and total_outcomes' do
+          enable_cache do
+            expect(subject.total_subgroups(g0.id)).to eq 6
+            expect(subject.total_outcomes(g0.id)).to eq 12
+            g0.add_outcome_group(global_group)
+            expect(described_class.new(context).total_subgroups(g0.id)).to eq 8
+            expect(described_class.new(context).total_outcomes(g0.id)).to eq 14
+          end
+        end
+      end
+    end
+
+    context 'when a group is adopted' do
+      it 'clears the cache' do
+        enable_cache do
+          expect(subject.total_subgroups(g0.id)).to eq 6
+          outcome_group = outcome_group_model(context: context)
+          g1.adopt_outcome_group(outcome_group)
+          expect(described_class.new(context).total_subgroups(g0.id)).to eq 7
+        end
+      end
+    end
+
+    context 'when a group is edited' do
+      it 'does not clear the cache' do
+        enable_cache do
+          # rubocop:disable RSpec/AnyInstance
+          expect_any_instance_of(Outcomes::LearningOutcomeGroupChildren).not_to receive(:clear_descendants_cache)
+          # rubocop:enable RSpec/AnyInstance
+          expect(subject.total_subgroups(g0.id)).to eq 6
+          g1.update(title: 'title edited')
+          expect(described_class.new(context).total_subgroups(g0.id)).to eq 6
+        end
+      end
+    end
+
+    context 'when an outcome is added' do
+      it 'clears the cache' do
+        enable_cache do
+          expect(subject.total_outcomes(g1.id)).to eq 9
+          outcome = LearningOutcome.create!(title: 'test outcome', context: context)
+          g1.add_outcome(outcome)
+          expect(described_class.new(context).total_outcomes(g1.id)).to eq 10
+        end
+      end
+    end
+
+    context 'when an outcome is destroyed' do
+      it 'clears the cache' do
+        enable_cache do
+          outcome = LearningOutcome.create!(title: 'test outcome', context: context)
+          g1.add_outcome(outcome)
+          expect(described_class.new(context).total_outcomes(g1.id)).to eq 10
+          outcome.destroy
+          expect(described_class.new(context).total_outcomes(g1.id)).to eq 9
+        end
+      end
+
+      context 'when the outcome belongs to a global group' do
+        it 'clears the cache' do
+          enable_cache do
+            expect(described_class.new.total_outcomes(global_group.id)).to eq 2
+            global_outcome1.destroy
+            expect(described_class.new.total_outcomes(global_group.id)).to eq 1
+          end
+        end
+      end
+
+      context 'when the outcome belongs to different contexts' do
+        it 'clears the cache on each context' do
+          enable_cache do
+            g1.add_outcome(global_outcome1)
+            expect(described_class.new(context).total_outcomes(g1.id)).to eq 10
+            expect(described_class.new.total_outcomes(global_group.id)).to eq 2
+            global_outcome1.destroy
+            expect(described_class.new(context).total_outcomes(g1.id)).to eq 9
+            expect(described_class.new.total_outcomes(global_group.id)).to eq 1
+          end
+        end
+      end
+    end
+
+    context 'when a child_outcome_link is destroyed' do
+      it 'clears the cache' do
+        enable_cache do
+          outcome = LearningOutcome.create!(title: 'test outcome', context: context)
+          child_outcome_link = g1.add_outcome(outcome)
+          expect(described_class.new(context).total_outcomes(g1.id)).to eq 10
+          child_outcome_link.destroy
+          expect(described_class.new(context).total_outcomes(g1.id)).to eq 9
+        end
+      end
+
+      context 'when the child_outcome_link belongs to global learning outcome group' do
+        it 'clears the cache' do
+          enable_cache do
+            outcome = LearningOutcome.create!(title: 'test outcome')
+            child_outcome_link = global_group.add_outcome(outcome)
+            expect(described_class.new.total_outcomes(global_group.id)).to eq 3
+            child_outcome_link.destroy
+            expect(described_class.new.total_outcomes(global_group.id)).to eq 2
+          end
+        end
       end
     end
   end

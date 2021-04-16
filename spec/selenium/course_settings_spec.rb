@@ -34,18 +34,20 @@ describe "course settings" do
   end
 
   context "considering homeroom courses" do
-    let(:canvas_for_elem_flag){false}
     before(:each) do
-      canvas_for_elem_flag = @account.root_account.feature_enabled?(:canvas_for_elementary)
+      @account.root_account.set_feature_flag!(:canvas_for_elementary, 'on')
+      @account.settings[:enable_as_k5_account] = {value: true}
+      @account.save!
+      @course.homeroom_course = true
+      @course.save!
     end
+
     after(:each) do
-      @account.root_account.set_feature_flag!(:canvas_for_elementary, canvas_for_elem_flag ? 'on' : 'off')
+      @account.root_account.set_feature_flag!(:canvas_for_elementary, 'off')
     end
 
     it 'hides most tabs if set' do
       @account.root_account.enable_feature!(:canvas_for_elementary)
-      @course.homeroom_course = true
-      @course.save!
 
       get "/courses/#{@course.id}/settings"
       expect(ff('#course_details_tabs > ul li').length).to eq 2
@@ -233,7 +235,9 @@ describe "course settings" do
       wait_for_ajaximations
       f('#nav_form > p:nth-of-type(2) > button.btn.btn-primary').click
       wait_for_ajaximations
-      f('.student_view_button').click
+      enter_student_view
+      wait_for_ajaximations
+      get "/courses/#{@course.id}/settings#tab-navigation"
       wait_for_ajaximations
       expect(f("#content")).not_to contain_link("Home")
     end
@@ -298,13 +302,6 @@ describe "course settings" do
   end
 
   context "right sidebar" do
-    it "should allow entering student view from the right sidebar" do
-      @fake_student = @course.student_view_student
-      get "/courses/#{@course.id}/settings"
-      f(".student_view_button").click
-      expect(displayed_username).to include(@fake_student.name)
-    end
-
     it "should allow leaving student view" do
       enter_student_view
       stop_link = f("#masquerade_bar .leave_student_view")

@@ -1295,6 +1295,18 @@ describe ContextExternalTool do
         tool.homework_submission = {enabled: true}
         expect(tool.settings[:homework_submission]).to include({enabled: true, selection_height: 300})
       end
+
+      it 'toggles not_selectable when placement is resource_selection' do
+        tool.resource_selection = {enabled: true}
+
+        tool.resource_selection = {enabled: false}
+        tool.save
+        expect(tool.not_selectable).to be_truthy
+
+        tool.resource_selection = {enabled: true}
+        tool.save
+        expect(tool.not_selectable).to be_falsy
+      end
     end
   end
 
@@ -1901,7 +1913,8 @@ describe ContextExternalTool do
 
     it "should not let concluded teachers see admin tools" do
       course_with_teacher(:account => @account, :active_all => true)
-      @course.enrollment_term.enrollment_dates_overrides.create!(:enrollment_type => "TeacherEnrollment", :end_at => 1.week.ago)
+      term = @course.enrollment_term
+      term.enrollment_dates_overrides.create!(enrollment_type: "TeacherEnrollment", end_at: 1.week.ago, context: term.root_account)
       expect(ContextExternalTool.global_navigation_granted_permissions(
         root_account: @account, user: @user, context: @account)[:original_visibility]).to eq 'members'
     end

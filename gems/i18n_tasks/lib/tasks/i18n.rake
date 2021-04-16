@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'i18n_tasks'
 require 'i18n_extraction'
 require 'shellwords'
@@ -38,6 +40,22 @@ namespace :i18n do
 
   desc "Generates a new en.yml file for all translations"
   task :generate => :check do
+    def deep_sort_hash_by_keys(value)
+      sort = ->(node) do
+        case node
+        when Hash
+          node.keys.sort.reduce({}) do |acc, key|
+            acc[key] = sort[node[key]]
+            acc
+          end
+        else
+          node
+        end
+      end
+
+      sort[value]
+    end
+
     yaml_dir = './config/locales/generated'
     FileUtils.mkdir_p(File.join(yaml_dir))
     yaml_file = File.join(yaml_dir, "en.yml")
@@ -51,7 +69,11 @@ namespace :i18n do
     }.freeze
 
     File.open(Rails.root.join(yaml_file), "w") do |file|
-      file.write({'en' => @translations.except(*special_keys)}.to_yaml(line_width: -1))
+      file.write(
+        {
+          'en' => deep_sort_hash_by_keys(@translations.except(*special_keys))
+        }.to_yaml(line_width: -1)
+      )
     end
     print "Wrote new #{yaml_file}\n\n"
   end

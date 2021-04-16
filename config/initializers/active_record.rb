@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #
 # Copyright (C) 2011 - present Instructure, Inc.
 #
@@ -470,7 +472,7 @@ class ActiveRecord::Base
   end
 
   def self.rank_sql(ary, col)
-    sql = ary.each_with_index.inject('CASE '){ |string, (values, i)|
+    sql = ary.each_with_index.inject(+'CASE '){ |string, (values, i)|
       string << "WHEN #{col} IN (" << Array(values).map{ |value| connection.quote(value) }.join(', ') << ") THEN #{i} "
     } << "ELSE #{ary.size} END"
     Arel.sql(sql)
@@ -487,7 +489,7 @@ class ActiveRecord::Base
     column = column.to_s
 
     result = if ActiveRecord::Base.configurations[Rails.env]['adapter'] == 'postgresql'
-      sql = ''
+      sql = +''
       sql << "SELECT NULL AS #{column} WHERE EXISTS (SELECT * FROM #{quoted_table_name} WHERE #{column} IS NULL) UNION ALL (" if include_nil
       sql << <<~SQL
         WITH RECURSIVE t AS (
@@ -516,6 +518,7 @@ class ActiveRecord::Base
                elsif first_or_last == :last && direction == :desc
                  " NULLS LAST"
                end
+      
       Arel.sql("#{column} #{direction.to_s.upcase}#{clause}".strip)
     else
       Arel.sql("#{column} IS#{" NOT" unless first_or_last == :last} NULL, #{column} #{direction.to_s.upcase}".strip)
@@ -746,6 +749,23 @@ class ActiveRecord::Base
     end
     changes_applied
   end
+
+  def self.with_statement_timeout(timeout = 30_000)
+    raise ArgumentError.new("timeout must be an integer") unless timeout.is_a? Integer
+
+    transaction do
+      connection.execute "SET LOCAL statement_timeout = #{timeout}"
+      yield
+    rescue ActiveRecord::StatementInvalid => e
+      raise ActiveRecord::QueryTimeout if e.cause.is_a? PG::QueryCanceled
+
+      raise e
+    end
+  end
+end
+
+module ActiveRecord
+  class QueryTimeout < ActiveRecord::StatementInvalid; end
 end
 
 module UsefulFindInBatches
@@ -1096,14 +1116,10 @@ ActiveRecord::Relation.class_eval do
 
     relation = clone
     old_select = relation.select_values
-    relation.select_values = ["DISTINCT ON (#{args.join(', ')}) "]
+    relation.select_values = [+"DISTINCT ON (#{args.join(', ')}) "]
     relation.distinct_value = false
 
-    if old_select.empty?
-      relation.select_values.first << "*"
-    else
-      relation.select_values.first << old_select.uniq.join(', ')
-    end
+    relation.select_values.first << (old_select.empty? ? "*" : old_select.uniq.join(', '))
 
     relation
   end
@@ -1237,7 +1253,7 @@ module UpdateAndDeleteWithJoins
   def delete_all
     return super if joins_values.empty?
 
-    sql = "DELETE FROM #{quoted_table_name} "
+    sql = +"DELETE FROM #{quoted_table_name} "
 
     join_sql = arel.join_sources.map(&:to_sql).join(" ")
     tables, join_conditions = deconstruct_joins(join_sql)
@@ -1360,20 +1376,10 @@ ActiveRecord::Associations::HasOneAssociation.class_eval do
 end
 
 class ActiveRecord::Migration
-  VALID_TAGS = [:predeploy, :postdeploy, :cassandra, :dynamodb]
   # at least one of these tags is required
   DEPLOY_TAGS = [:predeploy, :postdeploy]
 
   class << self
-    def tag(*tags)
-      raise "invalid tags #{tags.inspect}" unless tags - VALID_TAGS == []
-      (@tags ||= []).concat(tags).uniq!
-    end
-
-    def tags
-      @tags ||= []
-    end
-
     def is_postgres?
       connection.adapter_name == 'PostgreSQL'
     end
@@ -1397,7 +1403,7 @@ class ActiveRecord::Migration
 end
 
 class ActiveRecord::MigrationProxy
-  delegate :connection, :tags, :cassandra_cluster, to: :migration
+  delegate :connection, :cassandra_cluster, to: :migration
 
   def initialize(*)
     super
@@ -1521,9 +1527,16 @@ ActiveRecord::ConnectionAdapters::SchemaStatements.class_eval do
     execute schema_creation.accept(at)
   end
 
-  def add_replica_identity(table_string, column_name, default_value)
-    klass = table_string.constantize
-    DataFixup::BackfillNulls.run(klass, column_name, default_value: default_value)
+  def add_replica_identity(model_name, column_name, default_value)
+    klass = model_name.constantize
+    # when a batch of migrations includes both adding the `column_name` and
+    # calling this method (e.g. when migrating a newly created db), the cached
+    # column information can be stale, so we have to explicitly reset it here
+    # to avoid a NoMethodError
+    klass.reset_column_information
+    if klass.columns_hash[column_name.to_s].null
+      DataFixup::BackfillNulls.run(klass, column_name, default_value: default_value)
+    end
     change_column_null klass.table_name, column_name, false
     primary_column = klass.primary_key
     index_name = "index_#{klass.table_name}_replica_identity"
@@ -1531,8 +1544,8 @@ ActiveRecord::ConnectionAdapters::SchemaStatements.class_eval do
     execute(%[ALTER TABLE #{klass.quoted_table_name} REPLICA IDENTITY USING INDEX #{index_name}])
   end
 
-  def remove_replica_identity(table_string)
-    klass = table_string.constantize
+  def remove_replica_identity(model_name)
+    klass = model_name.constantize
     execute(%[ALTER TABLE #{klass.quoted_table_name} REPLICA IDENTITY DEFAULT])
     remove_index klass.table_name, name: "index_#{klass.table_name}_replica_identity", if_exists: true
   end
@@ -1715,7 +1728,7 @@ module TableRename
 
   def columns(table_name)
     if (old_name = RENAMES[table_name])
-      table_name = old_name if connection.table_exists?(old_name)
+      table_name = old_name if data_source_exists?(old_name)
     end
     super
   end

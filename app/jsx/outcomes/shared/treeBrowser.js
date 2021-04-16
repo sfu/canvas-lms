@@ -22,8 +22,8 @@ import I18n from 'i18n!OutcomeManagement'
 import 'compiled/jquery.rails_flash_notifications'
 import {CHILD_GROUPS_QUERY} from '../Management/api'
 import {FIND_GROUPS_QUERY} from '../api'
-import {useCanvasContext} from './hooks'
 import useSearch from '../../shared/hooks/useSearch'
+import useCanvasContext from './hooks/useCanvasContext'
 
 export const ROOT_ID = 0
 export const ACCOUNT_FOLDER_ID = -1
@@ -43,7 +43,7 @@ const mergeCollections = (groups, collections, parentGroupId) => {
     }
     return {
       ...memo,
-      [g._id]: structFromGroup(g)
+      [g._id]: structFromGroup(g, parentGroupId)
     }
   }, collections)
 
@@ -65,12 +65,13 @@ const groupDescriptor = ({childGroupsCount, outcomesCount}) => {
   })
 }
 
-const structFromGroup = g => ({
+const structFromGroup = (g, parentGroupId) => ({
   id: g._id,
   name: g.title,
   descriptor: groupDescriptor(g),
   collections: [],
-  outcomesCount: g.outcomesCount
+  outcomesCount: g.outcomesCount,
+  parentGroupId
 })
 
 const getCounts = rootGroups => {
@@ -151,6 +152,7 @@ const useTreeBrowser = () => {
 export const useManageOutcomes = () => {
   const {contextId, contextType} = useCanvasContext()
   const [selectedGroupId, setSelectedGroupId] = useState(null)
+  const [selectedParentGroupId, setSelectedParentGroupId] = useState(null)
   const client = useApolloClient()
   const {
     collections,
@@ -165,6 +167,7 @@ export const useManageOutcomes = () => {
   const queryCollections = ({id}) => {
     setSelectedGroupId(id)
     treeBrowserQueryCollection({id})
+    setSelectedParentGroupId(collections[id].parentGroupId)
   }
 
   useEffect(() => {
@@ -200,7 +203,8 @@ export const useManageOutcomes = () => {
     collections,
     queryCollections,
     rootId: ROOT_ID,
-    selectedGroupId
+    selectedGroupId,
+    selectedParentGroupId
   }
 }
 
@@ -307,5 +311,65 @@ export const useFindOutcomeModal = open => {
     searchString,
     updateSearch,
     clearSearch
+  }
+}
+
+export const useGroupMoveModal = groupId => {
+  const {contextId, contextType} = useCanvasContext()
+
+  const client = useApolloClient()
+  const {
+    collections,
+    setCollections,
+    queryCollections: treeBrowserQueryCollection,
+    error,
+    setError,
+    isLoading,
+    setIsLoading
+  } = useTreeBrowser()
+
+  const queryCollections = ({id}) => {
+    // Do not query for more collections if the groupId is the same as the id passed
+    if (id !== groupId) {
+      treeBrowserQueryCollection({id})
+    }
+  }
+
+  useEffect(
+    () => {
+      client
+        .query({
+          query: CHILD_GROUPS_QUERY,
+          variables: {
+            id: contextId,
+            type: contextType
+          }
+        })
+        .then(({data}) => {
+          setCollections(
+            mergeCollections(
+              data?.context?.rootOutcomeGroup?.childGroups?.nodes,
+              collections,
+              ROOT_ID
+            )
+          )
+        })
+        .finally(() => {
+          setIsLoading(false)
+        })
+        .catch(err => {
+          setError(err)
+        })
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
+
+  return {
+    error,
+    isLoading,
+    collections,
+    queryCollections,
+    rootId: ROOT_ID
   }
 }

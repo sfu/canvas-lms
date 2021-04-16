@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #
 # Copyright (C) 2011 - present Instructure, Inc.
 #
@@ -1294,9 +1296,17 @@ CanvasRails::Application.routes.draw do
       get 'groups/:group_id/potential_collaborators', action: :potential_collaborators, as: 'group_potential_collaborators'
     end
 
+    scope(controller: 'microsoft_sync/groups') do
+      post "courses/:course_id/microsoft_sync/group", action: :create
+      get "courses/:course_id/microsoft_sync/group", action: :show
+      delete "courses/:course_id/microsoft_sync/group", action: :destroy
+    end
+
     scope(controller: :external_tools) do
       post "/accounts/:account_id/external_tools/rce_favorites/:id", action: :add_rce_favorite, as: :account_external_tools_add_rce_favorite
       delete "/accounts/:account_id/external_tools/rce_favorites/:id", action: :remove_rce_favorite, as: :account_external_tools_remove_rce_favorite
+
+      get "/courses/:course_id/external_tools/visible_course_nav_tools", action: :visible_course_nav_tools, as: :visible_course_nav_tools
 
       %w(course account).each do |context|
         get "#{context}s/:#{context}_id/external_tools/sessionless_launch", action: :generate_sessionless_launch, as: "#{context}_external_tool_sessionless_launch"
@@ -2112,6 +2122,7 @@ CanvasRails::Application.routes.draw do
 
     get '/crocodoc_session', controller: 'crocodoc_sessions', action: 'show', as: :crocodoc_session
     get '/canvadoc_session', controller: 'canvadoc_sessions', action: 'show', as: :canvadoc_session
+    post '/canvadoc_session', controller: 'canvadoc_sessions', action: 'create'
 
     scope(controller: :grading_period_sets) do
       get 'accounts/:account_id/grading_period_sets', action: :index, as: :account_grading_period_sets

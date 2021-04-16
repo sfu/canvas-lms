@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #
 # Copyright (C) 2011 - present Instructure, Inc.
 #
@@ -625,8 +627,7 @@ class GradebooksController < ApplicationController
         outcome_proficiency: outcome_proficiency,
         sections: sections_json(visible_sections, @current_user, session, [], allow_sis_ids: true),
         settings: gradebook_settings(@context.global_id),
-        settings_update_url: api_v1_course_gradebook_settings_update_url(@context),
-        inactive_concluded_lmgb_filters: root_account.feature_enabled?(:inactive_concluded_lmgb_filters)
+        settings_update_url: api_v1_course_gradebook_settings_update_url(@context)
       }
     })
   end
@@ -872,9 +873,7 @@ class GradebooksController < ApplicationController
 
     @can_comment_on_submission = !@context.completed? && !@context_enrollment.try(:completed?)
 
-    @can_reassign_submissions =
-      @context.root_account.feature_enabled?(:reassign_assignments) &&
-      @assignment.can_reassign?(@current_user)
+    @can_reassign_submissions = @assignment.can_reassign?(@current_user)
 
     respond_to do |format|
 
@@ -1122,8 +1121,8 @@ class GradebooksController < ApplicationController
   end
 
   def change_gradebook_version
-    @current_user.preferences[:gradebook_version] = params[:version]
-    @current_user.save!
+    @current_user.migrate_preferences_if_needed
+    @current_user.set_preference(:gradebook_version, params[:version])
     redirect_to polymorphic_url([@context, 'gradebook'])
   end
 

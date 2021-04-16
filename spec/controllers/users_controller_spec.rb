@@ -267,8 +267,9 @@ describe UsersController do
 
     it "should not include future teacher term courses in manageable courses" do
       course_with_teacher_logged_in(:course_name => "MyCourse1", :active_all => 1)
-      @course.enrollment_term.enrollment_dates_overrides.create!(:enrollment_type => "TeacherEnrollment",
-        :start_at => 1.week.from_now, :end_at => 2.weeks.from_now)
+      term = @course.enrollment_term
+      term.enrollment_dates_overrides.create!(
+        enrollment_type: "TeacherEnrollment", start_at: 1.week.from_now, end_at: 2.weeks.from_now, context: term.root_account)
 
       get 'manageable_courses', params: {:user_id => @teacher.id, :term => "MyCourse"}
       expect(response).to be_successful
@@ -738,6 +739,15 @@ describe UsersController do
         it "should strip the self enrollment code before validation" do
           post 'create', params: {:pseudonym => { :unique_id => 'jacob@instructure.com', :password => 'asdfasdf', :password_confirmation => 'asdfasdf' }, :user => { :name => 'Jacob Fugal', :terms_of_use => '1', :self_enrollment_code => @course.self_enrollment_code + ' ', :initial_enrollment_type => 'student' }, :self_enrollment => '1'}
           expect(response).to be_successful
+        end
+
+        it "should set root_account_ids" do
+          post 'create', params: { pseudonym: { unique_id: 'jacob@instructure.com', password: 'asdfasdf', password_confirmation: 'asdfasdf' },
+                                   user: { name: 'happy gilmore', terms_of_use: '1', self_enrollment_code: @course.self_enrollment_code + ' ', initial_enrollment_type: 'student' },
+                                   self_enrollment: '1' }
+          expect(response).to be_successful
+          u = User.where(name: 'happy gilmore').take
+          expect(u.root_account_ids).to eq [Account.default.id]
         end
 
         it "should ignore the password if self enrolling with an email pseudonym" do
@@ -2337,6 +2347,7 @@ describe UsersController do
 
       new_user1 = User.where(:name => 'example1@example.com').first
       new_user2 = User.where(:name => 'Hurp Durp').first
+      expect([new_user1, new_user2].map(&:root_account_ids)).to match_array([[@course.root_account_id], [@course.root_account_id]])
       expect(json['invited_users'].map{|u| u['id']}).to match_array([new_user1.id, new_user2.id])
       expect(json['invited_users'].map{|u| u['user_token']}).to match_array([new_user1.token, new_user2.token])
     end
@@ -2459,6 +2470,7 @@ describe UsersController do
             expect(assigns[:js_bundles].flatten).not_to include :k5_dashboard
             expect(assigns[:css_bundles].flatten).to include :dashboard
             expect(assigns[:css_bundles].flatten).not_to include :k5_dashboard
+            expect(assigns[:js_env][:K5_MODE]).to be_falsy
           end
         end
 
@@ -2472,6 +2484,7 @@ describe UsersController do
             expect(assigns[:js_bundles].flatten).not_to include :k5_dashboard
             expect(assigns[:css_bundles].flatten).to include :dashboard
             expect(assigns[:css_bundles].flatten).not_to include :k5_dashboard
+            expect(assigns[:js_env][:K5_MODE]).to be_falsy
           end
         end
       end
@@ -2488,6 +2501,7 @@ describe UsersController do
             expect(assigns[:js_bundles].flatten).not_to include :k5_dashboard
             expect(assigns[:css_bundles].flatten).to include :dashboard
             expect(assigns[:css_bundles].flatten).not_to include :k5_dashboard
+            expect(assigns[:js_env][:K5_MODE]).to be_falsy
           end
         end
 
@@ -2501,6 +2515,7 @@ describe UsersController do
             expect(assigns[:js_bundles].flatten).not_to include :dashboard
             expect(assigns[:css_bundles].flatten).to include :k5_dashboard
             expect(assigns[:css_bundles].flatten).not_to include :dashboard
+            expect(assigns[:js_env][:K5_MODE]).to be_truthy
           end
         end
       end
@@ -2513,7 +2528,7 @@ describe UsersController do
       user_session(@user)
       get 'pandata_events_token'
       assert_status(400)
-      json = JSON.parse(response.body.gsub("while(1);", ""))
+      json = JSON.parse(response.body)
       expect(json['message']).to eq "Access token required"
     end
   end

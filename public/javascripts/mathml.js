@@ -53,21 +53,37 @@ const mathml = {
         url: `//cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=${configFile}&locale=${locale}`,
         cache: true,
         success: () => {
-          window.MathJax.Hub.Register.StartupHook('MathMenu Ready', function() {
+          window.MathJax.Hub.Register.StartupHook('MathMenu Ready', function () {
             // get the mathjax context menu above the rce's equation editor
             window.MathJax.Menu.BGSTYLE['z-index'] = 2000
           })
-          window.MathJax.Hub.Register.StartupHook('End Config', function() {
+          window.MathJax.Hub.Register.StartupHook('End Config', function () {
             // wait until MathJAx is configured before calling the callback
             cb?.()
           })
           if (ENV?.FEATURES?.new_math_equation_handling) {
-            window.MathJax.Hub.Register.MessageHook('Begin PreProcess', function(message) {
+            window.MathJax.Hub.Register.MessageHook('Begin PreProcess', function (message) {
               mathImageHelper.catchEquationImages(message[1])
             })
-            window.MathJax.Hub.Register.MessageHook('End Math', function(message) {
-              mathImageHelper.removeStrayEquationImages(message[1])
-              message[1]
+            window.MathJax.Hub.Register.MessageHook('Math Processing Error', function (message) {
+              const elem = message[1]
+              // ".math_equation_latex" is the elem we added for MathJax to typeset the image equation
+              if (elem.parentElement?.classList.contains('math_equation_latex')) {
+                // The equation we image we were trying to replace and failed is up 1 and back 1.
+                // If we remove its "mathjaxified" attribute, the "End Math" handler
+                // won't remove it from the DOM.
+                if (elem.parentElement.previousElementSibling?.hasAttribute('mathjaxified')) {
+                  elem.parentElement.previousElementSibling.removeAttribute('mathjaxified')
+                }
+                // remove the "math processing error" mathjax output.
+                elem.parentElement.remove()
+              }
+            })
+            window.MathJax.Hub.Register.MessageHook('End Math', function (message) {
+              const elem = message[1]
+              mathImageHelper.removeStrayEquationImages(elem)
+              mathImageHelper.nearlyInfiniteStyleFix(elem)
+              elem
                 .querySelectorAll('.math_equation_latex')
                 .forEach(m => m.classList.add('fade-in-equation'))
             })
@@ -80,7 +96,7 @@ const mathml = {
             // to add an ignoreClass config prop to the mml2jax processor, but it's not available.
             // Since we want to ignore <math> in .hidden-readable spans, let's remove the MathJunk™
             // right after MathJax adds it.
-            window.MathJax.Hub.Register.MessageHook('End Math', function(message) {
+            window.MathJax.Hub.Register.MessageHook('End Math', function (message) {
               $(message[1])
                 .find('.hidden-readable [class^="MathJax"], .hidden-readable [id^="MathJax"]')
                 .remove()
@@ -149,26 +165,35 @@ const mathml = {
     return false
   },
 
+  mathJaxGenerated: /^MathJax|MJX/,
+  // elements to ignore selector
+  ignore_list: '#header,#mobile-header,#left-side,#quiz-elapsed-time,.ui-menu-carat',
+
   isMathJaxIgnored(elem) {
     if (!elem) return true
 
     // ignore disconnected elements
     if (!document.body.contains(elem)) return true
 
-    // elements to ignore selector
-    const ignore_list =
-      '.MJX_Assistive_MathML,#header,#mobile-header,#left-side,#quiz-elapsed-time,.ui-menu-carat'
-
     // check if elem is in the ignore list
-    if (elem.parentElement?.querySelector(ignore_list) === elem) {
+    if (elem.parentElement?.querySelector(this.ignore_list) === elem) {
       return true
     }
 
-    // check if elem is a child of .mathjax_ignore
+    // check if elem is a child of something we're ignoring
     while (elem !== document.body) {
+      // child of .mathjax_ignore?
       if (elem.classList.contains('mathjax_ignore')) {
         return true
       }
+
+      // // child of MathJax generated element?
+      // if (
+      //   this.mathJaxGenerated.test(elem.id) ||
+      //   this.mathJaxGenerated.test(elem.getAttribute('class'))
+      // ) {
+      //   return true
+      // }
       elem = elem.parentElement
     }
     return false
@@ -207,9 +232,10 @@ const mathml = {
 
 const mathImageHelper = {
   getImageEquationText(img) {
-    let equation_text = img.getAttribute('data-equation-content')
-    if (!equation_text) {
-      const srceq = img.getAttribute('src').split('/equation_images/')[1]
+    let equation_text
+    const src = img.getAttribute('src')
+    if (src) {
+      const srceq = src.split('/equation_images/')[1]
       if (srceq) {
         equation_text = decodeURIComponent(decodeURIComponent(srceq))
       }
@@ -229,6 +255,7 @@ const mathImageHelper = {
           if (equation_text) {
             const mathtex = document.createElement('span')
             mathtex.setAttribute('class', 'math_equation_latex')
+            mathtex.setAttribute('style', img.getAttribute('style'))
             mathtex.textContent = `\\(${equation_text}\\)`
             if (img.nextSibling) {
               img.parentElement.insertBefore(mathtex, img.nextSibling)
@@ -258,6 +285,28 @@ const mathImageHelper = {
     window.dispatchEvent(
       new CustomEvent('process-new-math', {detail: {target: event.target.parentElement}})
     )
+  },
+
+  nearlyInfiniteStyleFix(elem) {
+    elem.querySelectorAll('[style*=clip], [style*=vertical-align]').forEach(e => {
+      let changed = false
+      let s = e.getAttribute('style')
+      const r = e.style.clip
+      if (/[\d.]+e\+?\d/.test(r)) {
+        // e.g. "rect(1e+07em, -9.999e+06em, -1e+07em, -999.997em)"
+        s = s.replace(/clip: rect[^;]+;/, '')
+        changed = true
+      }
+      const v = e.style.verticalAlign
+      if (Math.abs(parseFloat(v)) > 10000) {
+        // 10000 is a ridiculously large number
+        s = s.replace(/vertical-align[^;]+;/, '')
+        changed = true
+      }
+      if (changed) {
+        e.setAttribute('style', s)
+      }
+    })
   }
 }
 

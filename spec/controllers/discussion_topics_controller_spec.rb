@@ -163,6 +163,28 @@ describe DiscussionTopicsController do
     context "cross-sharding" do
       specs_require_sharding
 
+      it "should mark as read when viewed" do
+        @shard1.activate do
+          account = Account.create!(name: 'Shard2 account')
+          @course = account.courses.create!(name: 'new_course', workflow_state: 'available')
+          # @student is defined outside and lives on the default shard.
+          @course.enroll_user(@student, 'StudentEnrollment', enrollment_state: 'active')
+          user_session(@student)
+          course_topic(:skip_set_user => true)
+          @topic.publish!
+
+          expect(@student.stream_item_instances.count).to eq 1
+          sii = @student.stream_item_instances.take
+          expect(sii.workflow_state).to eq 'unread'
+          expect(@topic.read_state(@student)).to eq 'unread'
+
+          get 'show', params: { course_id: @course.id, id: @topic.id }
+
+          expect(sii.reload.workflow_state).to eq 'read'
+          expect(@topic.reload.read_state(@student)).to eq 'read'
+        end
+      end
+
       it 'returns the topic across shards' do
         @topic = @course.discussion_topics.create!(title: 'student topic', message: 'Hello', user: @student)
         user_session(@student)
@@ -217,8 +239,7 @@ describe DiscussionTopicsController do
       expect(parsed_topic["lock_at"].to_json).to eq lock_at_time.to_json
     end
 
-    it "sets DIRECT_SHARE_ENABLED when enabled" do
-      @course.account.enable_feature!(:direct_share)
+    it "sets DIRECT_SHARE_ENABLED when allowed" do
       user_session(@teacher)
       get 'index', params: {course_id: @course.id}
       expect(response).to be_successful
@@ -226,22 +247,13 @@ describe DiscussionTopicsController do
     end
 
     it "does not set DIRECT_SHARE_ENABLED if the user does not have manage_content" do
-      @course.account.enable_feature!(:direct_share)
       user_session(@student)
       get 'index', params: {course_id: @course.id}
       expect(response).to be_successful
       expect(assigns[:js_env][:DIRECT_SHARE_ENABLED]).to be(false)
     end
 
-    it "does not set DIRECT_SHARE_ENABLED when disabled" do
-      user_session(@teacher)
-      get 'index', params: {course_id: @course.id}
-      expect(response).to be_successful
-      expect(assigns[:js_env][:DIRECT_SHARE_ENABLED]).to be(false)
-    end
-
     it "does not set DIRECT_SHARE_ENABLED when viewing a group" do
-      @course.account.enable_feature!(:direct_share)
       user_session(@teacher)
       group = @course.groups.create!
       get 'index', params: {group_id: group.id}
@@ -792,6 +804,8 @@ describe DiscussionTopicsController do
 
       before(:each) do
         @course.root_account.enable_feature!(:canvas_for_elementary)
+        @course.account.settings[:enable_as_k5_account] = {value: true}
+        @course.account.save!
       end
 
       after(:each) do

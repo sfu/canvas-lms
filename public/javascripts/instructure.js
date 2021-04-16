@@ -205,8 +205,10 @@ export function enhanceUserContent() {
   $('a.instructure_file_link, a.instructure_scribd_file').each(function () {
     const $link = $(this)
     $('.user_content.unenhanced:visible')
-    if ($link.find('.ui-icon-extlink').length) {
-      // a bug in the new RCE added instructure_file_link class name to external links for a while
+    const apiReturnType = $link.data('api-returntype')
+    const isFile = apiReturnType == null || apiReturnType === 'File'
+    if ($link.find('.ui-icon-extlink').length || !isFile) {
+      // a bug in the new RCE added instructure_file_link class name to external and internal links for a while
       return
     }
     let $download_btn, $preview_link, $preview_container
@@ -221,11 +223,11 @@ export function enhanceUserContent() {
         qs.delete('wrap')
         qs.append('download_frd', '1')
         const download_url = `${href.origin}${href.pathname.replace(
-          /(?:\/download)?$/,
+          /(?:\/(download|preview))?$/,
           '/download'
         )}?${qs}`
         $download_btn = $(
-          `<a class="file_download_btn" role="button" download style="margin-inline-start: 5px;" href="${htmlEscape(
+          `<a class="file_download_btn" role="button" download style="margin-inline-start: 5px; text-decoration: none;" href="${htmlEscape(
             download_url
           )}">
               <img style="width:16px; height:16px" src="/images/svg-icons/svg_icon_download.svg" alt="" role="presentation"/>
@@ -539,7 +541,7 @@ $(function () {
       $.ajaxJSON(
         $link
           .attr('href')
-          .replace(/\/download/, '') // download as part of the path
+          .replace(/\/(download|preview)/, '') // download as part of the path
           .replace(/wrap=1&?/, '') // wrap=1 as part of the query_string
           .replace(/[?&]$/, ''), // any trailing chars if wrap=1 was at the end
         'GET',

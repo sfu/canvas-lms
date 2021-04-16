@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #
 # Copyright (C) 2011 - present Instructure, Inc.
 #
@@ -483,6 +485,7 @@ class UsersController < ApplicationController
 
     js_env({
       :DASHBOARD_SIDEBAR_URL => dashboard_sidebar_url,
+      :K5_MODE => @k5_mode,
       :PREFERENCES => {
         :dashboard_view => @current_user.dashboard_view(@domain_root_account),
         :hide_dashcard_color_overlays => @current_user.preferences[:hide_dashcard_color_overlays],
@@ -1252,8 +1255,7 @@ class UsersController < ApplicationController
   def api_show
     @user = api_find(User, params[:id])
     if @user.grants_right?(@current_user, session, :api_show_user)
-      includes = %w{locale avatar_url permissions email effective_locale}
-      includes += Array.wrap(params[:include]) & ['uuid', 'last_login']
+      includes = api_show_includes
 
       # would've preferred to pass User.with_last_login as the collection to
       # api_find but the implementation of that scope appears to be incompatible
@@ -2151,32 +2153,25 @@ class UsersController < ApplicationController
 
   def avatar_image
     cancel_cache_buster
-    # TODO: remove support for specifying user ids by id, require using
-    # the encrypted version. We can't do it right away because there are
-    # a bunch of places that will have cached fragments using the old
-    # style.
-    return redirect_to(User.default_avatar_fallback) unless service_enabled?(:avatars)
-    user_id = params[:user_id].to_i
-    if params[:user_id].present? && params[:user_id].match(/-/)
-      user_id = User.user_id_from_avatar_key(params[:user_id])
-    end
-    account_avatar_setting = service_enabled?(:avatars) ? @domain_root_account.settings[:avatars] || 'enabled' : 'disabled'
+    user_id = User.user_id_from_avatar_key(params[:user_id])
+
+    return redirect_to(User.default_avatar_fallback) unless service_enabled?(:avatars) && user_id.present?
+
+    account_avatar_setting = @domain_root_account.settings[:avatars] || 'enabled'
     user_id = Shard.global_id_for(user_id)
     user_shard = Shard.shard_for(user_id)
     url = user_shard.activate do
       Rails.cache.fetch(Cacher.avatar_cache_key(user_id, account_avatar_setting)) do
-        user = User.where(id: user_id).first if user_id.present?
+        user = User.where(id: user_id).first
         if user
-          user.avatar_url(nil, account_avatar_setting, "%{fallback}")
+          user.avatar_url(nil, account_avatar_setting)
         else
-          '%{fallback}'
+          User.default_avatar_fallback
         end
       end
     end
-    fallback = User.avatar_fallback_url(nil, request)
-    redirect_to (url.blank? || url == "%{fallback}") ?
-      User.default_avatar_fallback :
-      url.sub(CGI.escape("%{fallback}"), CGI.escape(fallback))
+
+    redirect_to User.avatar_fallback_url(url, request)
   end
 
   # @API Merge user into another user
@@ -2392,6 +2387,7 @@ class UsersController < ApplicationController
       user = User.new(:name => user_hash[:name] || email)
       cc = user.communication_channels.build(:path => email, :path_type => 'email')
       cc.user = user
+      user.root_account_ids = [@context.root_account.id]
       user.workflow_state = 'creation_pending'
 
       # check just in case
@@ -2707,6 +2703,12 @@ class UsersController < ApplicationController
     grading_periods
   end
 
+  def api_show_includes
+    includes = %w{locale avatar_url permissions email effective_locale}
+    includes += Array.wrap(params[:include]) & ['uuid', 'last_login']
+    includes
+  end
+
   def create_user
     run_login_hooks
     # Look for an incomplete registration with this pseudonym
@@ -2821,7 +2823,8 @@ class UsersController < ApplicationController
                                'pending_approval'
                              else
                                'pre_registered'
-                             end
+      end
+      @user.root_account_ids = [@domain_root_account.id]
     end
     @recaptcha_errors = nil
     if force_validations || !manage_user_logins

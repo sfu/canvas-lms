@@ -52,6 +52,7 @@ module Api::V1::Course
     settings[:image_url] = course.image_url
     settings[:image_id] = course.image_id
     settings[:image] = course.image
+    settings[:course_color] = course.course_color
 
     settings
   end
@@ -98,6 +99,11 @@ module Api::V1::Course
         precalculated_permissions: precalculated_permissions) do |builder, allowed_attributes, methods, permissions_to_include|
       hash = api_json(course, user, session, { :only => allowed_attributes, :methods => methods }, permissions_to_include)
       hash['term'] = enrollment_term_json(course.enrollment_term, user, session, enrollments, []) if includes.include?('term')
+      if includes.include?('grading_periods')
+        hash['grading_periods'] = course.enrollment_term&.grading_period_group&.grading_periods&.map do |gp|
+           api_json(gp, user, session, :only => %w(id title start_date end_date workflow_state))
+        end
+      end
       if includes.include?('course_progress')
         hash['course_progress'] = CourseProgress.new(course,
                                                      subject_user,
@@ -141,6 +147,7 @@ module Api::V1::Course
       hash['image_download_url'] = course.image if includes.include?('course_image') && course.feature_enabled?('course_card_images')
       hash['concluded'] = course.concluded? if includes.include?('concluded')
       apply_master_course_settings(hash, course, user)
+      hash['template'] = course.template? if course.root_account.feature_enabled?(:course_templates)
 
       # return hash from the block for additional processing in Api::V1::CourseJson
       hash

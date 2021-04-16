@@ -308,12 +308,6 @@ quizzes_next_submission_history:
     separately.
   applies_to: RootAccount
   root_opt_in: true
-import_to_quizzes_next:
-  state: allowed
-  display_name: New Quizzes Importing
-  description: Allow importing of QTI and Common Cartridge into New Quizzes.
-  applies_to: RootAccount
-  root_opt_in: true
 newquizzes_on_quiz_page:
   state: hidden
   display_name: New Quizzes on the Quizzes page
@@ -366,6 +360,10 @@ rce_enhancements:
   environments:
     production:
       state: hidden
+    development:
+      state: on
+    ci:
+      state: on
 new_features_ui:
   state: hidden
   applies_to: SiteAdmin
@@ -373,13 +371,6 @@ new_features_ui:
   description: This feature creates a SiteAdmin Release Flag tab to be able
     to release features to users through the UI. It also reworks the UI for
     the old Feature Options tabs.
-direct_share:
-  state: hidden
-  applies_to: RootAccount
-  display_name: Direct Share
-  description: This feature allows teachers to easily copy single items from
-    one course to another, and to share a single item of content with other
-    users so they can import those items into their courses as well.
 filter_speed_grader_by_student_group:
   state: allowed
   applies_to: RootAccount
@@ -427,17 +418,6 @@ timer_without_autosubmission:
   description: Presents the quiz setting to avoid automatic submission of a timed quiz when the available time has ended.
   applies_to: RootAccount
   state: hidden
-recent_history:
-  state: allowed
-  applies_to: RootAccount
-  display_name: Recent History
-  description: Show a list of recently visited pages in the Canvas global navigation
-easy_student_view:
-  state: hidden
-  applies_to: Course
-  display_name: Easy Toggle Student View
-  description: Places a button in the top-right corner of course pages allowing teachers to quickly switch to Student
-    View.
 new_course_availability_ui:
   state: hidden
   applies_to: RootAccount

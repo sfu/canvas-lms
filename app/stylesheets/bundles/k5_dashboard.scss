@@ -40,6 +40,20 @@
   padding: $ic-sp 0 $ic-sp $ic-sp*1.5 !important;
 }
 
+// Go to full width cards once there is not enough room for 2 cards plus the global nav bar,
+// but go back to 2 cards once the global nav goes away until there is not enough room again.
+@media only screen and (min-width: 768px) and (max-width: 804px),
+       only screen and (max-width: 682px) {
+  .ic-DashboardCard {
+    width: 100% !important;
+    margin-#{direction(left)}: 0 !important;
+  }
+
+  .ic-DashboardCard__box__container {
+    margin-#{direction(left)}: 0 !important;
+  }
+}
+
 // These overrides are required because InstUI Tabs don't natively support icons or
 // themeable "selected" colors. There are also some properties required for the
 // animated sticky header transitions that can't be accomplished easily via InstUI.
@@ -49,7 +63,10 @@
   // See https://developers.google.com/web/updates/2017/09/sticky-headers.
   top: -1px;
   padding-top: 1px;
-  border-bottom: $ic-border-color 1px solid;
+  // These offsets let the sticky header cover content that spills over into the
+  // page padding, otherwise it's still visible behind the sticky header.
+  margin-left: -24px;
+  padding-left: 24px;
   // We need a higher z-index than the planner items, some of which are at 1.
   z-index: 2;
 

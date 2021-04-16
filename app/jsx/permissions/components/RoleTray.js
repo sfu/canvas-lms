@@ -24,12 +24,16 @@ import React, {Component} from 'react'
 
 import {Alert} from '@instructure/ui-alerts'
 import {Button} from '@instructure/ui-buttons'
-import {View, Flex} from '@instructure/ui-layout'
-import {Dialog, ScreenReaderContent} from '@instructure/ui-a11y'
-import {Heading, Text} from '@instructure/ui-elements'
+import {Flex} from '@instructure/ui-flex'
+import {View} from '@instructure/ui-view'
+import {ScreenReaderContent} from '@instructure/ui-a11y-content'
+import {Dialog} from '@instructure/ui-dialog'
+import {Text} from '@instructure/ui-text'
+import {Heading} from '@instructure/ui-heading'
 import {IconArrowStartSolid, IconEditLine, IconTrashLine, IconXSolid} from '@instructure/ui-icons'
-import {Select, TextInput} from '@instructure/ui-forms'
-import {Tray} from '@instructure/ui-overlays'
+import {TextInput} from '@instructure/ui-text-input'
+import {SimpleSelect} from '@instructure/ui-simple-select'
+import {Tray} from '@instructure/ui-tray'
 
 import FriendlyDatetime from '../../shared/FriendlyDatetime'
 import actions from '../actions'
@@ -406,18 +410,18 @@ export default class RoleTray extends Component {
 
   renderBaseRoleSelector = () => (
     <View as="div" margin="medium 0 large 0">
-      <Select
-        label={I18n.t('Base Type')}
-        defaultOption={this.props.basedOn}
+      <SimpleSelect
+        renderLabel={I18n.t('Base Type')}
+        defaultValue={this.props.basedOn}
         onChange={(_event, option) => this.showEditBaseRoleAlert(option.value)}
         inputRef={c => (this.editRoleInput = c)}
       >
         {this.props.baseRoleLabels.map(label => (
-          <option key={label} value={label}>
+          <SimpleSelect.Option id={label} key={label} value={label}>
             {label}
-          </option>
+          </SimpleSelect.Option>
         ))}
-      </Select>
+      </SimpleSelect>
     </View>
   )
 

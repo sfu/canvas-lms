@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #
 # Copyright (C) 2011 - present Instructure, Inc.
 #
@@ -61,7 +63,7 @@ class AssignmentsController < ApplicationController
 
         set_js_assignment_data
         set_tutorial_js_env
-        set_section_list_js_env if @domain_root_account.feature_enabled?(:assignment_bulk_edit)
+        set_section_list_js_env
         hash = {
           WEIGHT_FINAL_GRADES: @context.apply_group_weights?,
           POST_TO_SIS_DEFAULT: @context.account.sis_default_grade_export[:value],
@@ -126,6 +128,16 @@ class AssignmentsController < ApplicationController
           module_id: mark_done_presenter.module.id
         }
       })
+    end
+
+    if @assignment.turnitin_enabled? || @assignment.vericite_enabled?
+      similarity_pledge = {
+        EULA_URL: tool_eula_url,
+        COMMENTS: plagiarism_comments,
+        PLEDGE_TEXT: pledge_text,
+      }
+
+      js_env({SIMILARITY_PLEDGE: similarity_pledge})
     end
 
     js_env({
@@ -198,6 +210,11 @@ class AssignmentsController < ApplicationController
         end
 
         env = js_env({COURSE_ID: @context.id})
+        submission = @assignment.submissions.find_by(user: @current_user)
+        if submission
+          js_env({ SUBMISSION_ID: submission.id })
+        end
+
         env[:SETTINGS][:filter_speed_grader_by_student_group] = filter_speed_grader_by_student_group?
 
         if env[:SETTINGS][:filter_speed_grader_by_student_group]
@@ -303,7 +320,7 @@ class AssignmentsController < ApplicationController
         # this will set @user_has_google_drive
         user_has_google_drive
 
-        @can_direct_share = @context.root_account.feature_enabled?(:direct_share) && @context.grants_right?(@current_user, session, :read_as_admin)
+        @can_direct_share = @context.grants_right?(@current_user, session, :read_as_admin)
         @assignment_menu_tools = external_tools_display_hashes(:assignment_menu)
 
         @mark_done = MarkDonePresenter.new(self, @context, params["module_item_id"], @current_user, @assignment)
@@ -646,7 +663,9 @@ class AssignmentsController < ApplicationController
         SIS_NAME: AssignmentUtil.post_to_sis_friendly_name(@context),
         VALID_DATE_RANGE: CourseDateRange.new(@context),
         ANNOTATED_DOCUMENT_SUBMISSIONS:
-          Account.site_admin.feature_enabled?(:annotated_document_submissions)
+          Account.site_admin.feature_enabled?(:annotated_document_submissions),
+        NEW_QUIZZES_ASSIGNMENT_BUILD_BUTTON_ENABLED:
+          Account.site_admin.feature_enabled?(:new_quizzes_assignment_build_button)
       }
 
       add_crumb(@assignment.title, polymorphic_url([@context, @assignment])) unless @assignment.new_record?
@@ -655,6 +674,7 @@ class AssignmentsController < ApplicationController
       hash[:ASSIGNMENT][:has_submitted_submissions] = @assignment.has_submitted_submissions?
       hash[:URL_ROOT] = polymorphic_url([:api_v1, @context, :assignments])
       hash[:CANCEL_TO] = set_cancel_to_url
+      hash[:CAN_CANCEL_TO] = generate_cancel_to_urls
       hash[:CONTEXT_ID] = @context.id
       hash[:CONTEXT_ACTION_SOURCE] = :assignments
       hash[:DUE_DATE_REQUIRED_FOR_ACCOUNT] = AssignmentUtil.due_date_required_for_account?(@context)
@@ -686,6 +706,16 @@ class AssignmentsController < ApplicationController
         hash[:allow_self_signup] = true # for group creation
         hash[:group_user_type] = 'student'
       end
+
+      if @assignment.annotatable_attachment_id.present?
+        if Account.site_admin.feature_enabled?(:annotated_document_submissions)
+          hash[:ANNOTATED_DOCUMENT] = {
+            display_name: @assignment.annotatable_attachment.display_name,
+            id: @assignment.annotatable_attachment.id
+          }
+        end
+      end
+
       js_env(hash)
       conditional_release_js_env(@assignment)
       set_master_course_js_env_data(@assignment, @context)
@@ -699,6 +729,17 @@ class AssignmentsController < ApplicationController
       return polymorphic_url([@context, :quizzes])
     end
     @assignment.new_record? ? polymorphic_url([@context, :assignments]) : polymorphic_url([@context, @assignment])
+  end
+
+  def generate_cancel_to_urls
+    if @assignment.quiz_lti?
+      quizzes_url = polymorphic_url([@context, :quizzes])
+      assignments_url = polymorphic_url([@context, :assignments])
+      modules_url = polymorphic_url([@context, :context_modules])
+      gradebook_url = polymorphic_url([@context, :gradebook])
+      return [quizzes_url, assignments_url, modules_url, gradebook_url]
+    end
+    [@assignment.new_record? ? polymorphic_url([@context, :assignments]) : polymorphic_url([@context, @assignment])]
   end
 
   # @API Delete an assignment
@@ -853,6 +894,14 @@ class AssignmentsController < ApplicationController
     pledge ||= @context.vericite_pledge.presence || closest_pledge if @assignment.vericite_enabled?
 
     pledge || (@assignment.course.account.closest_turnitin_pledge if @assignment.tool_settings_tool.present?)
+  end
+
+  def plagiarism_comments
+    if @assignment.turnitin_enabled?
+      @context.all_turnitin_comments
+    elsif @assignment.vericite_enabled?
+      @context.vericite_comments
+    end
   end
 
   def quiz_lti_tool_enabled?

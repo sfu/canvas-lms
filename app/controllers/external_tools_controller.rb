@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #
 # Copyright (C) 2011 - present Instructure, Inc.
 #
@@ -1143,6 +1145,29 @@ class ExternalToolsController < ApplicationController
         @context.save!
       end
       render json: {rce_favorite_tool_ids: favorite_ids.map{|id| Shard.relative_id_for(id, Shard.current, Shard.current)}}
+    end
+  end
+
+  # @API Get visible course navigation tools
+  # Get a list of external tools with the course_navigation placement that have not been hidden in
+  # course settings and whose visibility settings apply to the requesting user. These tools are the
+  # same that appear in the course navigation.
+  #
+  # @example_request
+  #
+  #   curl 'https://<canvas>/api/v1/courses/<course_id>/external_tools/visible_course_nav_tools' \
+  #        -H "Authorization: Bearer <token>"
+  def visible_course_nav_tools
+    if authorized_action(@context, @current_user, :read)
+      if @context.is_a?(Course)
+        tabs = @context.tabs_available(@current_user)
+        tool_ids = []
+        tabs.select{ |t| t[:external] }.each do |t|
+          tool_ids << t[:args][1] if t[:args] && t[:args][1]
+        end
+        @tools = ContextExternalTool.where(:id => tool_ids)
+        render :json => external_tools_json(@tools, @context, @current_user, session)
+      end
     end
   end
 

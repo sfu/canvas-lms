@@ -17,6 +17,7 @@
  */
 import React, {Component} from 'react'
 import classnames from 'classnames'
+import {colors} from '@instructure/canvas-theme'
 import {themeable, ApplyTheme} from '@instructure/ui-themeable'
 import {Text} from '@instructure/ui-text'
 import {Pill} from '@instructure/ui-pill'
@@ -32,7 +33,8 @@ import {
   IconCalendarMonthLine,
   IconDocumentLine,
   IconEditLine,
-  IconPeerReviewLine
+  IconPeerReviewLine,
+  IconWarningLine
 } from '@instructure/ui-icons'
 import {arrayOf, bool, number, string, func, shape, object} from 'prop-types'
 import {momentObj} from 'react-moment-proptypes'
@@ -67,7 +69,7 @@ export class PlannerItem extends Component {
     context: object,
     html_url: string,
     toggleCompletion: func,
-    updateTodo: func.isRequired,
+    updateTodo: func,
     badges: arrayOf(shape(badgeShape)),
     registerAnimatable: func,
     deregisterAnimatable: func,
@@ -81,13 +83,17 @@ export class PlannerItem extends Component {
     feedback: shape(feedbackShape),
     location: string,
     endTime: momentObj,
-    timeZone: string.isRequired
+    timeZone: string.isRequired,
+    simplifiedControls: bool,
+    isMissingItem: bool
   }
 
   static defaultProps = {
     badges: [],
     responsiveSize: 'large',
-    allDay: false
+    allDay: false,
+    simplifiedControls: false,
+    isMissingItem: false
   }
 
   constructor(props) {
@@ -116,7 +122,7 @@ export class PlannerItem extends Component {
 
   toDoLinkClick = e => {
     e.preventDefault()
-    this.props.updateTodo({updateTodoItem: {...this.props}})
+    this.props.updateTodo && this.props.updateTodo({updateTodoItem: {...this.props}})
   }
 
   registerRootDivRef = elt => {
@@ -331,7 +337,12 @@ export class PlannerItem extends Component {
       <div className={styles.title} style={{position: 'relative'}}>
         <Button
           variant="link"
-          theme={{mediumPadding: '0', mediumHeight: 'normal'}}
+          theme={{
+            mediumPadding: '0',
+            mediumHeight: 'normal',
+            linkColor: this.props.simplifiedControls ? colors.licorice : undefined,
+            linkHoverColor: this.props.simplifiedControls ? colors.licorice : undefined
+          }}
           buttonRef={link => {
             this.itemLink = link
           }}
@@ -362,12 +373,10 @@ export class PlannerItem extends Component {
     if (this.props.points) {
       return (
         <div className={styles.score}>
-          <Text color="secondary">
-            <Text size="large">{this.props.points}</Text>
-            <Text size="x-small">
-              &nbsp;
-              {formatMessage('pts')}
-            </Text>
+          <Text size="large">{this.props.points}</Text>
+          <Text size="x-small">
+            &nbsp;
+            {formatMessage('pts')}
           </Text>
         </div>
       )
@@ -377,7 +386,9 @@ export class PlannerItem extends Component {
         <div className={styles.editButton}>
           <ApplyTheme
             theme={{
-              [Button.theme]: {iconColor: this.props.color}
+              [Button.theme]: {
+                iconColor: this.props.simplifiedControls ? undefined : this.props.color
+              }
             }}
           >
             <Button variant="icon" icon={IconEditLine} onClick={this.toDoLinkClick}>
@@ -402,7 +413,7 @@ export class PlannerItem extends Component {
         <div className={metricsClasses}>
           {this.renderItemSubMetric()}
           <div className={styles.due}>
-            <Text color="secondary" size="x-small">
+            <Text size="x-small">
               <PresentationContent>{this.renderDateField()}</PresentationContent>
             </Text>
           </div>
@@ -419,17 +430,38 @@ export class PlannerItem extends Component {
     }
   }
 
+  renderCourseName = () => {
+    if (!this.props.isMissingItem || !this.props.courseName) return null
+
+    return (
+      <Text
+        size="x-small"
+        weight="bold"
+        color="primary"
+        letterSpacing="expanded"
+        transform="uppercase"
+        theme={{primaryColor: this.props.color}}
+        data-testid="MissingAssignments-CourseName"
+      >
+        {this.props.courseName}
+      </Text>
+    )
+  }
+
   renderItemDetails = () => {
     return (
       <div
         className={classnames(styles.details, !this.hasBadges() ? styles.details_no_badges : '')}
       >
-        <div className={styles.type}>
-          <Text size="x-small" color="secondary">
-            {this.renderType()}
-          </Text>
-        </div>
+        {!this.props.simplifiedControls && (
+          <div className={styles.type}>
+            <Text size="x-small" color="secondary">
+              {this.renderType()}
+            </Text>
+          </div>
+        )}
         {this.renderTitle()}
+        {this.renderCourseName()}
       </div>
     )
   }
@@ -467,12 +499,14 @@ export class PlannerItem extends Component {
   }
 
   getCheckboxTheme = () => {
-    return {
-      checkedBackground: this.props.color,
-      checkedBorderColor: this.props.color,
-      borderColor: this.props.color,
-      hoverBorderColor: this.props.color
-    }
+    return this.props.simplifiedControls
+      ? {}
+      : {
+          checkedBackground: this.props.color,
+          checkedBorderColor: this.props.color,
+          borderColor: this.props.color,
+          hoverBorderColor: this.props.color
+        }
   }
 
   renderExtraInfo() {
@@ -501,14 +535,22 @@ export class PlannerItem extends Component {
     if (location) {
       return (
         <div className={styles.location}>
-          <Text color="secondary">{location}</Text>
+          <Text>{location}</Text>
         </div>
       )
     }
     return null
   }
 
-  render() {
+  renderCompletedCheckbox() {
+    if (this.props.isMissingItem) {
+      return (
+        <div className={styles.completed}>
+          <IconWarningLine color="error" />
+        </div>
+      )
+    }
+
     const assignmentType = this.assignmentType()
     const checkboxLabel = this.state.completed
       ? formatMessage('{assignmentType} {title} is marked as done.', {
@@ -521,29 +563,37 @@ export class PlannerItem extends Component {
         })
 
     return (
+      <div className={styles.completed}>
+        <ApplyTheme
+          theme={{
+            [CheckboxFacade.theme]: this.getCheckboxTheme()
+          }}
+        >
+          <Checkbox
+            ref={this.registerFocusElementRef}
+            label={<ScreenReaderContent>{checkboxLabel}</ScreenReaderContent>}
+            checked={this.props.toggleAPIPending ? !this.state.completed : this.state.completed}
+            onChange={this.props.toggleCompletion}
+            disabled={this.props.toggleAPIPending}
+          />
+        </ApplyTheme>
+      </div>
+    )
+  }
+
+  render() {
+    return (
       <div
-        className={classnames(styles.root, styles[this.getLayout()], 'planner-item')}
+        className={classnames(styles.root, styles[this.getLayout()], 'planner-item', {
+          [styles.missingItem]: this.props.isMissingItem
+        })}
         ref={this.registerRootDivRef}
       >
         {this.renderNotificationBadge()}
-        <div className={styles.completed}>
-          <ApplyTheme
-            theme={{
-              [CheckboxFacade.theme]: this.getCheckboxTheme()
-            }}
-          >
-            <Checkbox
-              ref={this.registerFocusElementRef}
-              label={<ScreenReaderContent>{checkboxLabel}</ScreenReaderContent>}
-              checked={this.props.toggleAPIPending ? !this.state.completed : this.state.completed}
-              onChange={this.props.toggleCompletion}
-              disabled={this.props.toggleAPIPending}
-            />
-          </ApplyTheme>
-        </div>
+        {this.renderCompletedCheckbox()}
         <div
           className={this.props.associated_item === 'To Do' ? styles.avatar : styles.icon}
-          style={{color: this.props.color}}
+          style={{color: this.props.simplifiedControls ? undefined : this.props.color}}
           aria-hidden="true"
         >
           {this.renderIcon()}
@@ -561,4 +611,7 @@ export class PlannerItem extends Component {
 }
 
 const ResponsivePlannerItem = responsiviser()(PlannerItem)
-export default animatable(themeable(theme, styles)(ResponsivePlannerItem))
+const ThemeablePlannerItem = themeable(theme, styles)(ResponsivePlannerItem)
+const AnimatablePlannerItem = animatable(ThemeablePlannerItem)
+AnimatablePlannerItem.theme = ThemeablePlannerItem.theme
+export default AnimatablePlannerItem

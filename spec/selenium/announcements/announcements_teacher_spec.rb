@@ -33,6 +33,8 @@ describe "announcements" do
 
     before :each do
       user_session(@teacher)
+      Account.default.enable_feature!(:rce_enhancements)
+      stub_rcs_config
     end
 
     it "should allow saving of section announcement", test_id:3469728, priority: "1" do
@@ -120,6 +122,8 @@ describe "announcements" do
       end
 
       it "should perform front-end validation for message", priority: "1", test_id: 220366 do
+        skip("Skip for now -- message box is not emitted with enhanced RCE LS-1851")
+
         topic_title = 'new topic with file'
         get new_url
 
@@ -242,20 +246,30 @@ describe "announcements" do
       expect(ff('.discussion_entry .message')[1]).to include_text(student_entry)
     end
 
+    it "should create an announcement that requires an initial post", priority: "1", test_id: 3293292 do
+      get "/courses/#{@course.id}/discussion_topics/new?is_announcement=true"
+      replace_content(f('input[name=title]'), 'title')
+      type_in_tiny('textarea[name=message]', 'hi')
+      f('#allow_user_comments').click
+      f('#require_initial_post').click
+      expect_new_page_load { submit_form('.form-actions') }
+      announcement = Announcement.where(title: 'title').first
+      expect(announcement.require_initial_post).to eq(true)
+    end
+
     context "in a homeroom course" do
       let(:canvas_for_elem_flag) {@course.root_account.feature_enabled?(:canvas_for_elementary)}
-      let(:is_homeroom) {@course.homeroom_course}
 
       before :each do
         @course.root_account.enable_feature!(:canvas_for_elementary)
+        @course.account.settings[:enable_as_k5_account] = {value: true}
+        @course.account.save!
         @course.homeroom_course = true
         @course.save!
       end
 
       after :each do
         @course.root_account.disable_feature!(:canvas_for_elementary) unless canvas_for_elem_flag
-        @course.homeroom_course = is_homeroom
-        @course.save!
       end
 
       it "removes the Reply section" do

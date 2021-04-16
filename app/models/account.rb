@@ -71,7 +71,7 @@ class Account < ActiveRecord::Base
   has_many :developer_keys
   has_many :developer_key_account_bindings, inverse_of: :account, dependent: :destroy
   has_many :authentication_providers,
-           -> { order(:position) },
+           -> { ordered },
            inverse_of: :account,
            extend: AuthenticationProvider::FindWithType
 
@@ -84,6 +84,7 @@ class Account < ActiveRecord::Base
   has_many :progresses, :as => :context, :inverse_of => :context
   has_many :content_migrations, :as => :context, :inverse_of => :context
   has_many :sis_batch_errors, foreign_key: :root_account_id, inverse_of: :root_account
+  has_many :canvadocs_annotation_contexts
   has_one :outcome_proficiency, -> { preload(:outcome_proficiency_ratings) }, as: :context, inverse_of: :context, dependent: :destroy
   has_one :outcome_calculation_method, as: :context, inverse_of: :context, dependent: :destroy
 
@@ -109,6 +110,7 @@ class Account < ActiveRecord::Base
            inverse_of: :context,
            class_name: 'Lti::ResourceLink',
            dependent: :destroy
+  belongs_to :course_template, class_name: 'Course', inverse_of: :templated_accounts
 
   def inherited_assessment_question_banks(include_self = false, *additional_contexts)
     sql, conds = [], []
@@ -248,6 +250,7 @@ class Account < ActiveRecord::Base
   add_setting :support_url, :root_only => true
 
   add_setting :prevent_course_renaming_by_teachers, :boolean => true, :root_only => true
+  add_setting :prevent_course_availability_editing_by_teachers, :boolean => true, :root_only => true
   add_setting :login_handle_name, root_only: true
   add_setting :change_password_url, root_only: true
   add_setting :unknown_user_url, root_only: true

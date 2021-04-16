@@ -19,8 +19,9 @@
 import React from 'react'
 import OutcomeManagementPanel from '.'
 import {createCache} from 'jsx/canvas-apollo'
-import {accountMocks} from './__tests__/mocks'
+import {accountMocks, smallOutcomeTree} from './__tests__/mocks'
 import {MockedProvider} from '@apollo/react-testing'
+import OutcomesContext from '../contexts/OutcomesContext'
 
 export default {
   title: 'Examples/Outcomes/OutcomeManagementPanel',
@@ -36,15 +37,17 @@ export default {
 }
 
 const Template = args => {
-  const response = accountMocks(args.queryOptions)
+  const response = smallOutcomeTree()
   if (args.response) {
     // Overwrite the result data if it's provided
     response[0].result.data = args.response
   }
   return (
-    <MockedProvider mocks={response} cache={createCache()}>
-      <OutcomeManagementPanel contextType={args.contextType} contextId={args.contextId} />
-    </MockedProvider>
+    <OutcomesContext.Provider value={{env: {contextType: 'Account', contextId: '1'}}}>
+      <MockedProvider mocks={response} cache={createCache()}>
+        <OutcomeManagementPanel />
+      </MockedProvider>
+    </OutcomesContext.Provider>
   )
 }
 

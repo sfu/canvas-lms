@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #
 # Copyright (C) 2011 - present Instructure, Inc.
 #
@@ -185,7 +187,7 @@ class ApplicationController < ActionController::Base
         @js_env[:KILL_JOY] = @domain_root_account.kill_joy? if @domain_root_account&.kill_joy?
 
         cached_features = cached_js_env_account_features
-        @js_env[:DIRECT_SHARE_ENABLED] = cached_features.delete(:direct_share) && !@context.is_a?(Group) && @current_user&.can_content_share?
+        @js_env[:DIRECT_SHARE_ENABLED] = !@context.is_a?(Group) && @current_user&.can_content_share?
         @js_env[:FEATURES] = cached_features.merge(
           canvas_k6_theme: @context.try(:feature_enabled?, :canvas_k6_theme)
         )
@@ -228,11 +230,10 @@ class ApplicationController < ActionController::Base
   # put feature checks on Account.site_admin and @domain_root_account that we're loading for every page in here
   # so altogether we can get them faster the vast majority of the time
   JS_ENV_SITE_ADMIN_FEATURES = [
-    :cc_in_rce_video_tray, :featured_help_links, :rce_lti_favorites, :rce_pretty_html_editor, :rce_better_file_downloading, :rce_better_file_previewing
+    :cc_in_rce_video_tray, :featured_help_links, :rce_pretty_html_editor, :rce_better_file_downloading, :rce_better_file_previewing
   ].freeze
   JS_ENV_ROOT_ACCOUNT_FEATURES = [
-    :direct_share, :assignment_bulk_edit, :responsive_awareness, :recent_history,
-    :responsive_misc, :product_tours, :module_dnd, :files_dnd, :unpublished_courses,
+    :responsive_awareness, :responsive_misc, :product_tours, :module_dnd, :files_dnd, :unpublished_courses,
     :usage_rights_discussion_topics, :inline_math_everywhere, :granular_permissions_manage_users,
     :canvas_for_elementary
   ].freeze
@@ -426,7 +427,7 @@ class ApplicationController < ActionController::Base
         subAccounts: @context.account.sub_accounts.pluck(:id, :name).map{|id, name| {id: id, name: name}},
         terms: @context.account.root_account.enrollment_terms.active.to_a.map{|term| {id: term.id, name: term.name}},
         canManageCourse: can_manage,
-        canAutoPublishCourses: can_manage && @domain_root_account.feature_enabled?(:uxs_4_omg_a_scary_blueprint_checkbox)
+        canAutoPublishCourses: can_manage
       )
     end
     js_env :BLUEPRINT_COURSES_DATA => bc_data
@@ -542,7 +543,7 @@ class ApplicationController < ActionController::Base
     !(params[:controller] == "quizzes/quizzes" && params[:action] == "edit") &&
     params[:controller] != "question_banks"
   end
-  
+
   protected
 
   # we track the cost of each request in RequestThrottle in order
@@ -1913,7 +1914,7 @@ class ApplicationController < ActionController::Base
     # but we still use the assignment#new page to create the quiz.
     # also handles launch from existing quiz on quizzes page.
     if ref.present? && @assignment&.quiz_lti?
-      if (ref.include?('assignments/new') || ref =~ /courses\/\d+\/quizzes/i) && @context.root_account.feature_enabled?(:newquizzes_on_quiz_page)
+      if (ref.include?('assignments/new') || ref =~ /courses\/(\d+\/quizzes.?|.*\?quiz_lti)/) && @context.root_account.feature_enabled?(:newquizzes_on_quiz_page)
         return polymorphic_url([@context, :quizzes])
       end
 
@@ -1923,6 +1924,18 @@ class ApplicationController < ActionController::Base
 
       if ref =~ /courses\/\d+$/i
         return polymorphic_url([@context])
+      end
+
+      if ref =~ /courses\/(\d+\/modules.?|.*\?module_item_id=)/
+        return polymorphic_url([@context, :context_modules])
+      end
+
+      if ref =~ /\/courses\/.*\?quiz_lti/
+        return polymorphic_url([@context, :quizzes])
+      end
+
+      if ref =~ /courses\/\d+\/assignments/
+        return polymorphic_url([@context, :assignments])
       end
     end
     named_context_url(@context, :context_external_content_success_url, 'external_tool_redirect', include_host: true)
@@ -2211,11 +2224,6 @@ class ApplicationController < ActionController::Base
     bank
   end
 
-  def prepend_json_csrf?
-    requested_json = request.headers['Accept'] =~ %r{application/json}
-    request.get? && !requested_json && in_app?
-  end
-
   def in_app?
     !!(@current_user ? @pseudonym_session : session[:session_id])
   end
@@ -2267,12 +2275,6 @@ class ApplicationController < ActionController::Base
       json = options.delete(:json)
       unless json.is_a?(String)
         json = ActiveSupport::JSON.encode(json_cast(json))
-      end
-
-      # prepend our CSRF protection to the JSON response, unless this is an API
-      # call that didn't use session auth, or a non-GET request.
-      if prepend_json_csrf?
-        json = "while(1);#{json}"
       end
 
       # fix for some browsers not properly handling json responses to multipart
@@ -2793,7 +2795,7 @@ class ApplicationController < ActionController::Base
   }.freeze
 
   def show_student_view_button?
-    return false unless @context&.is_a?(Course) && @context&.feature_enabled?(:easy_student_view) && can_do(@context, @current_user, :use_student_view)
+    return false unless @context&.is_a?(Course) && can_do(@context, @current_user, :use_student_view)
 
     controller_action = "#{params[:controller]}##{params[:action]}"
     STUDENT_VIEW_PAGES.key?(controller_action) && (STUDENT_VIEW_PAGES[controller_action].nil? || !@context.tab_hidden?(STUDENT_VIEW_PAGES[controller_action]))

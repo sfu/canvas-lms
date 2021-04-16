@@ -18,9 +18,14 @@
 
 import React from 'react'
 import {shape, object, func, string, oneOfType, arrayOf, node} from 'prop-types'
-import {ScreenReaderContent} from '@instructure/ui-a11y'
-import {View, Flex} from '@instructure/ui-layout'
-import {Heading, List, Text, Avatar, Badge} from '@instructure/ui-elements'
+import {ScreenReaderContent} from '@instructure/ui-a11y-content'
+import {Flex} from '@instructure/ui-flex'
+import {View} from '@instructure/ui-view'
+import {Badge} from '@instructure/ui-badge'
+import {Avatar} from '@instructure/ui-avatar'
+import {Text} from '@instructure/ui-text'
+import {List} from '@instructure/ui-list'
+import {Heading} from '@instructure/ui-heading'
 import {Spinner} from '@instructure/ui-spinner'
 import {Button} from '@instructure/ui-buttons'
 import {ToggleDetails} from '@instructure/ui-toggle-details'
@@ -387,32 +392,30 @@ export default class MobileGlobalMenu extends React.Component {
             </List.Item>
           ))}
 
-          {ENV.FEATURES?.recent_history && (
-            <List.Item>
-              <ToggleDetails
-                iconPosition="end"
-                fluidWidth
-                onToggle={ensureLoaded('history')}
-                summary={
-                  <Flex padding="xx-small small">
-                    <Flex.Item width="3rem">
-                      <IconClockLine inline={false} size="small" color="brand" />
-                    </Flex.Item>
-                    <Flex.Item>
-                      <Text color="brand">{I18n.t('History')}</Text>
-                    </Flex.Item>
-                  </Flex>
-                }
-              >
-                <View as="div" margin="0 0 0 xx-large">
-                  <HistoryList
-                    history={this.props.DesktopNavComponent.state.history}
-                    hasLoaded={this.props.DesktopNavComponent.state.historyAreLoaded}
-                  />
-                </View>
-              </ToggleDetails>
-            </List.Item>
-          )}
+          <List.Item>
+            <ToggleDetails
+              iconPosition="end"
+              fluidWidth
+              onToggle={ensureLoaded('history')}
+              summary={
+                <Flex padding="xx-small small">
+                  <Flex.Item width="3rem">
+                    <IconClockLine inline={false} size="small" color="brand" />
+                  </Flex.Item>
+                  <Flex.Item>
+                    <Text color="brand">{I18n.t('History')}</Text>
+                  </Flex.Item>
+                </Flex>
+              }
+            >
+              <View as="div" margin="0 0 0 xx-large">
+                <HistoryList
+                  history={this.props.DesktopNavComponent.state.history}
+                  hasLoaded={this.props.DesktopNavComponent.state.historyAreLoaded}
+                />
+              </View>
+            </ToggleDetails>
+          </List.Item>
 
           {true /* TODO: put a check for if we should show help */ && (
             <List.Item>

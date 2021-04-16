@@ -18,7 +18,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom'
 import INST from 'INST'
-import I18n from 'i18n!assignment'
+import I18n from 'i18n!assignment_editview'
 import ValidatedFormView from '../ValidatedFormView'
 import _ from 'underscore'
 import $ from 'jquery'
@@ -50,7 +50,7 @@ import 'jqueryui/dialog'
 import 'jquery.toJSON'
 import '../../jquery.rails_flash_notifications'
 import '../../behaviors/tooltip'
-import {FileBrowserWrapper} from 'jsx/assignments/EditAssignment'
+import {AnnotatedDocumentSelector} from 'jsx/assignments/EditAssignment'
 
 ###
 xsslint safeString.identifier srOnly
@@ -157,6 +157,7 @@ export default class EditView extends ValidatedFormView
     events = {}
     events["click .cancel_button"] = 'handleCancel'
     events["click .save_and_publish"] = 'saveAndPublish'
+    events["click .build_button"] = 'handleBuild'
     events["change #{SUBMISSION_TYPE}"] = 'handleSubmissionTypeChange'
     events["change #{ONLINE_SUBMISSION_TYPES}"] = 'handleOnlineSubmissionTypeChange'
     events["change #{RESTRICT_FILE_UPLOADS}"] = 'handleRestrictFileUploadsChange'
@@ -331,25 +332,49 @@ export default class EditView extends ValidatedFormView
   toggleAnnotatedDocument: =>
     @$annotatedDocumentOptions.toggleAccessibly @$allowAnnotatedDocument.prop('checked')
 
-    documentChooserContainer = document.querySelector('#annotated_document_chooser_container')
-
     if @$allowAnnotatedDocument.prop('checked')
-      fileBrowserProps = {
-        useContextAssets: true,
-        allowUpload: true,
-        selectFile: (fileInfo) =>
-          document.getElementById('annotated_document_id').value = fileInfo.id
-          $.screenReaderFlashMessageExclusive(
-            I18n.t('selected %{filename}', {filename: fileInfo.name})
-          )
-      }
-
-      ReactDOM.render(
-        React.createElement(FileBrowserWrapper, fileBrowserProps),
-        documentChooserContainer
-      )
+      @renderAnnotatedDocumentSelector()
     else
-      ReactDOM.unmountComponentAtNode(documentChooserContainer)
+      @unmountAnnotatedDocumentSelector()
+
+  getAnnotatedDocumentContainer: =>
+    return document.querySelector('#annotated_document_chooser_container')
+
+  setAnnotatedDocument: (file) =>
+    $annotatedDocumentInput = document.getElementById('annotated_document_id')
+    @annotatedDocument = file
+
+    if @annotatedDocument == null
+      $annotatedDocumentInput.value = ''
+    else
+      $annotatedDocumentInput.value = @annotatedDocument.id
+
+  getAnnotatedDocument: () =>
+    return @annotatedDocument
+
+  renderAnnotatedDocumentSelector: () =>
+    props = {
+      attachment: @getAnnotatedDocument(),
+      onRemove: (fileInfo) =>
+        $.screenReaderFlashMessageExclusive(
+          I18n.t('removed %{filename}', {filename: fileInfo.name})
+        )
+        @setAnnotatedDocument(null)
+        @renderAnnotatedDocumentSelector()
+      onSelect: (fileInfo) =>
+        $.screenReaderFlashMessageExclusive(
+          I18n.t('selected %{filename}', {filename: fileInfo.name})
+        )
+        @setAnnotatedDocument({id: fileInfo.id, name: fileInfo.name})
+        @renderAnnotatedDocumentSelector()
+    }
+
+    element = React.createElement(AnnotatedDocumentSelector, props)
+    ReactDOM.render(element, @getAnnotatedDocumentContainer())
+
+  unmountAnnotatedDocumentSelector: () =>
+    ReactDOM.unmountComponentAtNode(@getAnnotatedDocumentContainer())
+    @setAnnotatedDocument(null)
 
   toggleAdvancedTurnitinSettings: (ev) =>
     ev.preventDefault()
@@ -523,6 +548,10 @@ export default class EditView extends ValidatedFormView
     @handleGroupCategoryChange()
     @handleAnonymousGradingChange()
 
+    if ENV.ANNOTATED_DOCUMENT_SUBMISSIONS && ENV.ANNOTATED_DOCUMENT
+      @setAnnotatedDocument({id: ENV.ANNOTATED_DOCUMENT.id, name: ENV.ANNOTATED_DOCUMENT.display_name})
+      @renderAnnotatedDocumentSelector()
+
     if ENV.CONDITIONAL_RELEASE_SERVICE_ENABLED
       @conditionalReleaseEditor = ConditionalRelease.attach(
         @$conditionalReleaseTarget.get(0),
@@ -675,6 +704,10 @@ export default class EditView extends ValidatedFormView
     @disableWhileLoadingOpts = {buttons: ['.save_and_publish']}
     @submit(event)
 
+  handleBuild: (event) ->
+    @navigateToBuild = true
+    @submit(event)
+
   onSaveFail: (xhr) =>
     response_text = JSON.parse(xhr.responseText)
     if response_text.errors
@@ -810,6 +843,8 @@ export default class EditView extends ValidatedFormView
         errors["online_submission_types[online_text_entry]"] = [
           message: I18n.t 'vericite_submission_types_validation', 'VeriCite only supports file submissions and text entry'
         ]
+    else if !@getAnnotatedDocument() && data.submission_types?.includes('annotated_document')
+      errors["online_submission_types[annotated_document]"] = [message: I18n.t('You must attach a file')]
 
     errors
 
@@ -867,6 +902,8 @@ export default class EditView extends ValidatedFormView
 
   locationAfterSave: (params) ->
     return params['return_to'] if returnToHelper.isValid(params['return_to'])
+    useCancelLocation = @assignment.isQuizLTIAssignment() && !@navigateToBuild && ENV.NEW_QUIZZES_ASSIGNMENT_BUILD_BUTTON_ENABLED
+    return @locationAfterCancel(deparam()) if useCancelLocation
     @model.get 'html_url'
 
   redirectAfterCancel: ->
@@ -875,6 +912,8 @@ export default class EditView extends ValidatedFormView
 
   locationAfterCancel: (params) ->
     return params['return_to'] if returnToHelper.isValid(params['return_to'])
+    if ENV.CAN_CANCEL_TO && ENV.CAN_CANCEL_TO.includes(document.referrer)
+      return document.referrer
     return ENV.CANCEL_TO if ENV.CANCEL_TO?
     null
 

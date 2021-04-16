@@ -95,7 +95,7 @@ class UserMerge
     move_observees
 
     Shard.with_each_shard(from_user.associated_shards + from_user.associated_shards(:weak) + from_user.associated_shards(:shadow)) do
-      max_position = Pseudonym.where(user_id: target_user).order(:position).last.try(:position) || 0
+      max_position = Pseudonym.where(user_id: target_user).ordered.last.try(:position) || 0
       pseudonyms_to_move = Pseudonym.where(user_id: from_user)
       merge_data.add_more_data(pseudonyms_to_move)
       pseudonyms_to_move.update_all(["user_id=?, position=position+?", target_user, max_position])
@@ -182,7 +182,8 @@ class UserMerge
 
   def copy_favorites
     from_user.favorites.preload(:context).find_each do |f|
-      target_user.favorites.find_or_create_by!(context: f.context, root_account_id: f.context.root_account_id)
+      fave = target_user.favorites.where(context_type: f.context_type, context_id: f.context_id).take
+      target_user.favorites.create!(context_type: f.context_type, context_id: f.context_id) unless fave
     end
   end
 
@@ -410,6 +411,8 @@ class UserMerge
     merge_data.build_more_data(observer_links, user: from_user, data: data)
 
     Shard.partition_by_shard(observer_links) do |shard_observer_links|
+      # restore user observation links that are deleted on the target user but active on the from_user
+      UserObservationLink.where(observer_id: target_user, workflow_state: 'deleted', user_id: shard_observer_links.map(&:user_id)).update_all(workflow_state: 'active')
       # delete links that are now duplicates between the from_user and target_user
       UserObservationLink.where(id: shard_observer_links).where(user_id: target_user.as_observer_observation_links.select(:user_id)).destroy_all
       # delete what would be observing themselves.

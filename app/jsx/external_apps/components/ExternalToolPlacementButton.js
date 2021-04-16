@@ -24,6 +24,8 @@ import Modal from '../../shared/components/InstuiModal'
 import store from '../lib/ExternalAppsStore'
 import $ from 'compiled/jquery.rails_flash_notifications'
 import {Button, ToggleButton} from '@instructure/ui-buttons'
+import {Text} from '@instructure/ui-text'
+import {View} from '@instructure/ui-view'
 import {Flex} from '@instructure/ui-flex'
 import {IconCheckMarkSolid, IconEndSolid} from '@instructure/ui-icons'
 
@@ -31,7 +33,8 @@ export default class ExternalToolPlacementButton extends React.Component {
   static propTypes = {
     tool: PropTypes.object.isRequired,
     type: PropTypes.string, // specify "button" if this is not a menu item
-    returnFocus: PropTypes.func.isRequired
+    returnFocus: PropTypes.func.isRequired,
+    onSuccess: PropTypes.func.isRequired
   }
 
   state = {
@@ -99,6 +102,9 @@ export default class ExternalToolPlacementButton extends React.Component {
         onError: () => {
           $.flashError(I18n.t('Unable to toggle placement'))
           this.togglePlacement(placement)
+        },
+        onSuccess: r => {
+          this.props.onSuccess(r, placement)
         }
       })
     })
@@ -144,13 +150,6 @@ export default class ExternalToolPlacementButton extends React.Component {
     }
 
     const tool = this.state.tool
-    const is_1_1_tool = tool.version === '1.1'
-    const canUpdateTool = ENV.PERMISSIONS && ENV.PERMISSIONS.create_tool_manually
-    const isEditableContext =
-      ENV.CONTEXT_BASE_URL &&
-      tool.context &&
-      ENV.CONTEXT_BASE_URL.includes(tool.context.toLowerCase())
-
     const appliedPlacements = Object.keys(allPlacements).filter(
       placement =>
         tool[placement] ||
@@ -163,7 +162,7 @@ export default class ExternalToolPlacementButton extends React.Component {
 
     // keep the old behavior of only displaying active placements when
     // toggles aren't present
-    if (!is_1_1_tool || !isEditableContext || !canUpdateTool) {
+    if (!this.shouldShowToggleButtons()) {
       return appliedPlacements
         .filter(key =>
           tool.resource_selection && (key === 'assignment_selection' || key === 'link_selection')
@@ -200,6 +199,53 @@ export default class ExternalToolPlacementButton extends React.Component {
     )
   }
 
+  shouldShowToggleButtons = () => {
+    const tool = this.state.tool
+    const is_1_1_tool = tool.version === '1.1'
+    const canUpdateTool = ENV.PERMISSIONS && ENV.PERMISSIONS.create_tool_manually
+    const isEditableContext =
+      ENV.CONTEXT_BASE_URL &&
+      tool.context &&
+      ENV.CONTEXT_BASE_URL.includes(tool.context.toLowerCase())
+
+    return is_1_1_tool && canUpdateTool && isEditableContext
+  }
+
+  placementsWithNotice = () => {
+    const placements = this.placements()
+
+    if (!placements || placements.length === 0) {
+      return
+    }
+
+    if (!this.shouldShowToggleButtons()) {
+      return placements
+    }
+
+    return (
+      <>
+        {placements}
+        <View
+          display="inline-block"
+          padding="none small"
+          margin="small none"
+          borderWidth="none none none large"
+          borderColor="info"
+          maxWidth="24rem"
+        >
+          <Text size="small" lineHeight="condensed">
+            <p style={{margin: 0}}>
+              {I18n.t(
+                'It may take some time for placement availability to reflect any changes made here. ' +
+                  'You can also clear your cache and hard refresh on pages where you expect placements to change.'
+              )}
+            </p>
+          </Text>
+        </View>
+      </>
+    )
+  }
+
   placementToggle = (key, value, enabled) => (
     <Flex justifyItems="space-between" key={key}>
       <Flex.Item>{value}</Flex.Item>
@@ -222,12 +268,13 @@ export default class ExternalToolPlacementButton extends React.Component {
 
   getModal = () => (
     <Modal
+      // eslint-disable-next-line react/no-string-refs
       ref="reactModal"
       open={this.state.modalIsOpen}
       onDismiss={this.closeModal}
       label={I18n.t('App Placements')}
     >
-      <Modal.Body>{this.placements() || I18n.t('No Placements Enabled')}</Modal.Body>
+      <Modal.Body>{this.placementsWithNotice() || I18n.t('No Placements Enabled')}</Modal.Body>
       <Modal.Footer>
         <Button onClick={this.closeModal}>{I18n.t('Close')}</Button>
       </Modal.Footer>
@@ -239,24 +286,30 @@ export default class ExternalToolPlacementButton extends React.Component {
 
     if (this.props.type === 'button') {
       return (
-        <a
-          href="#"
-          ref="placementButton"
-          role="button"
-          aria-label={editAriaLabel}
-          className="btn long"
-          onClick={this.openModal}
-        >
-          <i className="icon-info" data-tooltip="left" title={I18n.t('Tool Placements')} />
-          {this.getModal()}
-        </a>
+        <>
+          {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+          <a
+            href="#"
+            // eslint-disable-next-line react/no-string-refs
+            ref="placementButton"
+            role="button"
+            aria-label={editAriaLabel}
+            className="btn long"
+            onClick={this.openModal}
+          >
+            <i className="icon-info" data-tooltip="left" title={I18n.t('Tool Placements')} />
+            {this.getModal()}
+          </a>
+        </>
       )
     } else {
       return (
         <li role="presentation" className="ExternalToolPlacementButton">
+          {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
           <a
             href="#"
             tabIndex="-1"
+            // eslint-disable-next-line react/no-string-refs
             ref="placementButton"
             role="menuitem"
             aria-label={editAriaLabel}

@@ -39,7 +39,12 @@ describe('ExternalToolPlacementButton', () => {
       ...overrides
     }
     wrapper = mount(
-      <ExternalToolPlacementButton type="button" tool={tool} returnFocus={() => {}} />
+      <ExternalToolPlacementButton
+        type="button"
+        tool={tool}
+        returnFocus={() => {}}
+        onSuccess={jest.fn()}
+      />
     )
     instance = wrapper.instance()
   }
@@ -71,6 +76,36 @@ describe('ExternalToolPlacementButton', () => {
       store.togglePlacement.mockImplementation(({onError}) => onError())
       instance.handleTogglePlacement('editor_button')
       expect(instance.state.tool.editor_button.enabled).toBeTruthy()
+    })
+
+    it('executes onSuccess callback from props on api success', () => {
+      store.togglePlacement.mockImplementation(({onSuccess}) => onSuccess())
+
+      instance.handleTogglePlacement('editor_button')
+      expect(store.togglePlacement).toHaveBeenCalled()
+      expect(instance.props.onSuccess).toHaveBeenCalled()
+    })
+  })
+
+  describe('#placementsWithNotice', () => {
+    beforeEach(() => {
+      global.ENV = {
+        CONTEXT_BASE_URL: '/accounts/1',
+        PERMISSIONS: {
+          create_tool_manually: true
+        }
+      }
+    })
+
+    it('renders notice about caching when toggle buttons are shown', () => {
+      const placementsWithNotice = mount(<div>{instance.placementsWithNotice()}</div>)
+      expect(placementsWithNotice.text()).toMatch('It may take some time')
+    })
+
+    it('does not render notice when toggle buttons are hidden', () => {
+      render({version: '1.3'})
+      const placementsWithNotice = mount(<div>{instance.placementsWithNotice()}</div>)
+      expect(placementsWithNotice.text()).not.toMatch('It may take some time')
     })
   })
 

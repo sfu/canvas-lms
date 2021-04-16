@@ -398,10 +398,6 @@ describe 'Speedgrader' do
   end
 
   context 'reassigning' do
-    before(:once) do
-      @course.root_account.enable_feature!(:reassign_assignments)
-    end
-
     context 'with assignment' do
       before(:once) do
         @assignment_for_course = @course.assignments.create!(
@@ -612,6 +608,17 @@ describe 'Speedgrader' do
         expect(Speedgrader.comments.last).to be_displayed
 
         expect(Speedgrader.right_pane).to contain_jqcss("#reassign_assignment[disabled]:visible")
+      end
+
+      it 'allows reassignment when the assignment has been set back to unlimited attempts' do
+        @assignment_for_course.update!(allowed_attempts: -1)
+
+        Speedgrader.visit(@course.id, @assignment_for_course.id)
+
+        Speedgrader.add_comment_and_submit("commenting")
+        expect(Speedgrader.comments.last).to be_displayed
+        expect(Speedgrader.right_pane).not_to contain_css("#reassign_assignment[disabled]")
+        expect(Speedgrader.right_pane).to contain_jqcss("#reassign_assignment:visible")
       end
     end
 

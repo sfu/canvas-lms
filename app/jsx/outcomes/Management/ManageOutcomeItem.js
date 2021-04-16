@@ -24,7 +24,7 @@ import {Heading} from '@instructure/ui-heading'
 import {Checkbox} from '@instructure/ui-checkbox'
 import {IconButton} from '@instructure/ui-buttons'
 import {IconArrowOpenEndLine, IconArrowOpenDownLine} from '@instructure/ui-icons'
-import {ScreenReaderContent} from '@instructure/ui-a11y'
+import {ScreenReaderContent} from '@instructure/ui-a11y-content'
 import I18n from 'i18n!OutcomeManagement'
 import OutcomeKebabMenu from './OutcomeKebabMenu'
 import OutcomeDescription from './OutcomeDescription'
@@ -42,6 +42,7 @@ const ManageOutcomeItem = ({
   const [truncate, setTruncate] = useState(true)
   const onClickHandler = () => setTruncate(prevState => !prevState)
   const onChangeHandler = () => onCheckboxHandler(id)
+  const onMenuHandlerWrapper = (_, action) => onMenuHandler(id, action)
 
   if (!title) return null
 
@@ -97,7 +98,10 @@ const ManageOutcomeItem = ({
           </div>
         </Flex.Item>
         <Flex.Item>
-          <OutcomeKebabMenu menuTitle={I18n.t('Outcome Menu')} onMenuHandler={onMenuHandler} />
+          <OutcomeKebabMenu
+            menuTitle={I18n.t('Outcome Menu')}
+            onMenuHandler={onMenuHandlerWrapper}
+          />
         </Flex.Item>
       </Flex>
       <Flex as="div" alignItems="start">

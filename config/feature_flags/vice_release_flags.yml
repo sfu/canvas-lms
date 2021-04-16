@@ -15,14 +15,6 @@ confetti_for_valid_links:
     a course and no issues are found.
   applies_to: RootAccount
 
-notification_update_account_ui:
-  state: hidden
-  display_name: Account level notification preferences UI update
-  description: |-
-    Updates account notification preferences UI to be a more current
-    and updated user experience
-  applies_to: SiteAdmin
-
 react_announcement_discussion_edit:
   state: hidden
   display_name: Update announcement/discussion edit page to use react/instui
@@ -31,19 +23,20 @@ react_announcement_discussion_edit:
     allow us to make the page more accessible
   applies_to: RootAccount
 
+react_discussions_post:
+  state: hidden
+  display_name: Update Discussions to use React & InstUI
+  description: |-
+    This refactor will make our Discussions Posts more maintainable and
+    allow for easier changes in the future
+  applies_to: RootAccount
+
 react_inbox:
   state: hidden
   display_name: Update Inbox page to use react/instui
   description: |-
     This refactor will make this page more maintainable
   applies_to: RootAccount
-
-reduce_push_notifications:
-  state: hidden
-  display_name: Restrict Push Notifications to Select Types
-  description: |-
-    Disables Push notifications for certain types.
-  applies_to: SiteAdmin
 
 smart_alerts:
   state: hidden

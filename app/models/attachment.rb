@@ -86,6 +86,7 @@ class Attachment < ActiveRecord::Base
   has_one :crocodoc_document
   has_one :canvadoc
   belongs_to :usage_rights
+  has_many :canvadocs_annotation_contexts, inverse_of: :attachment
 
   before_save :set_root_account_id
   before_save :infer_display_name
@@ -300,7 +301,9 @@ class Attachment < ActiveRecord::Base
   def clone_for(context, dup=nil, options={})
     if !self.cloned_item && !self.new_record?
       self.cloned_item = ClonedItem.create(:original_item => self) # do we even use this for anything?
-      Attachment.where(:id => self).update_all(:cloned_item_id => self.cloned_item.id) # don't touch it for no reason
+      self.shard.activate do
+        Attachment.where(:id => self).update_all(:cloned_item_id => self.cloned_item.id) # don't touch it for no reason
+      end
     end
     existing = context.attachments.active.find_by_id(self)
 
@@ -1254,7 +1257,7 @@ class Attachment < ActiveRecord::Base
     #################### Begin legacy permission block #########################
 
     given do |user, session|
-      !context_root_account(user).feature_enabled?(:granular_permissions_course_files) &&
+      !context_root_account(user)&.feature_enabled?(:granular_permissions_course_files) &&
       self.context&.grants_right?(user, session, :manage_files) &&
       !self.associated_with_submission? &&
       (!self.folder || self.folder.grants_right?(user, session, :manage_contents))
@@ -1270,7 +1273,7 @@ class Attachment < ActiveRecord::Base
     ##################### End legacy permission block ##########################
 
     given do |user, session|
-      context_root_account(user).feature_enabled?(:granular_permissions_course_files) &&
+      context_root_account(user)&.feature_enabled?(:granular_permissions_course_files) &&
       self.context&.grants_right?(user, session, :manage_files_edit) &&
       !self.associated_with_submission? &&
       (!self.folder || self.folder.grants_right?(user, session, :manage_contents))
@@ -1278,7 +1281,7 @@ class Attachment < ActiveRecord::Base
     can :read and can :update
 
     given do |user, session|
-      context_root_account(user).feature_enabled?(:granular_permissions_course_files) &&
+      context_root_account(user)&.feature_enabled?(:granular_permissions_course_files) &&
       self.context&.grants_right?(user, session, :manage_files_delete) &&
       !self.associated_with_submission? &&
       (!self.folder || self.folder.grants_right?(user, session, :manage_contents))
@@ -1331,12 +1334,15 @@ class Attachment < ActiveRecord::Base
     can :attach_to_submission_comment
   end
 
-  # prevent an access attempt shortly before unlock_at from caching permissions beyond that time
-  def touch_on_unlock
+  def clear_permissions(run_at)
     GuardRail.activate(:primary) do
-      delay(run_at: unlock_at,
-            singleton: "touch_on_unlock_attachment_#{global_id}").touch
+      delay(run_at: run_at,
+            singleton: "clear_attachment_permissions_#{global_id}").touch
     end
+  end
+
+  def next_lock_change
+    [lock_at, unlock_at].compact.select {|t| t > Time.zone.now}.min
   end
 
   def locked_for?(user, opts={})
@@ -1344,8 +1350,12 @@ class Attachment < ActiveRecord::Base
     return {:asset_string => self.asset_string, :manually_locked => true} if self.locked || Folder.is_locked?(self.folder_id)
     RequestCache.cache(locked_request_cache_key(user)) do
       locked = false
+      # prevent an access attempt shortly before unlock_at/lock_at from caching permissions beyond that time
+      next_clear_cache = next_lock_change
+      if next_clear_cache.present? && next_clear_cache < (Time.zone.now + AdheresToPolicy::Cache::CACHE_EXPIRES_IN)
+        clear_permissions(next_clear_cache)
+      end
       if (self.unlock_at && Time.zone.now < self.unlock_at)
-        touch_on_unlock if (Time.zone.now + AdheresToPolicy::Cache::CACHE_EXPIRES_IN) >= self.unlock_at
         locked = {:asset_string => self.asset_string, :unlock_at => self.unlock_at}
       elsif (self.lock_at && Time.now > self.lock_at)
         locked = {:asset_string => self.asset_string, :lock_at => self.lock_at}
@@ -2019,9 +2029,9 @@ class Attachment < ActiveRecord::Base
       self.workflow_state = 'errored'
       case e
       when CanvasHttp::TooManyRedirectsError
-        self.upload_error_message = t :upload_error_too_many_redirects, "Too many redirects"
+        self.upload_error_message = t :upload_error_too_many_redirects, "Too many redirects for %{url}", url: url
       when CanvasHttp::InvalidResponseCodeError
-        self.upload_error_message = t :upload_error_invalid_response_code, "Invalid response code, expected 200 got %{code}", :code => e.code
+        self.upload_error_message = t :upload_error_invalid_response_code, "Invalid response code, expected 200 got %{code} for %{url}", :code => e.code, url: url
         Canvas::Errors.capture(e, clone_url_error_info(e, url))
       when CanvasHttp::RelativeUriError
         self.upload_error_message = t :upload_error_relative_uri, "No host provided for the URL: %{url}", :url => url

@@ -39,6 +39,7 @@ class DiscussionEntry < ActiveRecord::Base
   belongs_to :user
   belongs_to :attachment
   belongs_to :editor, :class_name => 'User'
+  belongs_to :root_account, class_name: 'Account'
   has_one :external_feed_entry, :as => :asset
 
   before_create :infer_root_entry_id
@@ -70,7 +71,7 @@ class DiscussionEntry < ActiveRecord::Base
 
   set_broadcast_policy do |p|
     p.dispatch :new_discussion_entry
-    p.to { subscribers - [user] }
+    p.to { discussion_topic.subscribers - [user] }
     p.whenever { |record|
       record.just_created && record.active?
     }
@@ -160,14 +161,6 @@ class DiscussionEntry < ActiveRecord::Base
         end
       end
     end
-  end
-
-  def posters
-    self.discussion_topic.posters rescue [self.user]
-  end
-
-  def subscribers
-    subscribed_users = self.discussion_topic.subscribers
   end
 
   def plaintext_message=(val)

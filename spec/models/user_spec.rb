@@ -435,7 +435,7 @@ describe User do
           user.update_root_account_ids
         }.to change {
           user.root_account_ids
-        }.from(nil).to([root_account.global_id])
+        }.from([]).to([root_account.global_id])
       end
 
       context 'and communication channels for the user exist' do
@@ -448,7 +448,7 @@ describe User do
             user.update_root_account_ids
           }.to change {
             user.communication_channels.first.root_account_ids
-          }.from(nil).to([root_account.id])
+          }.from([]).to([root_account.id])
         end
       end
     end
@@ -472,7 +472,7 @@ describe User do
           user.update_root_account_ids
         }.to change {
           user.root_account_ids&.sort
-        }.from(nil).to(
+        }.from([]).to(
           [root_account.id, shard_two_root_account.global_id].sort
         )
       end
@@ -1423,8 +1423,8 @@ describe User do
       expect(User.avatar_fallback_url("http://somedomain/path", OpenObject.new(:host => "bar", :protocol => "https://"))).to eq(
         "http://somedomain/path"
       )
-      expect(User.avatar_fallback_url('%{fallback}')).to eq(
-        '%{fallback}'
+      expect(User.avatar_fallback_url("http://localhost/path", OpenObject.new(:host => "bar", :protocol => "https://"))).to eq(
+        "https://bar/path"
       )
     end
 
@@ -2440,15 +2440,15 @@ describe User do
   describe "preferred_gradebook_version" do
     subject { user.preferred_gradebook_version }
 
-    let(:user) { User.new }
+    let(:user) { User.create! }
 
     it "returns default gradebook when preferred" do
-      user.preferences[:gradebook_version] = 'default'
+      user.set_preference(:gradebook_version, "default")
       is_expected.to eq 'default'
     end
 
     it "returns individual gradebook when preferred" do
-      user.preferences[:gradebook_version] = 'individual'
+      user.set_preference(:gradebook_version, "individual")
       is_expected.to eq 'individual'
     end
 

@@ -129,6 +129,32 @@ describe Api::V1::Attachment do
       expect(infer_file_extension(params)).to eq 'jpg'
     end
 
+    context 'when there is more than one extesion for the same mime type' do
+      it 'return `dat` extension from name parameter' do
+        params = ActionController::Parameters.new(
+          name: 'name.dat',
+          content_type: 'text/plain'
+        )
+
+        expect(infer_file_extension(params)).to eq 'dat'
+      end
+
+      it 'return `html` extension from filename parameter' do
+        params = ActionController::Parameters.new(
+          filename: 'name.html',
+          content_type: 'text/html'
+        )
+
+        expect(infer_file_extension(params)).to eq 'html'
+      end
+    end
+
+    it 'return the extension from content_type attribute when it is given' do
+      params = ActionController::Parameters.new(content_type: 'application/x-zip-compressed')
+
+      expect(infer_file_extension(params)).to eq 'zip'
+    end
+
     it 'return the extension from url attribute even it is an unknown type' do
       params = ActionController::Parameters.new(
         name: 'name',
@@ -155,7 +181,12 @@ describe Api::V1::Attachment do
     end
 
     it 'return `nil` when can not infer the extension' do
-      params = ActionController::Parameters.new(name: 'name')
+      params = ActionController::Parameters.new(
+        name: 'invalid',
+        filename: 'invalid',
+        url: 'invalid',
+        content_type: 'invalid'
+      )
 
       expect(infer_file_extension(params)).to be_nil
     end

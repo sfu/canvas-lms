@@ -30,6 +30,8 @@ describe ExternalToolsController do
     student_in_course(:active_all => true)
   end
 
+  before { consider_all_requests_local(false) }
+
   describe "GET 'jwt_token'" do
 
     before :each do
@@ -45,7 +47,7 @@ describe ExternalToolsController do
     it "returns the correct JWT token when given using the tool_id param" do
       user_session(@teacher)
       get :jwt_token, params: {course_id: @course.id, tool_id: @tool.id}
-      jwt = JSON.parse(response.body[9..-1])['jwt_token']
+      jwt = JSON.parse(response.body)['jwt_token']
       decoded_token = Canvas::Security.decode_jwt(jwt, [:skip_verification])
 
       expect(decoded_token['custom_canvas_user_id']).to eq @teacher.id.to_s
@@ -71,7 +73,7 @@ describe ExternalToolsController do
     it "returns the correct JWT token when given using the tool_launch_url param" do
       user_session(@teacher)
       get :jwt_token, params: {course_id: @course.id, tool_launch_url: @tool.url}
-      decoded_token = Canvas::Security.decode_jwt(JSON.parse(response.body[9..-1])['jwt_token'], [:skip_verification])
+      decoded_token = Canvas::Security.decode_jwt(JSON.parse(response.body)['jwt_token'], [:skip_verification])
 
       expect(decoded_token['custom_canvas_user_id']).to eq @teacher.id.to_s
       expect(decoded_token['custom_canvas_course_id']).to eq @course.id.to_s
@@ -1792,7 +1794,7 @@ describe ExternalToolsController do
 
       expect(response).to be_successful
 
-      json = JSON.parse(response.body.sub(/^while\(1\)\;/, ''))
+      json = JSON.parse(response.body)
       verifier = CGI.parse(URI.parse(json['url']).query)['verifier'].first
       redis_key = "#{@course.class.name}:#{Lti::RedisMessageClient::SESSIONLESS_LAUNCH_PREFIX}#{verifier}"
       launch_settings = JSON.parse(Canvas.redis.get(redis_key))
@@ -1812,7 +1814,7 @@ describe ExternalToolsController do
 
       expect(response).to be_successful
 
-      json = JSON.parse(response.body.sub(/^while\(1\)\;/, ''))
+      json = JSON.parse(response.body)
       verifier = CGI.parse(URI.parse(json['url']).query)['verifier'].first
       redis_key = "#{@course.class.name}:#{Lti::RedisMessageClient::SESSIONLESS_LAUNCH_PREFIX}#{verifier}"
       launch_settings = JSON.parse(Canvas.redis.get(redis_key))
@@ -1835,7 +1837,7 @@ describe ExternalToolsController do
       get :generate_sessionless_launch, params: {course_id: @course.id, launch_type: 'assessment', assignment_id: @assignment.id}
       expect(response).to be_successful
 
-      json = JSON.parse(response.body.sub(/^while\(1\)\;/, ''))
+      json = JSON.parse(response.body)
       verifier = CGI.parse(URI.parse(json['url']).query)['verifier'].first
       redis_key = "#{@course.class.name}:#{Lti::RedisMessageClient::SESSIONLESS_LAUNCH_PREFIX}#{verifier}"
       launch_settings = JSON.parse(Canvas.redis.get(redis_key))
@@ -1868,7 +1870,7 @@ describe ExternalToolsController do
       }
       expect(response).to be_successful
 
-      json = JSON.parse(response.body.sub(/^while\(1\)\;/, ''))
+      json = JSON.parse(response.body)
       verifier = CGI.parse(URI.parse(json['url']).query)['verifier'].first
       redis_key = "#{@course.class.name}:#{Lti::RedisMessageClient::SESSIONLESS_LAUNCH_PREFIX}#{verifier}"
       launch_settings = JSON.parse(Canvas.redis.get(redis_key))
@@ -1914,7 +1916,7 @@ describe ExternalToolsController do
 
       expect(response).to be_successful
 
-      json = JSON.parse(response.body.sub(/^while\(1\)\;/, ''))
+      json = JSON.parse(response.body)
       verifier = CGI.parse(URI.parse(json['url']).query)['verifier'].first
       redis_key = "#{@course.class.name}:#{Lti::RedisMessageClient::SESSIONLESS_LAUNCH_PREFIX}#{verifier}"
       launch_settings = JSON.parse(Canvas.redis.get(redis_key))
@@ -1942,7 +1944,7 @@ describe ExternalToolsController do
         module_item_id: @tg.id,
         content_type: 'ContextExternalTool'}
 
-      json = JSON.parse(response.body.sub(/^while\(1\)\;/, ''))
+      json = JSON.parse(response.body)
       verifier = CGI.parse(URI.parse(json['url']).query)['verifier'].first
       redis_key = "#{@course.class.name}:#{Lti::RedisMessageClient::SESSIONLESS_LAUNCH_PREFIX}#{verifier}"
       launch_settings = JSON.parse(Canvas.redis.get(redis_key))
@@ -1987,7 +1989,7 @@ describe ExternalToolsController do
 				controller.instance_variable_set :@access_token, login_pseudonym.user.access_tokens.create(purpose: 'test')
         get :generate_sessionless_launch, params: params
         expect(response).to be_successful
-        json = JSON.parse(response.body.sub(/^while\(1\)\;/, ''))
+        json = JSON.parse(response.body)
         url = URI.parse(json['url'])
         expect(url.path).to eq("#{course_external_tools_path(@course)}/#{tool.id}")
         expect(url.query).to match(/^display=borderless&session_token=[0-9a-zA-Z_\-]+$/)
@@ -2228,7 +2230,7 @@ describe ExternalToolsController do
 
       expect(response).to be_successful
 
-      json = JSON.parse(response.body.sub(/^while\(1\)\;/, ''))
+      json = JSON.parse(response.body)
       verifier = CGI.parse(URI.parse(json['url']).query)['verifier'].first
 
       expect(controller).to receive(:log_asset_access).once
@@ -2245,4 +2247,100 @@ describe ExternalToolsController do
     end
   end
 
+  describe "GET 'visible_course_nav_tools'" do
+    def add_tool(name)
+      tool = @course.context_external_tools.new(
+        name: name,
+        consumer_key: "key1",
+        shared_secret: "secret1"
+      )
+      tool.url = "http://www.example.com/basic_lti"
+      tool.use_1_3 = true
+      tool.developer_key = DeveloperKey.create!
+      tool.save!
+      tool
+    end
+
+    before :once do
+      course_with_teacher(:active_all => true)
+    end
+
+    it "ignores requests from unauthorized users" do
+      tool1 = add_tool("Course nav tool 1")
+      tool1.course_navigation = {enabled: true}
+      tool1.save!
+      get :visible_course_nav_tools, params: {:course_id => @course.id}
+      assert_unauthorized
+    end
+
+    it "handles bad requests" do
+      user_session(@teacher)
+      get :visible_course_nav_tools, params: {:course_id => 'definitely_not_a_course'}
+      expect(response.status).to eq 404
+    end
+
+    it "shows course nav tool to teacher" do
+      name = "Course nav tool 1"
+      tool1 = add_tool(name)
+      tool1.course_navigation = {enabled: true}
+      tool1.save!
+      user_session(@teacher)
+      get :visible_course_nav_tools, params: {:course_id => @course.id}
+      expect(response).to be_successful
+      tools = json_parse(response.body)
+      expect(tools.count).to eq 1
+      expect(tools.first["name"]).to eq name
+    end
+
+    it "shows course nav tool to student" do
+      name = "Course nav tool 1"
+      tool1 = add_tool(name)
+      tool1.course_navigation = {enabled: true}
+      tool1.save!
+      student_in_course(:course => @course)
+      user_session(@student)
+      get :visible_course_nav_tools, params: {:course_id => @course.id}
+      expect(response).to be_successful
+      tools = json_parse(response.body)
+      expect(tools.count).to eq 1
+      expect(tools.first["name"]).to eq name
+    end
+
+    it "returns an empty array if there are no tools" do
+      user_session(@teacher)
+      get :visible_course_nav_tools, params: {:course_id => @course.id}
+      expect(response).to be_successful
+      tools = json_parse(response.body)
+      expect(tools.count).to eq 0
+    end
+
+    it "doesn't return tools without course nav placement" do
+      add_tool("Random tool")
+      user_session(@teacher)
+      get :visible_course_nav_tools, params: {:course_id => @course.id}
+      expect(response).to be_successful
+      tools = json_parse(response.body)
+      expect(tools.count).to eq 0
+    end
+
+    it "doesn't return tools to student marked with admins visibility" do
+      name = "Course nav tool 2"
+      tool1 = add_tool(name)
+      tool1.course_navigation = {enabled: true, visibility: "admins"}
+      tool1.save!
+      user_session(@teacher)
+      get :visible_course_nav_tools, params: {:course_id => @course.id}
+      expect(response).to be_successful
+      tools = json_parse(response.body)
+      expect(tools.count).to eq 1
+      expect(tools.first["name"]).to eq name
+
+      student_in_course(:course => @course)
+      user_session(@student)
+      get :visible_course_nav_tools, params: {:course_id => @course.id}
+      expect(response).to be_successful
+      tools = json_parse(response.body)
+      expect(tools.count).to eq 0
+    end
+  end
 end

@@ -42,6 +42,7 @@ describe Types::LearningOutcomeGroupType do
     @user = @admin
     @outcome1 = outcome_model(context: Account.default, outcome_group: @outcome_group, short_description: "BBBB")
     @outcome2 = outcome_model(context: Account.default, outcome_group: @outcome_group, short_description: "AAAA")
+    Account.default.enable_feature! :improved_outcomes_management
   end
 
   let(:outcome_group_type) { GraphQLTypeTester.new(@outcome_group, current_user: @user) }
@@ -64,6 +65,12 @@ describe Types::LearningOutcomeGroupType do
   it "gets outcomes ordered by title" do
     expect(outcome_group_type.resolve("outcomes { nodes { ... on LearningOutcome { _id } } }")).to match_array([
       @outcome2.id.to_s, @outcome1.id.to_s
+    ])
+  end
+
+  it "accepts search_query in outcomes" do
+    expect(outcome_group_type.resolve("outcomes(searchQuery: \"BBBB\") { nodes { ... on LearningOutcome { _id } } }")).to match_array([
+      @outcome1.id.to_s
     ])
   end
 
@@ -119,6 +126,10 @@ describe Types::LearningOutcomeGroupType do
   describe '#outcomes_count' do
     it 'returns the total outcomes at the nested outcome groups' do
       expect(outcome_group_type.resolve("outcomesCount")).to eq 2
+    end
+
+    it "accepts search_query in outcomes_count" do
+      expect(outcome_group_type.resolve("outcomesCount(searchQuery: \"BBBB\")")).to eq 1
     end
   end
 end

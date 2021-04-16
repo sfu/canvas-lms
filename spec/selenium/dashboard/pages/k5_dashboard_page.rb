@@ -89,6 +89,58 @@ module K5PageObject
     "a[cursor='pointer']"
   end
 
+  def staff_selector(staff_name)
+    "h3:contains('#{staff_name}')"
+  end
+
+  def instructor_role_selector(inst_role)
+    "//*[@data-automation = 'instructor-role' and text() = '#{inst_role}']"
+  end
+
+  def instructor_bio_selector(inst_bio)
+    "//*[@data-automation = 'instructor-bio' and text() = '#{inst_bio}']"
+  end
+
+  def email_link_selector(email_address)
+    "a[href = 'mailto:#{email_address}']"
+  end
+
+  def grade_title_selector(title)
+    "div:contains('#{title}')"
+  end
+
+  def subject_grade_selector(value)
+    "//*[@data-automation = 'course_grade' and text() = '#{value}']"
+  end
+
+  def grade_progress_bar_selector(value)
+    "//*[@role = 'progressbar' and @value = '#{value}']"
+  end
+
+  def view_grades_button_selector(course_id)
+    "a[href = '/courses/#{course_id}/gradebook']"
+  end
+
+  def grading_period_dropdown_selector
+    "#grading-period-select"
+  end
+
+  def week_date_selector
+    "h2 div"
+  end
+
+  def previous_week_button_selector
+    "//button[.//span[. = 'View previous week']]"
+  end
+
+  def next_week_button_selector
+    "//button[.//span[. = 'View next week']]"
+  end
+
+  def today_button_selector
+    "//button[.//span[. = 'Today']]"
+  end
+
   #------------------------- Elements --------------------------
 
   def enable_homeroom_checkbox
@@ -163,6 +215,63 @@ module K5PageObject
     f(announcement_edit_button_selector)
   end
 
+  def staff_heading(staff_name)
+    fj(staff_selector(staff_name))
+  end
+
+  def email_link(email_address)
+    f(email_link_selector(email_address))
+  end
+
+  def instructor_role(role_type)
+    fxpath(instructor_role_selector(role_type))
+  end
+
+  def instructor_bio(instructor_bio)
+    fxpath(instructor_bio_selector(instructor_bio))
+  end
+
+  def subject_grades_title(title)
+    fj(grade_title_selector(title))
+  end
+
+  def subject_grade(grade_value)
+    fxpath(subject_grade_selector(grade_value))
+  end
+
+  def grade_progress_bar(grade_value)
+    fxpath(grade_progress_bar_selector(grade_value))
+  end
+
+  def view_grades_button(course_id)
+    f(view_grades_button_selector(course_id))
+  end
+
+  def grading_period_dropdown
+    f(grading_period_dropdown_selector)
+  end
+
+  def beginning_of_week_date
+    date_block = ff(week_date_selector)
+    date_block[0].text == 'Today' ? date_block[1].text : date_block[0].text
+  end
+
+  def end_of_week_date
+    ff(week_date_selector).last.text
+  end
+
+  def previous_week_button
+    fxpath(previous_week_button_selector)
+  end
+
+  def next_week_button
+    fxpath(next_week_button_selector)
+  end
+
+  def today_button
+    fxpath(today_button_selector)
+  end
+
   #----------------------- Actions & Methods -------------------------
 
   def check_enable_homeroom_checkbox
@@ -211,5 +320,25 @@ module K5PageObject
 
   def click_announcement_edit_pencil
     announcement_edit_pencil.click
+  end
+
+  def click_previous_week_button
+    previous_week_button.click
+  end
+
+  def click_next_week_button
+    next_week_button.click
+  end
+
+  def click_today_button
+    today_button.click
+  end
+
+  def beginning_weekday_calculation(current_date)
+    (current_date.beginning_of_week(:sunday)).strftime("%B %-d")
+  end
+
+  def ending_weekday_calculation(current_date)
+    (current_date.end_of_week(:sunday)).strftime("%B %-d")
   end
 end

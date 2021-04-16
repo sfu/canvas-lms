@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #
 # Copyright (C) 2014 - present Instructure, Inc.
 #
@@ -18,7 +20,7 @@
 # Note: Indented gems are meant to indicate transient dependencies of parent gems
 
 if CANVAS_RAILS6_0
-  gem 'rails', '6.0.3.5'
+  gem 'rails', '6.0.3.6'
 else
   gem 'rails', '6.1.3'
 end
@@ -97,13 +99,14 @@ gem 'nokogumbo', '2.0.4'
 gem 'oauth', '0.5.4', require: false
 gem 'oauth2', '1.4.4', require: false
 gem 'oj', '3.10.16'
+gem 'outrigger', '2.1.0'
 gem 'parallel', '1.20.0', require: false
   gem 'ruby-progressbar', '1.10.1', require: false # used to show progress of S3Uploader
 gem 'prawn-rails', '1.3.0'
 gem 'rack', '2.2.3'
 gem 'rack-brotli', '1.0.0'
 gem 'rack-test', '1.1.0'
-gem 'rake', '13.0.1'
+gem 'rake', '13.0.3'
 gem 'rails-observers', '0.1.5'
 gem 'ratom-nokogiri', '0.10.10', require: false
 gem 'redcarpet', '3.5.0', require: false
@@ -120,15 +123,20 @@ gem 'sanitize', '5.2.3', require: false
 gem 'sentry-raven', '2.13.0', require: false
 gem 'guardrail', '2.0.1'
 gem 'simple_oauth', '0.3.1', require: false
-gem 'switchman', '2.0.6'
+gem 'switchman', '2.0.8'
   gem 'open4', '1.3.4', require: false
 gem 'switchman-inst-jobs', '3.1.2'
 gem 'twilio-ruby', '5.36.0', require: false
 gem 'tzinfo', '1.2.7'
 gem 'vault', '0.15.0', require: false
 gem 'vericite_api', '1.5.3'
+gem 'week_of_month', '1.2.5',
+  github: 'instructure/week-of-month', ref: 'b3013639e9474f302b5a6f27e4e45313e8d24902'
 gem 'will_paginate', '3.3.0', require: false # required for folio-pagination
 
+path 'engines' do
+  gem 'audits'
+end
 path 'gems' do
   gem 'activesupport-suspend_callbacks'
   gem 'acts_as_list'

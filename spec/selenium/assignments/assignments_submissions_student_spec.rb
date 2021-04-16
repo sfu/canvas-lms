@@ -126,8 +126,7 @@ describe "submissions" do
       expect(@submission.workflow_state).to eq 'submitted'
     end
 
-    it "renders the webcam wraper when enable_webcam_submission is enabled", priority: "1" do
-      @course.root_account.enable_feature!(:enable_webcam_submission)
+    it "renders the webcam wraper", priority: "1" do
       @assignment.submission_types = 'online_upload'
       @assignment.save!
 
@@ -136,8 +135,7 @@ describe "submissions" do
       expect(f('.attachment_wrapper')).to be_displayed
     end
 
-    it "renders the webcam wraper when enable_webcam_submission is enabled and allowed_extensions has png", priority: "1" do
-      @course.root_account.enable_feature!(:enable_webcam_submission)
+    it "renders the webcam wraper when allowed_extensions has png", priority: "1" do
       @assignment.submission_types = 'online_upload'
       @assignment.allowed_extensions = ["png"]
       @assignment.save!
@@ -147,8 +145,7 @@ describe "submissions" do
       expect(f('.attachment_wrapper')).to be_displayed
     end
 
-    it "doesn't render the webcam wraper when enable_webcam_submission is enabled and allowed_extensions doens't have png", priority: "1" do
-      @course.root_account.enable_feature!(:enable_webcam_submission)
+    it "doesn't render the webcam wraper when allowed_extensions doens't have png", priority: "1" do
       @assignment.submission_types = 'online_upload'
       @assignment.allowed_extensions = ["pdf"]
       @assignment.save!
@@ -231,7 +228,7 @@ describe "submissions" do
       get "/courses/#{@course.id}/assignments/#{@assignment.id}"
       # expect
       expect(f('#sidebar_content .details')).to include_text "Not Submitted!"
-      expect(f('.submit_assignment_link')).to include_text "Submit Assignment"
+      expect(f('.submit_assignment_link')).to include_text "Start Assignment"
     end
 
     it "should not show as turned in or not turned in when assignment doesn't expect a submission", priority: "1", test_id: 237025 do

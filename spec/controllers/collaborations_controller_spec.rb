@@ -292,6 +292,7 @@ describe CollaborationsController do
     end
 
     it "should fail with invalid collaboration type" do
+      skip 'VICE-1273 03/29/2021'
       user_session(@teacher)
       post 'create', params: {:course_id => @course.id, :collaboration => {:title => "My Collab"}}
       assert_status(500)
@@ -332,6 +333,58 @@ describe CollaborationsController do
 
         it 'sets the resource_link_lookup_uuid' do
           expect(subject.resource_link_lookup_uuid).to eq lookup_uuid
+        end
+      end
+
+      context 'with the deep linking extension' do
+        subject do
+          post :create, params: params
+          Collaboration.find(assigns[:collaboration].id)
+        end
+
+        let(:teacher) { @teacher }
+        let(:student) { student_in_course(course: course, active_all: true).user }
+        let(:course) { @course }
+        let(:params) { { course_id: course.id, contentItems: [content_item].to_json } }
+        let(:content_item) do
+          {
+            type: 'ltiResourceLink',
+            url: 'http://test-tool.docker/launch?deep_linking=true',
+            title: 'Lti 1.3 Tool Title',
+            text: 'Lti 1.3 Tool Text',
+            icon: 'https://img.icons8.com/metro/1600/unicorn.png',
+            thumbnail: 'https://via.placeholder.com/150?text=thumbnail',
+            lookup_uuid: '9446c291-168f-4f46-bf3c-785dd3d986d3'
+          }
+        end
+
+        before { user_session(teacher) }
+
+        context 'with a group set' do
+          let(:group) { group_model(course: course) }
+          let(:content_item) do
+            super().merge(
+              Collaboration::DEEP_LINKING_EXTENSION => {
+                groups: [Lti::Asset.opaque_identifier_for(group)]
+              }
+            )
+          end
+
+          before { group.add_user(student, 'active') }
+
+          it 'associates the group to the collaboration' do
+            expect(subject.collaborators.pluck(:group_id).compact).to match_array [group.id]
+          end
+        end
+
+        context 'with users set' do
+          let(:content_item) do
+            super().merge(Collaboration::DEEP_LINKING_EXTENSION => { users: [student.lti_id] })
+          end
+
+          it 'associates the users to the collaboration' do
+            expect(subject.collaborators.pluck(:user_id)).to match_array [teacher.id, student.id]
+          end
         end
       end
 

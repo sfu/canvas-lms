@@ -229,6 +229,16 @@ describe Assignment do
 
         assignment.update_cached_due_dates
       end
+
+      it 'does not invoke DueDateCacher on an unchanged assignment in a before_save context' do
+        assignment = Assignment.suspend_callbacks(:update_cached_due_dates) do
+          @course.assignments.create(assignment_valid_attributes)
+        end
+        assignment.reload
+
+        expect(DueDateCacher).not_to receive(:recompute)
+        assignment.update_cached_due_dates
+      end
     end
 
     describe 'update_due_date_smart_alerts' do
@@ -2778,6 +2788,53 @@ describe Assignment do
       expect(grade).to eql("B")
     end
 
+    it "should match grade to score conversion with decimal part in points possible" do
+      @assignment.grading_type = 'letter_grade'
+      @assignment.points_possible = 8.7
+      gs = @assignment.context.grading_standards.build({title: "Custom GS"})
+      gs.data = {"A" => 0.91,
+                 "A-" => 0.90,
+                 "B+" => 0.87,
+                 "B" => 0.84,
+                 "B-" => 0.80,
+                 "C+" => 0.77,
+                 "C" => 0.74,
+                 "C-" => 0.70,
+                 "D+" => 0.67,
+                 "D" => 0.64,
+                 "D-" => 0.61,
+                 "F" => 0.0 }
+      gs.assignments << @assignment
+      gs.save!
+      @assignment.save!
+      score = @assignment.grade_to_score("A-")
+      expect(@assignment.score_to_grade(score)).to eql("A-")
+    end
+
+    it "should not return more than 3 decimal digits" do
+      @assignment.grading_type = 'letter_grade'
+      @assignment.points_possible = 8.7
+      gs = @assignment.context.grading_standards.build({title: "Custom GS"})
+      gs.data = {"A" => 0.91,
+                 "A-" => 0.90,
+                 "B+" => 0.87,
+                 "B" => 0.84,
+                 "B-" => 0.80,
+                 "C+" => 0.77,
+                 "C" => 0.74,
+                 "C-" => 0.70,
+                 "D+" => 0.67,
+                 "D" => 0.64,
+                 "D-" => 0.61,
+                 "F" => 0.0 }
+      gs.assignments << @assignment
+      gs.save!
+      @assignment.save!
+      score = @assignment.grade_to_score("A-")
+      decimal_part = score.to_s.split('.')[1]
+      expect(decimal_part.length).to be <= 3
+    end
+
     it "should preserve letter grades grades with nil points possible" do
       @assignment.grading_type = 'letter_grade'
       @assignment.points_possible = nil
@@ -3100,6 +3157,62 @@ describe Assignment do
       @a = @course.assignments.create! title: "blah",
         submission_types: "online_text_entry,online_url",
         points_possible: 10
+    end
+
+    context "when submission_type is annotated_document" do
+      before(:once) do
+        @annotatable_attachment = attachment_model(context: @course)
+        @a.update!(annotatable_attachment: @annotatable_attachment, submission_types: "annotated_document")
+      end
+
+      it "raises an error if an attachment id is not present in the options" do
+        expect {
+          @a.submit_homework(@user, submission_type: "annotated_document")
+        }.to raise_error "Invalid Attachment"
+      end
+
+      it "raises an error if assignment is not an annotatable attachment" do
+        @a.update!(submission_types: "online_text_entry")
+
+        expect {
+          @a.submit_homework(@user, annotated_document_id: @annotatable_attachment.id, submission_type: "annotated_document")
+        }.to raise_error "Invalid submission type"
+      end
+
+      it "raises an error if given attachment id does not match assignment's annotatable attachment id" do
+        other_attachment = attachment_model(context: @course)
+
+        expect {
+          @a.submit_homework(@user, annotated_document_id: other_attachment.id, submission_type: "annotated_document")
+        }.to raise_error "Invalid Attachment"
+      end
+
+      it "changes a CanvadocsAnnotationContext from draft attempt to the current attempt" do
+        submission = @a.submissions.find_by(user: @user)
+        submission.update!(attempt: 7)
+        annotation_context = submission.annotation_context(draft: true)
+
+        expect {
+          @a.submit_homework(@user, annotated_document_id: @annotatable_attachment.id, submission_type: "annotated_document")
+        }.to change {
+          annotation_context.reload.submission_attempt
+        }.from(nil).to(8)
+      end
+
+      it "does not change unrelated draft CanvadocsAnnotationContexts" do
+        submission = @a.submissions.find_by(user: @user)
+        other_attachment = attachment_model(context: @course)
+        unrelated_annotation_context = submission.canvadocs_annotation_contexts.create!(
+          attachment: other_attachment,
+          submission_attempt: nil
+        )
+
+        expect {
+          @a.submit_homework(@user, annotated_document_id: @annotatable_attachment.id, submission_type: "annotated_document")
+        }.not_to change {
+          unrelated_annotation_context.reload.submission_attempt
+        }
+      end
     end
 
     it "sets the 'eula_agreement_timestamp'" do
