@@ -1,7 +1,7 @@
 import $ from 'jquery'
 import React from 'react'
 import ReactDOM from 'react-dom'
-import SFUCopyrightComplianceModalDialog from 'jsx/sfu_copyright_compliance_notice/SFUCopyrightComplianceNoticeModalDialog'
+import {SFUCopyrightComplianceModalDialog} from '@sfu/sfu-copyright-compliance-notice'
 
 const formId = 'course_status_form'
 
