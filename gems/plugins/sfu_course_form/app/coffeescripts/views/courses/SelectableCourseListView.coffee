@@ -1,13 +1,10 @@
-define [
-  'jquery'
-  'underscore'
-  'Backbone'
-  'sfu_course_form/compiled/views/courses/CourseListView'
-  'sfu_course_form/compiled/views/courses/SelectableCourseView'
-], ($, _, Backbone, CourseListView, SelectableCourseView) ->
+import $ from 'jquery'
+import _ from 'underscore'
+import Backbone from '@canvas/backbone'
+import CourseListView from './CourseListView.coffee'
 
-  class SelectableCourseListView extends CourseListView
+export default class SelectableCourseListView extends CourseListView
 
-    renderOne: (course) ->
-      courseView = new SelectableCourseView({model: course})
-      this.$el.append courseView.render().el
+  renderOne: (course) ->
+    courseView = new SelectableCourseView({model: course})
+    this.$el.append courseView.render().el

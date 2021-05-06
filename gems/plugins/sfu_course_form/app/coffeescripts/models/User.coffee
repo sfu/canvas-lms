@@ -1,20 +1,18 @@
-define [
-  'jquery'
-  'underscore'
-  'Backbone'
-], ($, _, Backbone) ->
+import $ from 'jquery'
+import _ from 'underscore'
+import Backbone from '@canvas/backbone'
 
-  class User extends Backbone.Model
+export default class User extends Backbone.Model
 
-    initialize: (@userId) ->
+  initialize: (@userId) ->
+    @hasLoaded = false
+    @on 'change', ->
+      @hasLoaded = true
+      $(document).trigger 'userloaded'
+    @on 'error', ->
       @hasLoaded = false
-      @on 'change', ->
-        @hasLoaded = true
-        $(document).trigger 'userloaded'
-      @on 'error', ->
-        @hasLoaded = false
-        $(document).trigger 'userloaderror'
-      super
+      $(document).trigger 'userloaderror'
+    super
 
-    url: ->
-      "/sfu/api/v1/amaint/user/#{@userId}"
+  url: ->
+    "/sfu/api/v1/amaint/user/#{@userId}"

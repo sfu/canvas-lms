@@ -1,14 +1,12 @@
-define [
-  'jquery'
-  'underscore'
-  'Backbone'
-  'sfu_course_form/compiled/models/Term'
-], ($, _, Backbone, Term) ->
+import $ from 'jquery'
+import _ from 'underscore'
+import Backbone from '@canvas/backbone'
+import Term from '../models/Term.coffee'
 
-  class TermList extends Backbone.Collection
+export default class TermList extends Backbone.Collection
 
-    model: Term
+  model: Term
 
-    fetchAllCourses: (@userId) -> @each @fetchCoursesForTerm, this
+  fetchAllCourses: (@userId) -> @each @fetchCoursesForTerm, this
 
-    fetchCoursesForTerm: (term) -> term.fetchCourses @userId
+  fetchCoursesForTerm: (term) -> term.fetchCourses @userId
