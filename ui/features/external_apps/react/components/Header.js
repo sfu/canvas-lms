@@ -2,7 +2,7 @@
  * Copyright (C) 2014 - present Instructure, Inc.
  *
  * This file is part of Canvas.
- *
+ *u
  * Canvas is free software: you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License as published by the Free
  * Software Foundation, version 3 of the License.
@@ -22,7 +22,7 @@ import React from 'react'
 import {IconExternalLinkLine} from '@instructure/ui-icons'
 import {Link} from '@instructure/ui-link'
 import {ScreenReaderContent} from '@instructure/ui-a11y-content'
-import SFUPrivacyNotice from '../../sfu_pia_notice/SFUPrivacyNotice' /* SFU MOD */
+import SFUPrivacyNotice from '@sfu/sfu-pia-notice' /* SFU MOD */
 
 export default class Header extends React.Component {
   focus = () => {
