@@ -1,0 +1,7 @@
+{
+  "name": "@sfu/sfu-copyright-compliance-notice",
+  "private": true,
+  "version": "1.0.0",
+  "author": "Graham Ballantyne <grahamb@sfu.ca>",
+  "main": "./react/index.js"
+}
