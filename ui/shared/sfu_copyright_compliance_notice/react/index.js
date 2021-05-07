@@ -1,9 +1,9 @@
 import SFUCopyrightComplianceNotice from './SFUCopyrightComplianceNotice';
-import SFUCopyrightComplianceNoticeModalDialog from './SFUCopyrightComplianceNoticeModalDialog';
+import SFUCopyrightComplianceModalDialog from './SFUCopyrightComplianceModalDialog';
 import SFUCopyrightComplianceNoticeMoreInfo from './SFUCopyrightComplianceNoticeMoreInfo';
 
 export {
   SFUCopyrightComplianceNotice,
-  SFUCopyrightComplianceNoticeModalDialog,
+  SFUCopyrightComplianceModalDialog,
   SFUCopyrightComplianceNoticeMoreInfo,
 };
