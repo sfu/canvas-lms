@@ -2,6 +2,7 @@ import $ from 'jquery'
 import _ from 'underscore'
 import Backbone from '@canvas/backbone'
 import CourseListView from './CourseListView.coffee'
+import SelectableCourseView from './SelectableCourseView.coffee'
 
 export default class SelectableCourseListView extends CourseListView
 
