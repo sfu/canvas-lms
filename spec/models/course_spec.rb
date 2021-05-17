@@ -24,6 +24,7 @@ require 'lti2_course_spec_helper'
 require 'csv'
 require 'socket'
 
+
 describe Course do
   include_examples "outcome import context examples"
 
@@ -1569,9 +1570,9 @@ describe Course do
       expect(@course.course_section_visibility(unlimited_teacher)).to eq :all
     end
 
-    it "returns none for a nobody" do
-      worthless_loser = User.create(:name => "Worthless Loser")
-      expect(@course.course_section_visibility(worthless_loser)).to eq []
+    it "returns none for a user with no visibility" do
+      user_with_no_visibility = User.create(:name => "Sans Connexion")
+      expect(@course.course_section_visibility(user_with_no_visibility)).to eq []
     end
   end
 
@@ -1685,6 +1686,25 @@ describe Course do
         expect(course.outcome_calculation_method).to eq nil
         expect(course.resolved_outcome_calculation_method).to eq nil
       end
+    end
+  end
+
+  describe "comment_bank_items_visible_to" do
+    before do
+      @course = course_factory(active_all: true)
+      @user1 = user_model
+      @user2 = user_model
+      @item = comment_bank_item_model(course: @course, user: @user1)
+    end
+
+    it "should return items visible to the provided user" do
+      expect(@course.comment_bank_items_visible_to(@user2)).to eq []
+      expect(@course.comment_bank_items_visible_to(@user1)).to eq [@item]
+    end
+
+    it "should only return active records" do
+      @item.destroy
+      expect(@course.comment_bank_items_visible_to(@user1)).to eq []
     end
   end
 end
@@ -6117,6 +6137,30 @@ describe Course, "#show_total_grade_as_points?" do
       expect(course.can_stop_being_template?).to be false
       course.template = false
       expect(course).not_to be_valid
+    end
+  end
+
+  describe "#copy_from_course_template" do
+    it "copies unpublished content" do
+      course = Course.create!(template: true)
+      course.root_account.enable_feature!(:course_templates)
+      course.account.update!(course_template: course)
+      a = course.assignments.create!(title: 'bob', workflow_state: 'unpublished')
+      expect(a).to be_unpublished
+      q = course.quizzes.create!(title: 'joe', workflow_state: 'unpublished')
+      expect(q).to be_unpublished
+      wp = course.wiki_pages.create!(title: 'george', workflow_state: 'unpublished')
+      expect(wp).to be_unpublished
+      dt = course.discussion_topics.create!(title: 'phil', workflow_state: 'unpublished')
+      expect(dt).to be_unpublished
+
+      course2 = Course.create!
+      run_jobs
+
+      expect(course2.assignments.pluck(:title)).to eq ['bob']
+      expect(course2.quizzes.pluck(:title)).to eq ['joe']
+      expect(course2.wiki_pages.pluck(:title)).to eq ['george']
+      expect(course2.discussion_topics.pluck(:title)).to eq ['phil']
     end
   end
 end

@@ -247,7 +247,7 @@ describe "Files API", type: :request do
         'hidden' => false,
         'lock_at' => nil,
         'locked_for_user' => false,
-        'preview_url' => context_url(@attachment.context, :context_file_file_preview_url, @attachment, annotate: 0),
+        'preview_url' => context_url(@attachment.context, :context_file_file_preview_url, @attachment, annotate: 0, verifier: @attachment.uuid),
         'hidden_for_user' => false,
         'created_at' => @attachment.created_at.as_json,
         'updated_at' => @attachment.updated_at.as_json,
@@ -286,7 +286,7 @@ describe "Files API", type: :request do
         'hidden' => false,
         'lock_at' => nil,
         'locked_for_user' => false,
-        'preview_url' => context_url(@attachment.context, :context_file_file_preview_url, @attachment, annotate: 0),
+        'preview_url' => context_url(@attachment.context, :context_file_file_preview_url, @attachment, annotate: 0, verifier: @attachment.uuid),
         'hidden_for_user' => false,
         'created_at' => @attachment.created_at.as_json,
         'updated_at' => @attachment.updated_at.as_json,
@@ -1017,6 +1017,24 @@ describe "Files API", type: :request do
       api_call(:get, "/api/v1/courses/#{@course.id}/files/#{@att.id}", opts, {}, {}, :expected_status => 404)
     end
 
+    it 'should work with a valid verifier' do
+      @att.context = @teacher
+      @att.save!
+      course_with_student(course: @course)
+      user_session(@student)
+      opts = @file_path_options.merge(user_id: @teacher.id.to_param, verifier: @att.uuid.to_param)
+      api_call(:get, "/api/v1/users/#{@teacher.id}/files/#{@att.id}", opts, {}, {}, expected_status: 200)
+    end
+
+    it 'should 401 with invalid verifier' do
+      @att.context = @teacher
+      @att.save!
+      course_with_student(course: @course)
+      user_session(@student)
+      opts = @file_path_options.merge(user_id: @teacher.id.to_param, verifier: 'nope')
+      api_call(:get, "/api/v1/users/#{@teacher.id}/files/#{@att.id}", opts, {}, {}, expected_status: 401)
+    end
+
     it "should omit verifiers when using session auth" do
       user_session(@user)
       get @file_path
@@ -1053,11 +1071,12 @@ describe "Files API", type: :request do
       att2 = Attachment.create!(:filename => 'test.txt', :display_name => "test.txt", :uploaded_data => StringIO.new('file'), :folder => @root, :context => @course, :locked => true)
       att2.hidden = true
       att2.save!
-      json = api_call(:get, "/api/v1/files/#{att2.id}", {:controller => "files", :action => "api_show", :format => "json", :id => att2.id.to_param}, {})
+      json = api_call(:get, "/api/v1/files/#{att2.id}", {:controller => "files", :action => "api_show", :format => "json", :id => att2.id.to_param}, {:include => ['enhanced_preview_url']})
       expect(json['locked']).to be_truthy
       expect(json['hidden']).to be_truthy
       expect(json['hidden_for_user']).to be_falsey
       expect(json['locked_for_user']).to be_falsey
+      expect(json['preview_url'].include?('verifier')).to be_truthy
     end
 
     def should_be_locked(json)
@@ -1066,6 +1085,7 @@ describe "Files API", type: :request do
       expect(json['hidden']).to be_truthy
       expect(json['hidden_for_user']).to be_truthy
       expect(json['locked_for_user']).to be_truthy
+      expect(json['preview_url'].include?('verifier')).to be_falsey
     end
 
     it "should be locked/hidden for a student" do
@@ -1073,7 +1093,7 @@ describe "Files API", type: :request do
       att2 = Attachment.create!(:filename => 'test.txt', :display_name => "test.txt", :uploaded_data => StringIO.new('file'), :folder => @root, :context => @course, :locked => true)
       att2.hidden = true
       att2.save!
-      json = api_call(:get, "/api/v1/files/#{att2.id}", {:controller => "files", :action => "api_show", :format => "json", :id => att2.id.to_param}, {})
+      json = api_call(:get, "/api/v1/files/#{att2.id}", {:controller => "files", :action => "api_show", :format => "json", :id => att2.id.to_param}, {:include => ['enhanced_preview_url']})
       expect(json['locked']).to be_truthy
       should_be_locked(json)
 
@@ -1081,16 +1101,17 @@ describe "Files API", type: :request do
       att2.unlock_at = 2.days.from_now
       att2.lock_at = 2.days.ago
       att2.save!
-      json = api_call(:get, "/api/v1/files/#{att2.id}", {:controller => "files", :action => "api_show", :format => "json", :id => att2.id.to_param}, {})
+      json = api_call(:get, "/api/v1/files/#{att2.id}", {:controller => "files", :action => "api_show", :format => "json", :id => att2.id.to_param}, {:include => ['enhanced_preview_url']})
       expect(json['locked']).to be_falsey
       should_be_locked(json)
 
       att2.lock_at = att2.unlock_at = nil
       att2.save!
-      json = api_call(:get, "/api/v1/files/#{att2.id}", {:controller => "files", :action => "api_show", :format => "json", :id => att2.id.to_param}, {})
+      json = api_call(:get, "/api/v1/files/#{att2.id}", {:controller => "files", :action => "api_show", :format => "json", :id => att2.id.to_param}, {:include => ['enhanced_preview_url']})
       expect(json['url']).to eq file_download_url(att2, :verifier => att2.uuid, :download => '1', :download_frd => '1')
       expect(json['locked']).to be_falsey
       expect(json['locked_for_user']).to be_falsey
+      expect(json['preview_url']).not_to be_nil
     end
 
     it "should return not found error" do

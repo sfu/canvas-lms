@@ -153,7 +153,14 @@ module Api::V1::Attachment
       hash['canvadoc_document_id'] = attachment&.canvadoc&.document_id
     end
     if includes.include? 'enhanced_preview_url'
-      hash['preview_url'] = context_url(attachment.context, :context_file_file_preview_url, attachment, annotate: 0)
+      url_opts = {
+        annotate: 0
+      }
+      omit_verifier = options[:omit_verifier_in_app] && (respond_to?(:in_app?, true) && in_app? || @authenticated_with_jwt)
+      if downloadable && !omit_verifier
+        url_opts[:verifier] = attachment.uuid
+      end
+      hash['preview_url'] = context_url(attachment.context, :context_file_file_preview_url, attachment, url_opts)
     end
     if includes.include? 'usage_rights'
       hash['usage_rights'] = usage_rights_json(attachment.usage_rights, user)
