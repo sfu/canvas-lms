@@ -1,11 +1,8 @@
-define [
-  'jquery'
-  'underscore'
-  'Backbone'
-], ($, _, Backbone) ->
+import $ from 'jquery'
+import _ from 'underscore'
+import Backbone from '@canvas/backbone'
 
-  class SandboxList extends Backbone.Collection
+export default class SandboxList extends Backbone.Collection
+  initialize: (@userId) -> super
 
-    initialize: (@userId) -> super
-
-    url: -> "/sfu/api/v1/user/#{@userId}/sandbox"
+  url: -> "/sfu/api/v1/user/#{@userId}/sandbox"

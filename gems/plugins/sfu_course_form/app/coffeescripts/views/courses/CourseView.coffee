@@ -1,19 +1,17 @@
-define [
-  'jquery'
-  'underscore'
-  'Backbone'
-], ($, _, Backbone) ->
+import $ from 'jquery'
+import _ from 'underscore'
+import Backbone from '@canvas/backbone'
 
-  class CourseView extends Backbone.View
+export default class CourseView extends Backbone.View
 
-    initialize: ->
-      @model.on 'change', ( -> @render() ), this
-      super
+  initialize: ->
+    @model.on 'change', ( -> @render() ), this
+    super
 
-    tagName: 'li'
+  tagName: 'li'
 
-    template: _.template '<div><span class="term tag"><%= term %></span> <%= displayName %><% if (sections.length) { %></div><div class="tutorial_sections">&mdash; includes these sections: <%= sections.join(", ") %></div><% } %>'
+  template: _.template '<div><span class="term tag"><%= term %></span> <%= displayName %><% if (sections.length) { %></div><div class="tutorial_sections">&mdash; includes these sections: <%= sections.join(", ") %></div><% } %>'
 
-    render: ->
-      this.$el.html @template @model.toJSON()
-      this
+  render: ->
+    this.$el.html @template @model.toJSON()
+    this

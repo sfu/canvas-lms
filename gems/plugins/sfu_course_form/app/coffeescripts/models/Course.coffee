@@ -1,28 +1,26 @@
-define [
-  'jquery'
-  'underscore'
-  'Backbone'
-], ($, _, Backbone) ->
+import $ from 'jquery'
+import _ from 'underscore'
+import Backbone from '@canvas/backbone'
 
-  class Course extends Backbone.Model
+export default class Course extends Backbone.Model
 
-    initialize: (@term) ->
-      @selected = false # TODO: find a cleaner way to keep track of this runtime flag
-      super
+  initialize: (@term) ->
+    @selected = false # TODO: find a cleaner way to keep track of this runtime flag
+    super
 
-    # make useful custom attributes available to callers of toJSON()
-    toJSON: ->
-      $.extend Backbone.Model.prototype.toJSON.call(this),
-        term: @term.get('name')
-        selected: @selected
-        displayName: @displayName()
+  # make useful custom attributes available to callers of toJSON()
+  toJSON: ->
+    $.extend Backbone.Model.prototype.toJSON.call(this),
+      term: @term.get('name')
+      selected: @selected
+      displayName: @displayName()
 
-    addSections: (newSections) ->
-      # NOTE: does not currently check if course already has sections
-      if newSections.length > 0
-        @set
-          sections: newSections
-          key: "#{@get('key')}:::#{newSections.join(',').toLowerCase()}"
-      this
+  addSections: (newSections) ->
+    # NOTE: does not currently check if course already has sections
+    if newSections.length > 0
+      @set
+        sections: newSections
+        key: "#{@get('key')}:::#{newSections.join(',').toLowerCase()}"
+    this
 
-    displayName: -> "#{@get('name')}#{@get('number')} - #{@get('section')} #{@get('title')}"
+  displayName: -> "#{@get('name')}#{@get('number')} - #{@get('section')} #{@get('title')}"

@@ -24,7 +24,7 @@ import I18n from 'i18n!course_wizard'
 import ListItems from './ListItems'
 import getCookie from 'get-cookie'
 
-import SFUCopyrightComplianceNotice from '../sfu_copyright_compliance_notice/SFUCopyrightComplianceNotice' /* SFU MOD */
+import {SFUCopyrightComplianceNotice} from '@sfu/sfu-copyright-compliance-notice' /* SFU MOD */
 
 const courseNotSetUpItem = {
   get text() {

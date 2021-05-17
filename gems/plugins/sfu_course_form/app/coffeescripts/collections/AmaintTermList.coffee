@@ -1,11 +1,9 @@
-define [
-  'jquery'
-  'underscore'
-  'Backbone'
-], ($, _, Backbone) ->
+import $ from 'jquery'
+import _ from 'underscore'
+import Backbone from '@canvas/backbone'
 
-  class AmaintTermList extends Backbone.Collection
+export default class AmaintTermList extends Backbone.Collection
 
-    initialize: (@userId) -> super
+  initialize: (@userId) -> super
 
-    url: -> "/sfu/api/v1/amaint/user/#{@userId}/term"
+  url: -> "/sfu/api/v1/amaint/user/#{@userId}/term"
