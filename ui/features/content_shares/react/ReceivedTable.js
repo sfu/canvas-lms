@@ -51,11 +51,13 @@ export default function ReceivedTable({shares, onPreview, onImport, onRemove, on
   function renderActionMenu(share) {
     const items = []
     if (share.content_export?.workflow_state === 'exported') {
+      /* SFU MOD - Remove Preview menu item (Received Content page).
       items.push(
         <Menu.Item key="prv" data-testid="preview-menu-action" onSelect={() => onPreview(share)}>
           <IconEyeLine /> <View margin="0 0 0 x-small">{I18n.t('Preview')}</View>
         </Menu.Item>
       )
+      END SFU MOD - Remove Preview menu item (Received Content page). */
       items.push(
         <Menu.Item key="imp" data-testid="import-menu-action" onSelect={() => onImport(share)}>
           <IconImportLine /> <View margin="0 0 0 x-small">{I18n.t('Import')}</View>
