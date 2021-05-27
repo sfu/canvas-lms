@@ -156,9 +156,11 @@ class Pseudonym < ActiveRecord::Base
 
   def self.custom_find_by_unique_id(unique_id)
     return unless unique_id
+
     active.by_unique_id(unique_id).where("authentication_provider_id IS NULL OR EXISTS (?)",
-      AuthenticationProvider.active.where(auth_type: ['canvas', 'ldap']).
-        where("authentication_provider_id=authentication_providers.id")).first
+      AuthenticationProvider.active.where(auth_type: ['canvas', 'ldap'])
+        .where("authentication_provider_id=authentication_providers.id"))
+        .order("authentication_provider_id NULLS LAST").first
   end
 
   def self.for_auth_configuration(unique_id, aac)
@@ -380,6 +382,12 @@ class Pseudonym < ActiveRecord::Base
     user.sms
   end
 
+  def infer_auth_provider(ap)
+    previously_changed = changed?
+    self.authentication_provider ||= ap
+    save! if !previously_changed && changed? && account.feature_enabled?(:persist_inferred_authentication_providers)
+  end
+
   # managed_password? and passwordable? differ in their treatment of pseudonyms
   # not linked to an authentication_provider. They both err towards the
   # "positive" case matching their name. I.e. if you have both Canvas and
@@ -406,10 +414,11 @@ class Pseudonym < ActiveRecord::Base
     require 'net/ldap'
     res = false
     res ||= valid_ldap_credentials?(plaintext_password)
-    if passwordable?
+    if !res && passwordable?
       # Only check SIS if they haven't changed their password
-      res ||= valid_ssha?(plaintext_password) if password_auto_generated?
+      res = valid_ssha?(plaintext_password) if password_auto_generated?
       res ||= valid_password?(plaintext_password)
+      infer_auth_provider(account.canvas_authentication_provider) if res
     end
     res
   end
@@ -430,7 +439,6 @@ class Pseudonym < ActiveRecord::Base
     digest == digested_password
   end
 
-  attr_reader :ldap_authentication_provider_used
   def ldap_bind_result(password_plaintext)
     aps = case authentication_provider
           when AuthenticationProvider::LDAP
@@ -443,12 +451,12 @@ class Pseudonym < ActiveRecord::Base
     end
     aps.each do |config|
       res = config.ldap_bind_result(self.unique_id, password_plaintext)
-      if res
-        @ldap_authentication_provider_used = config
-        return res
-      end
+      next unless res
+
+      infer_auth_provider(config)
+      return res
     end
-    return nil
+    nil
   end
 
   def add_ldap_channel

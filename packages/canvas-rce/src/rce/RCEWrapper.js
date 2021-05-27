@@ -280,7 +280,11 @@ class RCEWrapper extends React.Component {
   }
 
   setCode(newContent) {
-    this.mceInstance()?.setContent(newContent)
+    if (this.state.editorView === PRETTY_HTML_EDITOR_VIEW) {
+      return this.mceInstance()?.setContent(newContent, {format: 'raw'})
+    } else {
+      return this.mceInstance()?.setContent(newContent)
+    }
   }
 
   // This function is called imperatively by the page that renders the RCE.
@@ -1390,7 +1394,6 @@ class RCEWrapper extends React.Component {
       case PRETTY_HTML_EDITOR_VIEW:
         this.getTextarea().setAttribute('aria-hidden', true)
         this.getTextarea().labels?.[0]?.setAttribute('aria-hidden', true)
-        this.mceInstance().undoManager.add() // all changes in html vidw are 1 undo
         this.mceInstance().hide()
         this._elementRef.current.querySelector('.CodeMirror')?.CodeMirror.setCursor(0, 0)
         break
@@ -1451,9 +1454,10 @@ class RCEWrapper extends React.Component {
           <RceHtmlEditor
             ref={this._prettyHtmlEditorRef}
             height={document[FS_ELEMENT] ? `${window.screen.height}px` : this.state.height}
-            code={this.mceInstance().getContent({format: 'html'})}
+            code={this.getCode()}
             onChange={value => {
               this.getTextarea().value = value
+              this.handleTextareaChange()
             }}
             onFocus={this.handleFocusHtmlEditor}
           />
