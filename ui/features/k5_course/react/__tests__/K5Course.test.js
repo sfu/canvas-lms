@@ -57,13 +57,15 @@ const defaultProps = {
   canManage: false,
   courseOverview: '<h2>Time to learn!</h2>',
   hideFinalGrades: false,
+  userIsStudent: true,
   userIsInstructor: false,
   showStudentView: false,
   studentViewPath: '/courses/30/student_view/1',
   showLearningMasteryGradebook: false,
   tabs: defaultTabs
 }
-const FETCH_APPS_URL = '/api/v1/courses/30/external_tools/visible_course_nav_tools'
+const FETCH_APPS_URL = '/api/v1/external_tools/visible_course_nav_tools?context_codes[]=course_30'
+
 const FETCH_TABS_URL = '/api/v1/courses/30/tabs'
 const GRADING_PERIODS_URL = encodeURI(
   '/api/v1/courses/30?include[]=grading_periods&include[]=current_grading_period_scores&include[]=total_scores'
@@ -71,7 +73,7 @@ const GRADING_PERIODS_URL = encodeURI(
 const ASSIGNMENT_GROUPS_URL = encodeURI(
   '/api/v1/courses/30/assignment_groups?include[]=assignments&include[]=submission&include[]=read_state'
 )
-const ENROLLMENTS_URL = '/api/v1/courses/30/enrollments'
+const ENROLLMENTS_URL = '/api/v1/courses/30/enrollments?user_id=1'
 
 let modulesContainer
 
