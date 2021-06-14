@@ -1,2 +1,2 @@
-require ['plugins/sfu_stats/quickstats'], (quickstats) ->
+require ['../../../public/javascripts/quickstats.js'], (quickstats) ->
   $(document).ready quickstats
