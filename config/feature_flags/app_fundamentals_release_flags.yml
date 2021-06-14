@@ -19,11 +19,6 @@ granular_permissions_course_files:
   applies_to: RootAccount
   display_name: Granular permissions for managing course files
   description: Add granularity to permissions around managing course files
-release_notes_ui:
-  state: hidden
-  applies_to: SiteAdmin
-  display_name: Advertise release notes via the UI
-  description: Enables siteadmin users to configure release notes to display to users
 course_templates:
   state: hidden
   applies_to: RootAccount
@@ -34,3 +29,8 @@ persist_inferred_authentication_providers:
   applies_to: RootAccount
   display_name: Require Authenticion Provider on Logins
   description: Persists the used authentication provider when logging in, and defaults new logins to the default provider
+allow_unconfirmed_users_in_user_list:
+  state: hidden
+  applies_to: RootAccount
+  display_name: Allow Unconfirmed E-mail Addresses When Adding Users
+  description: This is technicaly a security vulnerability, but some schools need to preserve their workflows for a while.
