@@ -292,11 +292,33 @@ module Canvas
     end
   end
 
+  # these methods are expected to be empty
+  # for open source canvas, but are useful
+  # hooks for overriding in very large deployments
+  # of the lms.
   def self.cluster
+    nil
+  end
+
+  def self.region
+    nil
+  end
+
+  def self.region_code
     nil
   end
 
   def self.environment
     Rails.env
+  end
+
+  # for use in cases where you want to tie an action
+  # to the "current" user in situations like console invocation.
+  # As long as all authorized console users are provisioned with siteadmin
+  # pseudonyms that share their username, this will look up their associated user record.
+  # Otherwise it's still safe, it will just return a nil user.
+  def self.infer_user(username=nil)
+    unix_user = username || ENV['SUDO_USER'] || ENV['USER']
+    Account.site_admin.pseudonyms.active.by_unique_id(unix_user).first&.user
   end
 end

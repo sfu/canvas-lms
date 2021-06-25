@@ -203,8 +203,13 @@ class User < ActiveRecord::Base
     class_name: "Auditors::ActiveRecord::GradeChangeRecord",
     dependent: :destroy,
     inverse_of: :grader
+  has_many :auditor_feature_flag_records,
+    class_name: 'Auditors::ActiveRecord::FeatureFlagRecord',
+    dependent: :destroy,
+    inverse_of: :user
 
   has_many :comment_bank_items, -> { where("workflow_state<>'deleted'") }
+  has_many :microsoft_sync_partial_sync_changes, :class_name => 'MicrosoftSync::PartialSyncChange', dependent: :destroy, inverse_of: :user
 
   belongs_to :otp_communication_channel, :class_name => 'CommunicationChannel'
 
@@ -602,11 +607,9 @@ class User < ActiveRecord::Base
         shard_user_ids = users.map(&:id)
 
         data[:enrollments] += shard_enrollments =
-            Enrollment.where("workflow_state NOT IN ('deleted','completed','inactive','rejected') AND type<>'StudentViewEnrollment'").
+            Enrollment.where("workflow_state NOT IN ('deleted','inactive','rejected') AND type<>'StudentViewEnrollment'").
                 where(:user_id => shard_user_ids).
                 select([:user_id, :course_id, :course_section_id]).
-                joins(:enrollment_state).
-                where.not(enrollment_states: {state: 'completed'}).
                 distinct.to_a
 
         # probably a lot of dups, so more efficient to use a set than uniq an array
@@ -654,10 +657,7 @@ class User < ActiveRecord::Base
         current_associations[key] = [aa.id, aa.depth]
       end
 
-      account_id_to_root_account_id = Account.where(id: precalculated_associations&.keys).pluck(:id, :root_account_id).reduce({}) do |cache, fields|
-        cache[fields[0]] = fields[1] || fields[0]
-        cache
-      end
+      account_id_to_root_account_id = Account.where(id: precalculated_associations&.keys).pluck(:id, Arel.sql(Account.resolved_root_account_id_sql)).to_h
 
       users_or_user_ids.uniq.sort_by{|u| u.try(:id) || u}.each do |user_id|
         if user_id.is_a? User
@@ -1694,6 +1694,10 @@ class User < ActiveRecord::Base
 
   def disabled_inbox?
     !!preferences[:disable_inbox]
+  end
+
+  def elementary_dashboard_disabled?
+    !!preferences[:elementary_dashboard_disabled]
   end
 
   def create_announcements_unlocked?

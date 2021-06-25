@@ -81,19 +81,12 @@
         <li><a href="{{url}}"><i class="icon-user" aria-hidden="true"></i> {{#t "links.user_details"}}User
               Details{{/t}}</a></li>
 
-        {{#if canRemoveUsers}}
-          <li class="ui-menu-item">
-            <hr />
-          </li>
-          {{#if isInactive}}
-            <li><a href="#" data-event="reactivateUser"><i class="icon-user" aria-hidden="true"></i> {{#t}}Re-activate
-                  User{{/t}}</a></li>
-          {{else}}
-            <li><a href="#" data-event="deactivateUser"><i class="icon-deactivate-user" aria-hidden="true"></i>
-                {{#t}}Deactivate User{{/t}}</a></li>
-          {{/if}}
-          <li><a href="#" data-event="removeFromCourse"><i class="icon-trash" aria-hidden="true"></i>
-              {{#t "links.remove_from_course"}}Remove From Course{{/t}}</a></li>
+      {{#if canRemoveUsers}}
+        <li style="clear: left; border: none;" aria-hidden="true"><hr /></li>
+        {{#if isInactive}}
+          <li><a href="#" data-event="reactivateUser"><i class="icon-user" aria-hidden="true"></i>  {{#t}}Re-activate User{{/t}}</a></li>
+        {{else}}
+          <li><a href="#" data-event="deactivateUser"><i class="icon-deactivate-user" aria-hidden="true"></i> {{#t}}Deactivate User{{/t}}</a></li>
         {{/if}}
         {{#each customLinks}}
           <li><a href="{{url}}"><i class="{{icon_class}}"></i> {{text}}</a></li>

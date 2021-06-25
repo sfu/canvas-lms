@@ -347,7 +347,7 @@ module ApplicationHelper
       if (tab[:id] == @context.class::TAB_COLLABORATIONS rescue false)
         Collaboration.any_collaborations_configured?(@context) && !@context.feature_enabled?(:new_collaborations)
       elsif (quiz_lti_tab?(tab) rescue false)
-        new_quizzes_navigation_placements_enabled?
+        new_quizzes_navigation_placements_enabled?(@context)
       elsif (tab[:id] == @context.class::TAB_COLLABORATIONS_NEW rescue false)
         @context.feature_enabled?(:new_collaborations)
       elsif (tab[:id] == @context.class::TAB_CONFERENCES rescue false)
@@ -1276,10 +1276,13 @@ module ApplicationHelper
 
   def prefetch_xhr(url, id: nil, options: {})
     id ||= url
+    # these are the same defaults set in js-utils/src/prefetched_xhrs.js as "defaultFetchOptions"
+    # and it would be nice to combine them so that they don't have to be copied here.
     opts = {
       credentials: 'same-origin',
       headers: {
-        Accept: 'application/json+canvas-string-ids, application/json'
+        Accept: 'application/json+canvas-string-ids, application/json',
+        'X-Requested-With' => 'XMLHttpRequest'
       }
     }.deep_merge(options)
     javascript_tag "(window.prefetched_xhrs = (window.prefetched_xhrs || {}))[#{id.to_json}] = fetch(#{url.to_json}, #{opts.to_json})"
